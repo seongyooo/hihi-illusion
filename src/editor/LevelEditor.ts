@@ -1224,14 +1224,18 @@ export class LevelEditor {
   /** 내장 스테이지(JSON 파일)를 에디터에 로드한다 */
   async loadBuiltinStage(stageNum: number): Promise<void> {
     const fileMap: Record<number, () => Promise<{ default: unknown }>> = {
-      1: () => import('../levels/level_custom_1.json'),
-      2: () => import('../levels/level_custom_2.json'),
-      3: () => import('../levels/level_custom_3.json'),
-      4: () => import('../levels/level_custom_4.json'),
-      5: () => import('../levels/level_custom_5.json'),
-      6: () => import('../levels/level_custom_6.json'),
-      7: () => import('../levels/level_custom_7.json'),
-      8: () => import('../levels/level_custom_8.json'),
+      1:  () => import('../levels/level_custom_1.json'),
+      2:  () => import('../levels/level_custom_2.json'),
+      3:  () => import('../levels/level_custom_3.json'),
+      4:  () => import('../levels/level_custom_4.json'),
+      5:  () => import('../levels/level_custom_5.json'),
+      6:  () => import('../levels/level_custom_6.json'),
+      7:  () => import('../levels/level_custom_7.json'),
+      8:  () => import('../levels/level_custom_8.json'),
+      9:  () => import('../levels/level_custom_9.json'),
+      10: () => import('../levels/level_custom_10.json'),
+      11: () => import('../levels/level_custom_11.json'),
+      12: () => import('../levels/level_custom_12.json'),
     };
     const loader = fileMap[stageNum];
     if (!loader) return;

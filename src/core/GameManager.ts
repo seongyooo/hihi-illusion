@@ -153,6 +153,10 @@ export class GameManager {
     6: 'custom_stage_6',
     7: 'custom_stage_7',
     8: 'custom_stage_8',
+    9: 'custom_stage_9',
+    10: 'custom_stage_10',
+    11: 'custom_stage_11',
+    12: 'custom_stage_12',
   };
 
   private loadStage(stageNum: number): void {

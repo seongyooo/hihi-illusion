@@ -62,4 +62,28 @@ export const LEVELS: LevelMeta[] = [
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_8.json') as unknown as Promise<{ default: LevelData }>,
   },
+  {
+    id:              'custom_stage_9',
+    title:           'The Relay',
+    backgroundColor: '#E8F0EE',
+    file:            () => import('./level_custom_9.json') as unknown as Promise<{ default: LevelData }>,
+  },
+  {
+    id:              'custom_stage_10',
+    title:           'The Elevator',
+    backgroundColor: '#F0EDE8',
+    file:            () => import('./level_custom_10.json') as unknown as Promise<{ default: LevelData }>,
+  },
+  {
+    id:              'custom_stage_11',
+    title:           'Mirage',
+    backgroundColor: '#EDE8F0',
+    file:            () => import('./level_custom_11.json') as unknown as Promise<{ default: LevelData }>,
+  },
+  {
+    id:              'custom_stage_12',
+    title:           'Convergence',
+    backgroundColor: '#E8EBF0',
+    file:            () => import('./level_custom_12.json') as unknown as Promise<{ default: LevelData }>,
+  },
 ];

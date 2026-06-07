@@ -57,9 +57,18 @@ export class EditorLobby {
     builtinGrid.className = 'editor-lobby__grid';
 
     const builtinStages = [
-      { num: 1, name: 'The Prologue' },
-      { num: 2, name: 'The Bridge'   },
-      { num: 3, name: 'The Illusion' },
+      { num: 1,  name: 'The Prologue' },
+      { num: 2,  name: 'The Bridge'   },
+      { num: 3,  name: 'The Illusion' },
+      { num: 4,  name: 'Custom Level' },
+      { num: 5,  name: 'Custom Level' },
+      { num: 6,  name: 'Custom Level' },
+      { num: 7,  name: 'Custom Level' },
+      { num: 8,  name: 'Custom Level' },
+      { num: 9,  name: 'The Relay'    },
+      { num: 10, name: 'The Elevator' },
+      { num: 11, name: 'Mirage'       },
+      { num: 12, name: 'Convergence'  },
     ];
     for (const s of builtinStages) {
       const card = document.createElement('div');
