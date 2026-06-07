@@ -4,14 +4,18 @@
   box-sizing: border-box;
 }
 
+html,
 body {
-  background: #F5F0E8;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
+  overscroll-behavior: none; /* iOS 바운스 스크롤 방지 */
+  background: #F5F0E8;
 }
 
 #app {
-  width: 100vw;
-  height: 100vh;
+  position: fixed; /* 주소창 유무와 관계없이 실제 보이는 뷰포트에 고정 */
+  inset: 0;
 }
 
 canvas {

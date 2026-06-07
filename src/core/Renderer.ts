@@ -42,8 +42,9 @@ export class Renderer {
     // Lighting
     this.setupLights();
 
-    // Resize handler
+    // Resize handler (visualViewport covers mobile address-bar show/hide)
     window.addEventListener('resize', () => this.onResize(container));
+    window.visualViewport?.addEventListener('resize', () => this.onResize(container));
   }
 
   private setupLights(): void {
