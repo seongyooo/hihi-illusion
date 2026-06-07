@@ -342,11 +342,14 @@ export class GameManager {
       this.hud.enableSkip(() => { this.stageSelect.show(); });
     }
 
-    // Intro camera fly-in
-    this.renderer.camera.position.set(22, 16, 12);
+    // Intro camera fly-in (center derived from level data)
+    const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
+    const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+    this.orbit.target.set(cx, 0, cz);
+    this.renderer.camera.position.set(cx + 22, 16, cz + 12);
     this.orbit.update();
     this.orbit.enabled = false;
-    this.cameraCtrl.transitionTo({ position: [12, 8, 6], lookAt: [-1, 0, -1] }, 1.8)
+    this.cameraCtrl.transitionTo({ position: [cx + 12, 8, cz + 6], lookAt: [cx, 0, cz] }, 1.8)
       .then(() => { this.orbit.enabled = true; });
   }
 
