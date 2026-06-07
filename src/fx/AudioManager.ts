@@ -1,0 +1,75 @@
+// Procedural audio via Web Audio API — no external dependencies.
+// AudioContext is created lazily on first call (satisfies browser autoplay policy).
+
+export class AudioManager {
+  private ctx: AudioContext | null = null;
+
+  private getCtx(): AudioContext {
+    if (!this.ctx) this.ctx = new AudioContext();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  }
+
+  private tone(
+    freq: number,
+    type: OscillatorType,
+    volume: number,
+    attack: number,
+    decay: number,
+    delay = 0
+  ): void {
+    const ctx = this.getCtx();
+    const t   = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(volume, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
+    osc.start(t);
+    osc.stop(t + attack + decay);
+  }
+
+  // Soft tap — character starts moving
+  playStep(): void {
+    const ctx = this.getCtx();
+    const t   = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(520, t);
+    osc.frequency.exponentialRampToValueAtTime(260, t + 0.1);
+    g.gain.setValueAtTime(0.1, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    osc.start(t);
+    osc.stop(t + 0.13);
+  }
+
+  // Ascending C-major arpeggio — illusion connection opens
+  playIllusionActivate(): void {
+    const notes = [523.25, 659.25, 783.99]; // C5 E5 G5
+    notes.forEach((freq, i) => {
+      this.tone(freq, 'triangle', 0.18, 0.02, 0.45, i * 0.1);
+    });
+  }
+
+  // Ascending C-major chord strum — goal reached
+  playGoalReached(): void {
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      this.tone(freq, 'triangle', 0.20, 0.02, 1.2, i * 0.06);
+    });
+  }
+
+  // Swoosh + arrival ping — teleport
+  playTeleport(): void {
+    this.tone(880, 'sine',     0.12, 0.01, 0.18, 0.00);
+    this.tone(440, 'sine',     0.08, 0.01, 0.12, 0.05);
+    this.tone(660, 'triangle', 0.16, 0.02, 0.32, 0.12);
+  }
+}

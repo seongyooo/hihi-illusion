@@ -1,0 +1,60 @@
+{
+  "id": "level_01",
+  "name": "The Prologue",
+  "backgroundColor": "#F5F0E8",
+
+  "blocks": [
+    { "id": "g00", "position": [-2, -1, -2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g01", "position": [-1, -1, -2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g02", "position": [ 0, -1, -2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g03", "position": [ 1, -1, -2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g04", "position": [ 2, -1, -2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g10", "position": [-2, -1, -1], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g11", "position": [-1, -1, -1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g12", "position": [ 0, -1, -1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g13", "position": [ 1, -1, -1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g14", "position": [ 2, -1, -1], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g20", "position": [-2, -1,  0], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g21", "position": [-1, -1,  0], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g22", "position": [ 0, -1,  0], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g23", "position": [ 1, -1,  0], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g24", "position": [ 2, -1,  0], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g30", "position": [-2, -1,  1], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g31", "position": [-1, -1,  1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g32", "position": [ 0, -1,  1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g33", "position": [ 1, -1,  1], "color": "#DCCFAD", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g34", "position": [ 2, -1,  1], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g40", "position": [-2, -1,  2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g41", "position": [-1, -1,  2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g42", "position": [ 0, -1,  2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g43", "position": [ 1, -1,  2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+    { "id": "g44", "position": [ 2, -1,  2], "color": "#E8D5B7", "size": [1, 0.3, 1], "walkable": false },
+
+    { "id": "s0", "position": [ 0,   0,    0], "color": "#A8D8EA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s1", "position": [ 1,   0.5,  0], "color": "#9DCFE0", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s2", "position": [ 1,   1,   -1], "color": "#AA96DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s3", "position": [ 0,   1.5, -1], "color": "#9D89CC", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s4", "position": [-1,   2,   -1], "color": "#FCBAD3", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s5", "position": [-1,   2.5,  0], "color": "#ECA8C1", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s6", "position": [-1,   3,    1], "color": "#FFFED2", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s7", "position": [ 0,   3.5,  1], "color": "#C9C9FF", "size": [1, 0.5, 1], "walkable": true }
+  ],
+
+  "ladders": [
+    { "nodeA": "s0", "nodeB": "s1" },
+    { "nodeA": "s1", "nodeB": "s2" },
+    { "nodeA": "s2", "nodeB": "s3" },
+    { "nodeA": "s3", "nodeB": "s4" },
+    { "nodeA": "s4", "nodeB": "s5" },
+    { "nodeA": "s5", "nodeB": "s6" },
+    { "nodeA": "s6", "nodeB": "s7" }
+  ],
+
+  "character": {
+    "startNodeId": "s0"
+  },
+
+  "goal": {
+    "blockId": "s7"
+  }
+}

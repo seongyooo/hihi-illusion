@@ -1,0 +1,308 @@
+{
+  "id": "custom_stage_6",
+  "name": "Custom Level",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        5.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        6.5,
+        0.75,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b003",
+      "position": [
+        9.5,
+        1.75,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [
+        9.5,
+        1.75,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b005",
+      "position": [
+        10.5,
+        1.75,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b006",
+      "position": [
+        10.5,
+        1.75,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b011",
+      "position": [
+        3.5,
+        3.75,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b012",
+      "position": [
+        3.5,
+        3.75,
+        11.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b014",
+      "position": [
+        3.5,
+        4.25,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b015",
+      "position": [
+        4.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b016",
+      "position": [
+        3.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b017",
+      "position": [
+        3.5,
+        4.75,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [
+    {
+      "nodeA": "b001",
+      "nodeB": "b002"
+    }
+  ],
+  "illusionConnections": [
+    {
+      "nodeA": "b016",
+      "nodeB": "b017",
+      "activateAzimuth": -0.1,
+      "azimuthTolerance": 2,
+      "activateElevation": 56.6,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b015",
+      "nodeB": "b017",
+      "activateAzimuth": -18.6,
+      "azimuthTolerance": 2,
+      "activateElevation": 55.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b017",
+      "activateAzimuth": -33.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 51.3,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b002",
+      "nodeB": "b017",
+      "activateAzimuth": -44.8,
+      "azimuthTolerance": 2,
+      "activateElevation": 43.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b004",
+      "nodeB": "b017",
+      "activateAzimuth": -39.6,
+      "azimuthTolerance": 2,
+      "activateElevation": 21,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b003",
+      "nodeB": "b017",
+      "activateAzimuth": -45,
+      "azimuthTolerance": 2,
+      "activateElevation": 23.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b003",
+      "nodeB": "b017",
+      "activateAzimuth": -55.8,
+      "azimuthTolerance": 2,
+      "activateElevation": 22.4,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b006",
+      "nodeB": "b017",
+      "activateAzimuth": -60.3,
+      "azimuthTolerance": 2,
+      "activateElevation": 20.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b002",
+      "nodeB": "b012",
+      "activateAzimuth": -22.1,
+      "azimuthTolerance": 2,
+      "activateElevation": 29.1,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b004",
+      "nodeB": "b012",
+      "activateAzimuth": -35.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 13.3,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b003",
+      "nodeB": "b012",
+      "activateAzimuth": -39.8,
+      "azimuthTolerance": 2,
+      "activateElevation": 14.3,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b002",
+      "nodeB": "b003",
+      "activateAzimuth": 117.2,
+      "azimuthTolerance": 2,
+      "activateElevation": 23.9,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b002",
+      "nodeB": "b004",
+      "activateAzimuth": 135,
+      "azimuthTolerance": 2,
+      "activateElevation": 19.2,
+      "elevationTolerance": 2
+    }
+  ],
+  "character": {
+    "startNodeId": "b016"
+  },
+  "midpoint": {
+    "blockId": "b005"
+  },
+  "goal": {
+    "blockId": "b012"
+  }
+}

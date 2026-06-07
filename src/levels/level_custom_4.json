@@ -1,0 +1,108 @@
+{
+  "id": "custom_stage_4",
+  "name": "Custom Level",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        6.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        9.5,
+        1.75,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b003",
+      "position": [
+        10.5,
+        1.75,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [
+        10.5,
+        1.75,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [],
+  "illusionConnections": [
+    {
+      "nodeA": "b001",
+      "nodeB": "b002",
+      "activateAzimuth": 44.8,
+      "azimuthTolerance": 2,
+      "activateElevation": 30,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b002",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b003",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b004",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
+    }
+  ],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b004"
+  }
+}
