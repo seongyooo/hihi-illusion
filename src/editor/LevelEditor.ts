@@ -1320,6 +1320,7 @@ export class LevelEditor {
       8:  () => import('../levels/level_custom_8.json'),
       9:  () => import('../levels/level_custom_9.json'),
       10: () => import('../levels/level_custom_10.json'),
+      11: () => import('../levels/level_custom_11.json'),
     };
     const loader = fileMap[stageNum];
     if (!loader) return;

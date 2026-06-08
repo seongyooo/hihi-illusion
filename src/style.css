@@ -40,8 +40,8 @@ canvas {
 
 .hud-star-counter {
   position: absolute;
-  top: 16px;
-  right: 18px;
+  top: max(16px, env(safe-area-inset-top, 16px));
+  right: max(18px, env(safe-area-inset-right, 18px));
   color: #FFD700;
   font-size: 18px;
   font-weight: 700;
@@ -118,13 +118,14 @@ canvas {
   left: 50%;
   transform: translate(-50%, -50%) scale(0.8);
   font-family: 'Georgia', serif;
-  font-size: 36px;
+  font-size: clamp(22px, 7vw, 36px);
   letter-spacing: 0.2em;
   color: #f5f0e8;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.6s ease 0.4s, transform 0.6s ease 0.4s;
   user-select: none;
+  white-space: nowrap;
 }
 
 .hud-clear.visible {
@@ -152,15 +153,16 @@ canvas {
 
 .hud-clear-btn {
   font-family: 'Georgia', serif;
-  font-size: 13px;
+  font-size: clamp(11px, 3vw, 13px);
   letter-spacing: 0.25em;
   color: #f5f0e8;
   background: transparent;
   border: 1.5px solid rgba(245, 240, 232, 0.55);
-  padding: 11px 32px;
+  padding: clamp(9px, 2.5vw, 11px) clamp(18px, 6vw, 32px);
   border-radius: 40px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
 }
 
 .hud-clear-btn:hover {
@@ -200,7 +202,7 @@ canvas {
 
 .tutorial-instruction__main {
   font-family: 'Georgia', serif;
-  font-size: 26px;
+  font-size: clamp(16px, 5.5vw, 26px);
   letter-spacing: 0.12em;
   color: #1a2a3a;
   text-shadow: 0 1px 8px rgba(255,255,255,0.9);
@@ -209,7 +211,7 @@ canvas {
 
 .tutorial-instruction__sub {
   font-family: 'Georgia', serif;
-  font-size: 13px;
+  font-size: clamp(11px, 3vw, 13px);
   letter-spacing: 0.06em;
   color: #3a4a5a;
   text-shadow: 0 1px 4px rgba(255,255,255,0.8);
@@ -238,7 +240,7 @@ canvas {
 
 .title-screen__title {
   font-family: 'Georgia', serif;
-  font-size: 72px;
+  font-size: clamp(36px, 14vw, 72px);
   letter-spacing: 0.35em;
   color: #f5f0e8;
   font-weight: normal;
@@ -247,13 +249,13 @@ canvas {
 
 .title-screen__play {
   font-family: 'Georgia', serif;
-  font-size: 16px;
+  font-size: clamp(13px, 3.5vw, 16px);
   letter-spacing: 0.35em;
   text-indent: 0.35em;
   color: #f5f0e8;
   background: transparent;
   border: 1.5px solid rgba(245, 240, 232, 0.45);
-  padding: 14px 52px;
+  padding: clamp(11px, 3vw, 14px) clamp(32px, 9vw, 52px);
   border-radius: 40px;
   cursor: pointer;
   transition: background 0.22s ease, border-color 0.22s ease;
@@ -287,8 +289,8 @@ canvas {
 
 .stage-select__back {
   position: absolute;
-  top: 24px;
-  left: 28px;
+  top: max(24px, env(safe-area-inset-top, 24px));
+  left: max(28px, env(safe-area-inset-left, 28px));
   font-family: 'Georgia', serif;
   font-size: 13px;
   letter-spacing: 0.15em;
@@ -317,18 +319,20 @@ canvas {
 
 .stage-select__grid {
   display: grid;
-  grid-template-columns: repeat(6, 64px);
-  gap: 12px;
+  /* 셀 크기를 뷰포트 너비 기준으로 동적 계산: 모바일에서 6열이 넘치지 않도록 */
+  --cell-size: clamp(44px, calc((100vw - 80px) / 6), 64px);
+  grid-template-columns: repeat(6, var(--cell-size));
+  gap: clamp(6px, 1.5vw, 12px);
 }
 
 .stage-select__cell {
-  width: 64px;
-  height: 64px;
+  width: var(--cell-size, 64px);
+  height: var(--cell-size, 64px);
   border: 1.5px solid rgba(245, 240, 232, 0.25);
   border-radius: 8px;
   background: rgba(245, 240, 232, 0.05);
   font-family: 'Georgia', serif;
-  font-size: 18px;
+  font-size: clamp(13px, 3.5vw, 18px);
   color: #f5f0e8;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
@@ -536,7 +540,7 @@ canvas {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 24px 32px 20px;
+  padding: clamp(16px, 4vw, 24px) clamp(16px, 5vw, 32px) 20px;
   border-bottom: 1px solid #1e1e36;
 }
 .editor-lobby__title {
@@ -554,7 +558,7 @@ canvas {
 }
 
 .editor-lobby__section {
-  padding: 24px 32px;
+  padding: clamp(16px, 4vw, 24px) clamp(16px, 5vw, 32px);
 }
 .editor-lobby__section h3 {
   font-family: 'Courier New', monospace;
@@ -591,6 +595,11 @@ canvas {
   font-size: 13px;
   color: #d8d4cc;
   flex: 1;
+}
+.editor-lobby__card-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .editor-lobby__empty {
   font-family: 'Courier New', monospace;

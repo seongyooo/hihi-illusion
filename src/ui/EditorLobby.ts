@@ -67,6 +67,7 @@ export class EditorLobby {
       { num: 8,  name: 'The Elevator' },
       { num: 9,  name: 'Mirage'       },
       { num: 10, name: 'Convergence'  },
+      { num: 11, name: 'Custom Level' },
     ];
     for (const s of builtinStages) {
       const card = document.createElement('div');
@@ -138,9 +139,23 @@ export class EditorLobby {
       editBtn.textContent = 'Edit';
       editBtn.addEventListener('click', () => this.onEdit(level.stageNum));
 
+      const delBtn = document.createElement('button');
+      delBtn.className = 'editor-btn danger';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => {
+        if (!confirm(`Stage ${level.stageNum} "${level.data.name}"을 삭제할까요?`)) return;
+        CustomLevelStore.delete(level.stageNum);
+        this.rebuildGrid();
+      });
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'editor-lobby__card-btns';
+      btnRow.appendChild(editBtn);
+      btnRow.appendChild(delBtn);
+
       card.appendChild(num);
       card.appendChild(name);
-      card.appendChild(editBtn);
+      card.appendChild(btnRow);
       this.gridEl.appendChild(card);
     }
   }
