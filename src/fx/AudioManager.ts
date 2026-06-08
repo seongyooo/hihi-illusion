@@ -66,6 +66,13 @@ export class AudioManager {
     });
   }
 
+  // Sparkling two-note chime — star collected
+  playStarCollect(): void {
+    this.tone(880,    'sine',     0.14, 0.01, 0.22, 0.00); // A5
+    this.tone(1318.5, 'triangle', 0.10, 0.01, 0.30, 0.07); // E6
+    this.tone(1760,   'sine',     0.08, 0.01, 0.40, 0.14); // A6
+  }
+
   // Swoosh + arrival ping — teleport
   playTeleport(): void {
     this.tone(880, 'sine',     0.12, 0.01, 0.18, 0.00);

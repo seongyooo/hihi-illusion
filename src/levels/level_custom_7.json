@@ -1,300 +1,89 @@
 {
   "id": "custom_stage_7",
-  "name": "Custom Level",
-  "backgroundColor": "#E8EEF5",
+  "name": "The Relay",
+  "backgroundColor": "#E8F0EE",
   "blocks": [
     {
       "id": "b001",
-      "position": [
-        12.5,
-        2.25,
-        10.5
-      ],
+      "position": [4.5, 0.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b002",
-      "position": [
-        11.5,
-        1.75,
-        10.5
-      ],
+      "position": [5.5, 0.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b003",
-      "position": [
-        11.5,
-        1.25,
-        9.5
-      ],
+      "position": [6.5, 0.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b004",
-      "position": [
-        7.5,
-        1.25,
-        9.5
-      ],
+      "position": [6.5, 0.25, 5.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b005",
-      "position": [
-        6.5,
-        1.25,
-        9.5
-      ],
+      "position": [4.5, 0.25, 9.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b006",
-      "position": [
-        6.5,
-        1.75,
-        9.5
-      ],
+      "position": [5.5, 0.25, 9.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b007",
-      "position": [
-        6.5,
-        2.25,
-        9.5
-      ],
+      "position": [6.5, 0.25, 9.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b008",
-      "position": [
-        4.5,
-        0.75,
-        5.5
-      ],
+      "position": [10.5, 0.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b009",
-      "position": [
-        5.5,
-        0.75,
-        5.5
-      ],
+      "position": [10.5, 0.25, 5.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b010",
-      "position": [
-        5.5,
-        0.75,
-        4.5
-      ],
+      "position": [9.5, 0.25, 5.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b011",
-      "position": [
-        4.5,
-        0.75,
-        4.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b012",
-      "position": [
-        3.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     }
   ],
-  "ladders": [
-    {
-      "nodeA": "b001",
-      "nodeB": "b002"
-    },
-    {
-      "nodeA": "b003",
-      "nodeB": "b002"
-    },
-    {
-      "nodeA": "b004",
-      "nodeB": "b007"
-    }
+  "ladders": [],
+  "teleporters": [
+    { "nodeA": "b004", "nodeB": "b005" },
+    { "nodeA": "b007", "nodeB": "b008" }
   ],
-  "illusionConnections": [
-    {
-      "nodeA": "b001",
-      "nodeB": "b004",
-      "activateAzimuth": 75.5,
-      "azimuthTolerance": 2,
-      "activateElevation": 13.8,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b009",
-      "activateAzimuth": 60,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.4,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b009",
-      "activateAzimuth": 50.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.9,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b010",
-      "activateAzimuth": 45.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.1,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b004",
-      "activateAzimuth": 71.3,
-      "azimuthTolerance": 2,
-      "activateElevation": 9.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b009",
-      "activateAzimuth": 45.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.9,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b010",
-      "activateAzimuth": 40.3,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b004",
-      "nodeB": "b009",
-      "activateAzimuth": 33.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.7,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b012",
-      "activateAzimuth": 45,
-      "azimuthTolerance": 2,
-      "activateElevation": 25.4,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b008",
-      "activateAzimuth": 33.2,
-      "azimuthTolerance": 2,
-      "activateElevation": 22.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b009",
-      "activateAzimuth": 18.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 25.2,
-      "elevationTolerance": 2
-    }
-  ],
+  "illusionConnections": [],
   "character": {
     "startNodeId": "b001"
   },
-  "midpoint": {
-    "blockId": "b010"
-  },
   "goal": {
-    "blockId": "b012"
+    "blockId": "b010"
   }
 }

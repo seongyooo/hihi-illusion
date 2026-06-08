@@ -22,6 +22,10 @@ import { CustomLevelStore }   from '../editor/CustomLevelStore';
 import { ParticleSystem }     from '../fx/ParticleSystem';
 import { AudioManager }       from '../fx/AudioManager';
 import { TeleportManager }    from '../mechanics/TeleportManager';
+import { StarManager }        from '../mechanics/StarManager';
+import { SwitchManager }      from '../world/SwitchManager';
+import { ElevatorManager }    from '../world/ElevatorManager';
+import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS }             from '../levels/registry';
 
 export class GameManager {
@@ -48,6 +52,11 @@ export class GameManager {
   private input:       InputManager | null = null;
   private illusionMgr:      IllusionManager | null = null;
   private teleportMgr:      TeleportManager | null = null;
+  private starMgr:          StarManager      | null = null;
+  private switchMgr:        SwitchManager   | null = null;
+  private elevatorMgr:      ElevatorManager | null = null;
+  private tutorialSequencer: TutorialSequencer | null = null;
+  private tutorialInputLocked = false;
   private goalGlow:         THREE.PointLight | null = null;
   private goalMarker:       THREE.Mesh | null = null;
   private midpointMarker:   THREE.Mesh | null = null;
@@ -63,6 +72,11 @@ export class GameManager {
   // ── Stage tracking ────────────────────────────────────────────────────
   private currentStageNum = 0;  // 0 = tutorial, 1+ = actual stages
 
+  // ── Pending timers / tweens (must be cancelled on unload) ────────────
+  private midpointCinematicTween:   gsap.core.Tween | null = null;
+  private midpointCinematicTimeout: ReturnType<typeof setTimeout> | null = null;
+  private goalClearTimeout:         ReturnType<typeof setTimeout> | null = null;
+
   constructor(container: HTMLElement) {
     this.debug      = new URLSearchParams(location.search).has('debug');
     this.renderer   = new Renderer(container);
@@ -76,6 +90,7 @@ export class GameManager {
     this.orbit.enablePan     = false;
     this.orbit.minDistance   = 6;
     this.orbit.maxDistance   = 25;
+    this.orbit.minPolarAngle = Math.PI / 6;  // elevation 최대 60° 제한
     this.orbit.target.set(-1, 0, -1);
 
     this.cameraCtrl   = new CameraController(this.renderer.camera, this.orbit.target);
@@ -155,15 +170,14 @@ export class GameManager {
     8: 'custom_stage_8',
     9: 'custom_stage_9',
     10: 'custom_stage_10',
-    11: 'custom_stage_11',
-    12: 'custom_stage_12',
   };
 
   private loadStage(stageNum: number): void {
-    this.currentStageNum = stageNum;
     const custom = CustomLevelStore.getByStage(stageNum);
-    if (custom) { this.loadCustomLevel(custom.data); return; }
-    if (this.builtinIds[stageNum]) { this.loadLevel(this.builtinIds[stageNum]); return; }
+    if (custom) { this.currentStageNum = stageNum; this.loadCustomLevel(custom.data); return; }
+    if (this.builtinIds[stageNum]) { this.currentStageNum = stageNum; this.loadLevel(this.builtinIds[stageNum]); return; }
+    // QA-04: silent fail 방지 — stageNum 업데이트 없이 조기 종료
+    console.warn(`[GameManager] loadStage: no level for stageNum=${stageNum}`);
   }
 
   private getNextStageNum(): number | null {
@@ -228,8 +242,11 @@ export class GameManager {
       this.goalGlow.intensity = 0;
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) this.setupMidpointMarker(midMesh);
-    } else {
-      if (goalMesh) this.setupGoalMarker(goalMesh);
+    } else if (this.isTutorial) {
+      // 튜토리얼: 경로 블록이 올라온 뒤 _revealTutorialGoal()에서 활성화
+      this.goalGlow.intensity = 0;
+    } else if (goalMesh) {
+      this.setupGoalMarker(goalMesh);
       gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     }
 
@@ -247,6 +264,29 @@ export class GameManager {
       );
     if (padNodePairs.length > 0) this.teleportMgr.setupPads(padNodePairs);
 
+    // StarManager
+    this.starMgr = new StarManager(this.renderer.scene, this.particles);
+    if ((data.stars ?? []).length > 0) {
+      this.starMgr.setup(data.stars!, (id) => this.graph!.getNode(id));
+      this.hud.showStarCounter(0, this.starMgr.getTotal());
+    }
+
+    // SwitchManager
+    this.switchMgr = new SwitchManager(this.renderer.scene, this.particles);
+    if ((data.switches ?? []).length > 0) {
+      this.switchMgr.setup(
+        data.switches!,
+        this.graph,
+        (id) => this.level!.blocks.get(id)?.mesh,
+      );
+    }
+
+    // ElevatorManager
+    this.elevatorMgr = new ElevatorManager(this.renderer.scene);
+    if ((data.elevators ?? []).length > 0) {
+      this.elevatorMgr.setup(data.elevators!, this.graph);
+    }
+
     // Character
     this.character  = new Character();
     const startNode = this.graph.getNode(data.character.startNodeId);
@@ -257,7 +297,23 @@ export class GameManager {
       (start, end) => this.graph!.findPath(start, end),
       startNode,
       {
+        onDepart: (nodeId) => {
+          this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
+        },
         onArrival: (nodeId) => {
+          // 튜토리얼 시퀀스 트리거
+          this.tutorialSequencer?.onArrival(nodeId);
+
+          // 스위치 / 엘리베이터 트리거
+          this.switchMgr?.onCharacterArrive(nodeId, this.graph!);
+          this.elevatorMgr?.onCharacterArrive(nodeId, this.graph!);
+
+          // 별 수집
+          if (this.starMgr?.tryCollect(nodeId)) {
+            this.hud.updateStarCounter(this.starMgr.getCollected(), this.starMgr.getTotal());
+            this.audio.playStarCollect();
+          }
+
           // 순간이동 패드 도착 → 즉시 발동 (경로탐색과 무관)
           const teleportDest = this.graph!.getTeleportDest(nodeId);
           if (teleportDest) {
@@ -266,14 +322,21 @@ export class GameManager {
               this.teleportMgr?.playEffect(this.graph!.getNode(nodeId)!, destNode);
               this.audio.playTeleport();
               this.controller!.teleportTo(destNode);
-              return; // midpoint/goal 판정은 도착지에서 하지 않음
+              // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
+              if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId) {
+                this.onMidpointReached();
+              }
+              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this.starMgr?.allCollected() ?? true)) {
+                this.onGoalReached();
+              }
+              return;
             }
           }
 
           if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId) {
             this.onMidpointReached();
           }
-          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached)) {
+          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this.starMgr?.allCollected() ?? true)) {
             this.onGoalReached();
           }
           if (this.isTutorial && !this.tutorialMoved) {
@@ -296,6 +359,7 @@ export class GameManager {
       interactTargets,
       {
         onBlockClick: (blockId) => {
+          if (this.tutorialInputLocked) return;
           const node = this.graph!.getNode(blockId);
           if (node) { this.controller!.moveTo(node); this.audio.playStep(); }
         },
@@ -331,22 +395,36 @@ export class GameManager {
 
     this._initLevelObjects(data);
 
-    // Tutorial hints
+    // Tutorial hints / sequencer
     if (this.isTutorial) {
-      this.tutorialHint.showStep(1);
-      const onCameraChange = () => {
-        if (this.tutorialMoved) {
-          this.tutorialHint.hide();
-          this.orbit.removeEventListener('change', onCameraChange);
-        }
-      };
-      this.orbit.addEventListener('change', onCameraChange);
+      this.tutorialInputLocked = false;
+      this.tutorialSequencer = new TutorialSequencer({
+        scene:               this.renderer.scene,
+        graph:               this.graph!,
+        hintUI:              this.tutorialHint,
+        onInputLock:         (locked) => {
+          this.tutorialInputLocked = locked;
+          if (locked) this.controller?.stop();
+        },
+        onAddInteractTarget: (mesh) => { this.input?.addTarget(mesh); },
+        onPathRevealed:      () => { this._revealTutorialGoal(); },
+        onStarBlockHidden:   (nodeId) => { this.starMgr?.hideStarMesh(nodeId); },
+        onStarBlockRevealed: (nodeId) => {
+          const node = this.graph?.getNode(nodeId);
+          if (node) this.starMgr?.repositionStar(nodeId, node);
+        },
+      });
+
+      // s1 블록 mesh를 넘겨 화살표 위치 결정
+      const s1Mesh = this.level!.blocks.get('s1')?.mesh;
+      if (s1Mesh) this.tutorialSequencer.start(s1Mesh);
+
       this.hud.enableSkip(() => { this.titleScreen.show(); });
     } else {
       this.hud.enableSkip(() => { this.stageSelect.show(); });
     }
 
-    // Intro camera fly-in (center derived from level data)
+    // Intro camera fly-in
     const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
     const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
     this.orbit.target.set(cx, 0, cz);
@@ -383,7 +461,22 @@ export class GameManager {
   private unloadCurrent(): void {
     if (!this.level) return;
 
-    // NEW-04: 미드포인트 시네마틱 중 전환 시 cam/orbit tween 강제 종료
+    // QA-01: proxy tween(p1/p2)과 setTimeout 취소
+    if (this.midpointCinematicTween) {
+      this.midpointCinematicTween.kill();
+      this.midpointCinematicTween = null;
+    }
+    if (this.midpointCinematicTimeout !== null) {
+      clearTimeout(this.midpointCinematicTimeout);
+      this.midpointCinematicTimeout = null;
+    }
+    // QA-02: goalClearTimeout 취소
+    if (this.goalClearTimeout !== null) {
+      clearTimeout(this.goalClearTimeout);
+      this.goalClearTimeout = null;
+    }
+
+    // NEW-04: cam/orbit 직접 tween이 있을 경우도 대비해 유지
     gsap.killTweensOf(this.renderer.camera.position);
     gsap.killTweensOf(this.orbit.target);
     this.orbit.enabled = true;
@@ -438,6 +531,15 @@ export class GameManager {
     this.illusionMgr = null;
     this.teleportMgr?.dispose();
     this.teleportMgr = null;
+    this.starMgr?.dispose();
+    this.starMgr = null;
+    this.switchMgr?.dispose();
+    this.switchMgr   = null;
+    this.elevatorMgr?.dispose();
+    this.elevatorMgr = null;
+    this.tutorialSequencer?.dispose();
+    this.tutorialSequencer    = null;
+    this.tutorialInputLocked  = false;
 
     this.blockLabels.dispose();
     this.hud.reset();
@@ -449,12 +551,21 @@ export class GameManager {
     // Reset orbit constraints
     this.orbit.minAzimuthAngle = -Infinity;
     this.orbit.maxAzimuthAngle =  Infinity;
-    this.orbit.minPolarAngle   = 0;
+    this.orbit.minPolarAngle   = Math.PI / 6;  // elevation 최대 60° 제한 유지
     this.orbit.maxPolarAngle   = Math.PI;
     this.orbit.target.set(-1, 0, -1);
   }
 
-  private setupGoalMarker(goalMesh: THREE.Group): void {
+  /** 튜토리얼: 경로 블록이 모두 올라온 뒤 goal glow/marker를 활성화 */
+  private _revealTutorialGoal(): void {
+    const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh;
+    if (!goalMesh || !this.goalGlow) return;
+
+    gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+    this.setupGoalMarker(goalMesh);
+  }
+
+  private setupGoalMarker(goalMesh: THREE.Object3D): void {
     const wp = new THREE.Vector3();
     goalMesh.getWorldPosition(wp);
 
@@ -474,7 +585,7 @@ export class GameManager {
     });
   }
 
-  private setupMidpointMarker(midMesh: THREE.Group): void {
+  private setupMidpointMarker(midMesh: THREE.Object3D): void {
     const wp = new THREE.Vector3();
     midMesh.getWorldPosition(wp);
 
@@ -541,9 +652,10 @@ export class GameManager {
     // OrbitControls 비활성화 (시네마틱 동안 유저 조작 차단)
     orbit.enabled = false;
 
+    // QA-01: p1/p2 tween 참조와 setTimeout ID 저장 → unloadCurrent()에서 취소
     // ── Phase 1: 골 블록 방향으로 패닝 ──────────────────────────────────
     const p1 = { t: 0 };
-    gsap.to(p1, {
+    this.midpointCinematicTween = gsap.to(p1, {
       t: 1,
       duration: 1.1,
       ease: 'power2.inOut',
@@ -553,6 +665,7 @@ export class GameManager {
         orbit.update();
       },
       onComplete: () => {
+        this.midpointCinematicTween = null;
         // ── Phase 2: 골 링 scale-in ────────────────────────────────────
         this.setupGoalMarker(goalMesh);
 
@@ -585,9 +698,10 @@ export class GameManager {
         }
 
         // ── Phase 3: 잠시 머문 뒤 원래 위치로 복귀 ──────────────────────
-        setTimeout(() => {
+        this.midpointCinematicTimeout = setTimeout(() => {
+          this.midpointCinematicTimeout = null;
           const p2 = { t: 0 };
-          gsap.to(p2, {
+          this.midpointCinematicTween = gsap.to(p2, {
             t: 1,
             duration: 1.1,
             ease: 'power2.inOut',
@@ -597,6 +711,7 @@ export class GameManager {
               orbit.update();
             },
             onComplete: () => {
+              this.midpointCinematicTween = null;
               cam.position.copy(origCamPos);
               orbit.target.copy(origTarget);
               orbit.update();
@@ -614,7 +729,10 @@ export class GameManager {
 
     this.audio.playGoalReached();
 
-    const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh ?? null;
+    const goalMesh = (
+      this.level?.blocks.get(this.goalBlockId)?.mesh ??
+      this.graph?.getNode(this.goalBlockId)?.mesh
+    ) ?? null;
     if (goalMesh) {
       const wp = new THREE.Vector3();
       goalMesh.getWorldPosition(wp);
@@ -630,7 +748,9 @@ export class GameManager {
       });
     }
 
-    setTimeout(() => {
+    // QA-02: setTimeout ID 저장 → unloadCurrent()에서 취소
+    this.goalClearTimeout = setTimeout(() => {
+      this.goalClearTimeout = null;
       if (this.isTutorial) {
         // 튜토리얼 클리어: 버튼 없이 잠시 후 타이틀 화면으로 이동
         this.hud.showClear();
@@ -666,6 +786,7 @@ export class GameManager {
       this.blockLabels.update();
     }
 
+    if (this.graph) this.elevatorMgr?.update(this.graph);
     this.controller?.update();
     this.renderer.render();
   }

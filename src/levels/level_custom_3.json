@@ -1,42 +1,12 @@
 {
   "id": "custom_stage_3",
-  "name": "The Illusion",
-  "backgroundColor": "#E8EFF5",
+  "name": "Custom Level",
+  "backgroundColor": "#E8EEF5",
   "blocks": [
     {
-      "id": "b022",
+      "id": "b001",
       "position": [
-        4.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b023",
-      "position": [
-        5.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b024",
-      "position": [
-        5.5,
+        3.5,
         0.25,
         6.5
       ],
@@ -49,71 +19,11 @@
       "walkable": true
     },
     {
-      "id": "b025",
+      "id": "b004",
       "position": [
         6.5,
-        0.25,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b026",
-      "position": [
-        7.5,
-        0.25,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b027",
-      "position": [
-        8.5,
-        0.25,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b028",
-      "position": [
-        8.5,
-        0.75,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b029",
-      "position": [
-        7.5,
         1.25,
-        5.5
+        8.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -124,26 +34,11 @@
       "walkable": true
     },
     {
-      "id": "b030",
-      "position": [
-        7.5,
-        1.75,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b031",
+      "id": "b005",
       "position": [
         8.5,
         2.25,
-        6.5
+        4.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -154,29 +49,56 @@
       "walkable": true
     }
   ],
-  "ladders": [
+  "ladders": [],
+  "illusionConnections": [
     {
-      "nodeA": "b027",
-      "nodeB": "b028"
+      "nodeA": "b001",
+      "nodeB": "b004",
+      "activateAzimuth": 45.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 19.2,
+      "elevationTolerance": 2
     },
     {
-      "nodeA": "b029",
-      "nodeB": "b028"
+      "nodeA": "b001",
+      "nodeB": "b004",
+      "activateAzimuth": 71.3,
+      "azimuthTolerance": 2,
+      "activateElevation": 17.5,
+      "elevationTolerance": 2
     },
     {
-      "nodeA": "b029",
-      "nodeB": "b030"
+      "nodeA": "b004",
+      "nodeB": "b005",
+      "activateAzimuth": 146.5,
+      "azimuthTolerance": 2,
+      "activateElevation": 15.3,
+      "elevationTolerance": 2
     },
     {
-      "nodeA": "b031",
-      "nodeB": "b030"
+      "nodeA": "b001",
+      "nodeB": "b005",
+      "activateAzimuth": 116.2,
+      "azimuthTolerance": 2,
+      "activateElevation": 23.9,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b005",
+      "activateAzimuth": 101.2,
+      "azimuthTolerance": 2,
+      "activateElevation": 21.3,
+      "elevationTolerance": 2
     }
   ],
-  "illusionConnections": [],
   "character": {
-    "startNodeId": "b022"
+    "startNodeId": "b001"
+  },
+  "midpoint": {
+    "blockId": "b004"
   },
   "goal": {
-    "blockId": "b031"
+    "blockId": "b005"
   }
 }

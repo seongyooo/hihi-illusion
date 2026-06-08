@@ -5,6 +5,7 @@ import type { Character } from './Character';
 
 export interface CharacterControllerOptions {
   onArrival?: (nodeId: string) => void;
+  onDepart?:  (nodeId: string) => void;
 }
 
 export class CharacterController {
@@ -14,7 +15,11 @@ export class CharacterController {
   private isMoving = false;
   private pendingTarget: PathNode | null = null;
   private onArrival?: (nodeId: string) => void;
+  private onDepart?:  (nodeId: string) => void;
   private readonly _wp = new THREE.Vector3();
+
+  // 남은 경로 (한 스텝씩 소비)
+  private _movePath: PathNode[] = [];
 
   constructor(
     character: Character,
@@ -26,6 +31,7 @@ export class CharacterController {
     this.findPath    = findPath;
     this.currentNode = startNode;
     this.onArrival   = options.onArrival;
+    this.onDepart    = options.onDepart;
     const { x, y, z } = startNode.position;
     character.setPosition(x, y, z);
   }
@@ -46,54 +52,95 @@ export class CharacterController {
     this.currentNode = node;
   }
 
+  /**
+   * 현재 이동을 즉시 중단하고 마지막으로 밟은 노드에 정착한다.
+   * 튜토리얼 장애물 연출처럼 외부에서 캐릭터를 멈춰야 할 때 사용.
+   */
+  stop(): void {
+    this._movePath    = [];
+    this.pendingTarget = null;
+    gsap.killTweensOf(this.character.mesh.position);
+    gsap.killTweensOf(this.character.mesh.rotation);
+    this.isMoving = false;
+    // 현재 노드 위치로 스냅
+    this.currentNode.mesh.getWorldPosition(this._wp);
+    this.character.setPosition(
+      this._wp.x,
+      this._wp.y + this.currentNode.halfHeight,
+      this._wp.z,
+    );
+  }
+
   private _startMove(target: PathNode): void {
     const path = this.findPath(this.currentNode, target);
     if (path.length === 0) return;
 
-    this.isMoving = true;
+    this.isMoving  = true;
+    this._movePath = path.slice(1); // start 제외, 방문할 노드 목록
+    this._advance();
+  }
+
+  /**
+   * 남은 경로에서 한 스텝 애니메이션.
+   * 도착할 때마다 onArrival 발생 → 외부(튜토리얼 등)에서 stop() 호출 가능.
+   */
+  private _advance(): void {
+    if (!this.isMoving) return; // stop()에 의해 중단됨
+
+    if (this._movePath.length === 0) {
+      // 최종 목적지 도달
+      this.isMoving = false;
+      this.onArrival?.(this.currentNode.id);
+      if (this.pendingTarget && this.pendingTarget !== this.currentNode) {
+        const next = this.pendingTarget;
+        this.pendingTarget = null;
+        this._startMove(next);
+      } else {
+        this.pendingTarget = null;
+      }
+      return;
+    }
+
+    const node = this._movePath.shift()!;
+    const prev = this.currentNode;
+    const dx   = node.position.x - prev.position.x;
+    const dz   = node.position.z - prev.position.z;
+
+    this.onDepart?.(prev.id);
+
     const tl = gsap.timeline({
       onComplete: () => {
-        this.currentNode = target;
-        this.isMoving = false;
-        this.onArrival?.(target.id);
-
-        if (this.pendingTarget && this.pendingTarget !== this.currentNode) {
-          const next = this.pendingTarget;
-          this.pendingTarget = null;
-          this._startMove(next);
-        } else {
-          this.pendingTarget = null;
+        this.currentNode = node;
+        // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
+        // (QA-06: 이중 발동 방지 — 마지막 노드에서 tl.onComplete + 경로소진 양쪽 호출되던 문제)
+        if (this._movePath.length > 0) {
+          this.onArrival?.(node.id);
         }
+        this._advance();           // stop() 이후면 isMoving=false라 즉시 반환
       },
     });
 
-    for (let i = 1; i < path.length; i++) {
-      const node = path[i];
-      const prev = path[i - 1];
-      const dx = node.position.x - prev.position.x;
-      const dz = node.position.z - prev.position.z;
-      if (dx !== 0 || dz !== 0) {
-        tl.to(this.character.mesh.rotation, {
-          y: Math.atan2(dx, dz),
-          duration: 0.1,
-        });
-      }
-
-      tl.to(this.character.mesh.position, {
-        x: node.position.x,
-        y: node.position.y + 0.08,
-        z: node.position.z,
-        duration: 0.15,
-        ease: 'power1.out',
-      }).to(this.character.mesh.position, {
-        y: node.position.y,
+    if (dx !== 0 || dz !== 0) {
+      tl.to(this.character.mesh.rotation, {
+        y: Math.atan2(dx, dz),
         duration: 0.1,
-        ease: 'power1.in',
       });
     }
+
+    tl.to(this.character.mesh.position, {
+      x: node.position.x,
+      y: node.position.y + 0.08,
+      z: node.position.z,
+      duration: 0.15,
+      ease: 'power1.out',
+    }).to(this.character.mesh.position, {
+      y: node.position.y,
+      duration: 0.1,
+      ease: 'power1.in',
+    });
   }
 
-  // Call every frame — keeps character glued to its node's world position.
+  // 매 프레임: 이동 중이 아닐 때 캐릭터를 노드 월드 좌표에 고정
   update(): void {
     if (this.isMoving) return;
     this.currentNode.mesh.getWorldPosition(this._wp);

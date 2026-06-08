@@ -83,6 +83,21 @@ export interface LevelData {
     elevationTolerance: number;
   }>;
   teleporters?: Array<{ nodeA: string; nodeB: string }>;
+  switches?: Array<{
+    switchNodeId: string;
+    targetNodeId: string;
+    mode: 'hold' | 'toggle';
+    type: 'spawn' | 'move';
+    moveTarget?: [number, number, number];
+  }>;
+  elevators?: Array<{
+    nodeId:   string;
+    bottomY:  number;
+    topY:     number;
+    duration: number;
+    mode:     'auto' | 'trigger';
+  }>;
+  stars?: Array<{ nodeId: string }>;
   character: { startNodeId: string };
   midpoint?: { blockId: string };
   goal: { blockId: string };

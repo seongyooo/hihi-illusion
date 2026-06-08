@@ -38,6 +38,25 @@ canvas {
   user-select: none;
 }
 
+.hud-star-counter {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  color: #FFD700;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hud-star-counter.visible {
+  opacity: 1;
+}
+
 .hud-debug {
   position: absolute;
   bottom: 16px;
@@ -160,28 +179,40 @@ canvas {
   border-color: rgba(245, 240, 232, 0.55);
 }
 
-/* Tutorial hint */
-.tutorial-hint {
+/* Tutorial instruction card (big, upper-center) */
+.tutorial-instruction {
   position: absolute;
-  bottom: 60px;
+  top: 22%;
   left: 50%;
-  transform: translateX(-50%) translateY(8px);
-  font-family: 'Georgia', serif;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: #f5f0e8;
-  background: rgba(26, 26, 46, 0.75);
-  padding: 8px 20px;
-  border-radius: 20px;
+  transform: translateX(-50%) translateY(-6px);
+  text-align: center;
   pointer-events: none;
   user-select: none;
   opacity: 0;
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  z-index: 10;
 }
 
-.tutorial-hint.visible {
+.tutorial-instruction.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.tutorial-instruction__main {
+  font-family: 'Georgia', serif;
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  color: #1a2a3a;
+  text-shadow: 0 1px 8px rgba(255,255,255,0.9);
+  margin-bottom: 10px;
+}
+
+.tutorial-instruction__sub {
+  font-family: 'Georgia', serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: #3a4a5a;
+  text-shadow: 0 1px 4px rgba(255,255,255,0.8);
 }
 
 /* Title screen */

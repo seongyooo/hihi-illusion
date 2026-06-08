@@ -109,6 +109,11 @@ export class InputManager {
     if (this.orbitControls) this.orbitControls.enabled = true;
   };
 
+  /** 런타임에 raycast 대상 추가 (튜토리얼 동적 블록 등) */
+  addTarget(mesh: THREE.Object3D): void {
+    if (!this.targets.includes(mesh)) this.targets.push(mesh);
+  }
+
   dispose(): void {
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);

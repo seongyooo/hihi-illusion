@@ -4,6 +4,7 @@ export class HUD {
   private clearEl:        HTMLElement;
   private clearButtonsEl: HTMLElement;
   private debugEl:        HTMLElement;
+  private starCounterEl:  HTMLElement;
   private skipPointerDownX = 0;
   private skipPointerDownY = 0;
   private skipPointerDown:  ((e: PointerEvent) => void) | null = null;
@@ -28,6 +29,10 @@ export class HUD {
     this.clearButtonsEl.className = 'hud-clear-buttons';
     container.appendChild(this.clearButtonsEl);
 
+    this.starCounterEl = document.createElement('div');
+    this.starCounterEl.className = 'hud-star-counter';
+    container.appendChild(this.starCounterEl);
+
     this.debugEl = document.createElement('div');
     this.debugEl.className = 'hud-debug';
     container.appendChild(this.debugEl);
@@ -36,6 +41,19 @@ export class HUD {
 
   setLevelName(name: string): void {
     this.levelNameEl.textContent = name;
+  }
+
+  showStarCounter(collected: number, total: number): void {
+    this.starCounterEl.textContent = `★ ${collected} / ${total}`;
+    this.starCounterEl.classList.add('visible');
+  }
+
+  updateStarCounter(collected: number, total: number): void {
+    this.starCounterEl.textContent = `★ ${collected} / ${total}`;
+  }
+
+  hideStarCounter(): void {
+    this.starCounterEl.classList.remove('visible');
   }
 
   enableSkip(cb: () => void): void {
@@ -115,6 +133,7 @@ export class HUD {
     this.clearButtonsEl.innerHTML = '';
     this.levelNameEl.textContent = '';
     this.debugEl.style.display = 'none';
+    this.hideStarCounter();
     this.disableSkip();
   }
 }

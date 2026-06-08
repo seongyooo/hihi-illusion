@@ -58,17 +58,15 @@ export class EditorLobby {
 
     const builtinStages = [
       { num: 1,  name: 'The Prologue' },
-      { num: 2,  name: 'The Bridge'   },
-      { num: 3,  name: 'The Illusion' },
+      { num: 2,  name: 'Custom Level' },
+      { num: 3,  name: 'Custom Level' },
       { num: 4,  name: 'Custom Level' },
       { num: 5,  name: 'Custom Level' },
       { num: 6,  name: 'Custom Level' },
-      { num: 7,  name: 'Custom Level' },
-      { num: 8,  name: 'Custom Level' },
-      { num: 9,  name: 'The Relay'    },
-      { num: 10, name: 'The Elevator' },
-      { num: 11, name: 'Mirage'       },
-      { num: 12, name: 'Convergence'  },
+      { num: 7,  name: 'The Relay'    },
+      { num: 8,  name: 'The Elevator' },
+      { num: 9,  name: 'Mirage'       },
+      { num: 10, name: 'Convergence'  },
     ];
     for (const s of builtinStages) {
       const card = document.createElement('div');

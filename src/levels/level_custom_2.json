@@ -1,72 +1,12 @@
 {
   "id": "custom_stage_2",
-  "name": "The Bridge",
-  "backgroundColor": "#EEE8F0",
+  "name": "Custom Level",
+  "backgroundColor": "#E8EEF5",
   "blocks": [
     {
-      "id": "b034",
-      "position": [
-        5.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b035",
+      "id": "b001",
       "position": [
         6.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b036",
-      "position": [
-        7.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b037",
-      "position": [
-        8.5,
-        0.25,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b038",
-      "position": [
-        8.5,
         0.25,
         6.5
       ],
@@ -79,70 +19,10 @@
       "walkable": true
     },
     {
-      "id": "b040",
+      "id": "b002",
       "position": [
-        8.5,
-        0.25,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b044",
-      "position": [
-        7.5,
-        0.25,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b045",
-      "position": [
-        6.5,
-        0.25,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b046",
-      "position": [
-        5.5,
-        0.25,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b047",
-      "position": [
-        8.5,
-        0.75,
+        9.5,
+        1.75,
         8.5
       ],
       "color": "#A8C5DA",
@@ -154,11 +34,11 @@
       "walkable": true
     },
     {
-      "id": "b048",
+      "id": "b003",
       "position": [
-        8.5,
-        0.75,
-        7.5
+        10.5,
+        1.75,
+        8.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -169,10 +49,10 @@
       "walkable": true
     },
     {
-      "id": "b049",
+      "id": "b004",
       "position": [
-        8.5,
-        1.25,
+        10.5,
+        1.75,
         7.5
       ],
       "color": "#A8C5DA",
@@ -184,25 +64,45 @@
       "walkable": true
     }
   ],
-  "ladders": [
+  "ladders": [],
+  "illusionConnections": [
     {
-      "nodeA": "b040",
-      "nodeB": "b047"
+      "nodeA": "b001",
+      "nodeB": "b002",
+      "activateAzimuth": 44.8,
+      "azimuthTolerance": 2,
+      "activateElevation": 30,
+      "elevationTolerance": 2
     },
     {
-      "nodeA": "b049",
-      "nodeB": "b047"
+      "nodeA": "b001",
+      "nodeB": "b002",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
     },
     {
-      "nodeA": "b038",
-      "nodeB": "b049"
+      "nodeA": "b001",
+      "nodeB": "b003",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b004",
+      "activateAzimuth": 71.4,
+      "azimuthTolerance": 2,
+      "activateElevation": 27.8,
+      "elevationTolerance": 2
     }
   ],
-  "illusionConnections": [],
   "character": {
-    "startNodeId": "b034"
+    "startNodeId": "b001"
   },
   "goal": {
-    "blockId": "b046"
+    "blockId": "b004"
   }
 }

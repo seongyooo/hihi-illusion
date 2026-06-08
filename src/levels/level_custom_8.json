@@ -1,156 +1,98 @@
 {
   "id": "custom_stage_8",
-  "name": "Custom Level",
-  "backgroundColor": "#E8EEF5",
+  "name": "The Elevator",
+  "backgroundColor": "#F0EDE8",
   "blocks": [
     {
       "id": "b001",
-      "position": [
-        3.5,
-        0.25,
-        6.5
-      ],
+      "position": [5.5, 0.25, 7.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b002",
-      "position": [
-        7.5,
-        0.25,
-        6.5
-      ],
+      "position": [6.5, 0.25, 7.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b003",
-      "position": [
-        7.5,
-        0.25,
-        5.5
-      ],
+      "position": [7.5, 0.25, 7.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b004",
-      "position": [
-        8.5,
-        0.25,
-        6.5
-      ],
+      "position": [7.5, 0.25, 8.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b005",
-      "position": [
-        8.5,
-        0.25,
-        5.5
-      ],
+      "position": [7.5, 0.25, 9.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b006",
-      "position": [
-        6.5,
-        0.25,
-        6.5
-      ],
+      "position": [3.5, 2.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b007",
-      "position": [
-        3.5,
-        0.25,
-        7.5
-      ],
+      "position": [4.5, 2.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b008",
-      "position": [
-        3.5,
-        0.25,
-        8.5
-      ],
+      "position": [5.5, 2.25, 4.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
       "walkable": true
     },
     {
       "id": "b009",
-      "position": [
-        3.5,
-        0.25,
-        9.5
-      ],
+      "position": [5.5, 1.75, 5.5],
       "color": "#A8C5DA",
-      "size": [
-        1,
-        0.5,
-        1
-      ],
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b010",
+      "position": [5.5, 1.25, 6.5],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b011",
+      "position": [4.5, 1.25, 6.5],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
       "walkable": true
     }
   ],
-  "ladders": [],
+  "ladders": [
+    { "nodeA": "b008", "nodeB": "b009" },
+    { "nodeA": "b009", "nodeB": "b010" }
+  ],
   "teleporters": [
-    {
-      "nodeA": "b009",
-      "nodeB": "b005"
-    }
+    { "nodeA": "b005", "nodeB": "b006" }
   ],
   "illusionConnections": [],
   "character": {
     "startNodeId": "b001"
   },
   "goal": {
-    "blockId": "b006"
+    "blockId": "b011"
   }
 }

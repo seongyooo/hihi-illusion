@@ -86,6 +86,7 @@ export class LevelEditor {
   private illusionConns: IllusionConn[] = [];
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
+  private starNodeIds:     string[] = [];
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
   private goalBlockId:    string | null = null;
@@ -106,9 +107,11 @@ export class LevelEditor {
   private illusionListEl!: HTMLElement;
   private ladderListEl!: HTMLElement;
   private teleporterListEl!: HTMLElement;
-  private illusionFormEl!: HTMLElement;
-  private ladderFormEl!: HTMLElement;
+  private starListEl!:       HTMLElement;
+  private illusionFormEl!:   HTMLElement;
+  private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
+  private starFormEl!:       HTMLElement;
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private selIdEl!: HTMLElement;
@@ -404,8 +407,12 @@ export class LevelEditor {
           <label>NodeB:</label><input class="editor-input" id="ill-nodeB" style="width:80px">
         </div>
         <div class="editor-row" style="align-items:center; gap:6px;">
-          <label>Azimuth:</label><input class="editor-input" id="ill-az" type="number" value="0" style="width:70px">
-          <label style="margin-left:6px;">Elevation:</label><input class="editor-input" id="ill-el" type="number" value="30" style="width:70px">
+          <label>Azimuth:</label><input class="editor-input" id="ill-az" type="number" value="0" style="width:60px">
+          <label style="margin-left:4px;">±</label><input class="editor-input" id="ill-az-tol" type="number" value="2" min="0.5" max="30" step="0.5" style="width:45px" title="Azimuth tolerance (°)">
+        </div>
+        <div class="editor-row" style="align-items:center; gap:6px;">
+          <label>Elevation:</label><input class="editor-input" id="ill-el" type="number" value="30" style="width:60px">
+          <label style="margin-left:4px;">±</label><input class="editor-input" id="ill-el-tol" type="number" value="2" min="0.5" max="30" step="0.5" style="width:45px" title="Elevation tolerance (°)">
         </div>
         <div class="editor-row" style="margin-top:2px;">
           <button class="editor-btn" id="ill-capture" style="width:100%; font-size:10px;">↺ Use Current Camera Angle</button>
@@ -435,12 +442,14 @@ export class LevelEditor {
       illAddBtn.textContent = 'Add';
       illAddBtn.style.marginTop = '6px';
       illAddBtn.addEventListener('click', () => {
-        const nodeA = (this.illusionFormEl.querySelector('#ill-nodeA') as HTMLInputElement).value.trim();
-        const nodeB = (this.illusionFormEl.querySelector('#ill-nodeB') as HTMLInputElement).value.trim();
-        const azimuth = parseFloat((this.illusionFormEl.querySelector('#ill-az') as HTMLInputElement).value);
+        const nodeA     = (this.illusionFormEl.querySelector('#ill-nodeA') as HTMLInputElement).value.trim();
+        const nodeB     = (this.illusionFormEl.querySelector('#ill-nodeB') as HTMLInputElement).value.trim();
+        const azimuth   = parseFloat((this.illusionFormEl.querySelector('#ill-az') as HTMLInputElement).value);
+        const azimuthTol = Math.max(0.5, parseFloat((this.illusionFormEl.querySelector('#ill-az-tol') as HTMLInputElement).value) || 2);
         const elevation = parseFloat((this.illusionFormEl.querySelector('#ill-el') as HTMLInputElement).value);
+        const elevationTol = Math.max(0.5, parseFloat((this.illusionFormEl.querySelector('#ill-el-tol') as HTMLInputElement).value) || 2);
         if (nodeA && nodeB) {
-          this.illusionConns.push({ nodeA, nodeB, azimuth, azimuthTol: 2, elevation, elevationTol: 2 });
+          this.illusionConns.push({ nodeA, nodeB, azimuth, azimuthTol, elevation, elevationTol });
           this.rebuildIllusionList();
           this.illusionFormEl.classList.remove('open');
         }
@@ -537,6 +546,61 @@ export class LevelEditor {
 
       addBtn.addEventListener('click', () => {
         this.teleporterFormEl.classList.toggle('open');
+      });
+    }));
+
+    // Stars
+    p.appendChild(this.buildSection('STARS', (sec) => {
+      this.starListEl = document.createElement('div');
+      sec.appendChild(this.starListEl);
+      this.rebuildStarList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Star';
+      addBtn.style.width = '100%';
+      addBtn.style.marginTop = '6px';
+      sec.appendChild(addBtn);
+
+      this.starFormEl = document.createElement('div');
+      this.starFormEl.className = 'editor-add-form';
+      this.starFormEl.innerHTML = `
+        <div class="editor-row">
+          <label>Node ID:</label><input class="editor-input" id="star-nodeId" style="width:100px" placeholder="e.g. b001">
+        </div>
+      `;
+      const starAddBtn = document.createElement('button');
+      starAddBtn.className = 'editor-btn primary';
+      starAddBtn.textContent = 'Add';
+      starAddBtn.style.marginTop = '6px';
+      starAddBtn.addEventListener('click', () => {
+        const nodeId = (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value.trim();
+        if (nodeId && !this.starNodeIds.includes(nodeId)) {
+          this.starNodeIds.push(nodeId);
+          this.rebuildStarList();
+          (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = '';
+        }
+      });
+      // 선택된 블록을 바로 추가하는 버튼
+      const starAddSelectedBtn = document.createElement('button');
+      starAddSelectedBtn.className = 'editor-btn';
+      starAddSelectedBtn.textContent = 'Add Selected Block';
+      starAddSelectedBtn.style.marginTop = '4px';
+      starAddSelectedBtn.style.width = '100%';
+      starAddSelectedBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        const id = this.selectedBlock.id;
+        if (!this.starNodeIds.includes(id)) {
+          this.starNodeIds.push(id);
+          this.rebuildStarList();
+        }
+      });
+      this.starFormEl.appendChild(starAddBtn);
+      this.starFormEl.appendChild(starAddSelectedBtn);
+      sec.appendChild(this.starFormEl);
+
+      addBtn.addEventListener('click', () => {
+        this.starFormEl.classList.toggle('open');
       });
     }));
 
@@ -711,6 +775,23 @@ export class LevelEditor {
     });
   }
 
+  private rebuildStarList(): void {
+    this.starListEl.innerHTML = '';
+    this.starNodeIds.forEach((nodeId, i) => {
+      const item = document.createElement('div');
+      item.className = 'editor-conn-item';
+      item.innerHTML = `<span style="color:#FFD700">★</span> <span>${nodeId}</span>`;
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        this.starNodeIds.splice(i, 1);
+        this.rebuildStarList();
+      });
+      item.appendChild(del);
+      this.starListEl.appendChild(item);
+    });
+  }
+
   private updateSelectedPanel(): void {
     const b = this.selectedBlock;
     if (b) {
@@ -805,6 +886,7 @@ export class LevelEditor {
     if (this.startNodeId    === block.id) this.startNodeId    = this.blocks[0]?.id ?? null;
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
     if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
+    this.starNodeIds = this.starNodeIds.filter(id => id !== block.id);
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -1090,6 +1172,7 @@ export class LevelEditor {
       })),
       ladders: this.ladderConns,
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
+      stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -1124,6 +1207,7 @@ export class LevelEditor {
     this.illusionConns   = [];
     this.ladderConns     = [];
     this.teleporterConns = [];
+    this.starNodeIds     = [];
     this.selectedBlock   = null;
     this.hoveredBlock    = null;
     this.midpointBlockId = null;
@@ -1180,11 +1264,13 @@ export class LevelEditor {
     }));
     this.ladderConns     = data.ladders ?? [];
     this.teleporterConns = data.teleporters ?? [];
+    this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
 
     // Rebuild panel lists
     this.rebuildIllusionList();
     this.rebuildLadderList();
     this.rebuildTeleporterList();
+    this.rebuildStarList();
     this.updateSelectedPanel();
     this.updateMarkers();
     for (const b of this.blocks) this.addLabel(b.id);
@@ -1234,8 +1320,6 @@ export class LevelEditor {
       8:  () => import('../levels/level_custom_8.json'),
       9:  () => import('../levels/level_custom_9.json'),
       10: () => import('../levels/level_custom_10.json'),
-      11: () => import('../levels/level_custom_11.json'),
-      12: () => import('../levels/level_custom_12.json'),
     };
     const loader = fileMap[stageNum];
     if (!loader) return;

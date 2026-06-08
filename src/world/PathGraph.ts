@@ -15,6 +15,7 @@ const SAME_FLOOR_Y    = 0.15; // 이 미만이면 같은 층으로 판정
 
 export class PathGraph {
   private nodes: Map<string, PathNode> = new Map();
+  private disabledNodes: Set<string> = new Set();
   private ladderEdges:    Array<[string, string]> = [];
   private illusionEdges:  Array<[string, string]> = [];
   private teleporterEdges: Array<[string, string]> = [];
@@ -103,7 +104,7 @@ export class PathGraph {
 
   private buildEdges(): void {
     for (const node of this.nodes.values()) node.neighbors = [];
-    const list = Array.from(this.nodes.values());
+    const list = Array.from(this.nodes.values()).filter(n => !this.disabledNodes.has(n.id));
 
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
@@ -122,6 +123,7 @@ export class PathGraph {
 
     // 사다리 엣지: 다른 층 이동 (명시적 선언 필요)
     for (const [aId, bId] of this.ladderEdges) {
+      if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
       if (a && b) {
@@ -132,6 +134,7 @@ export class PathGraph {
 
     // 착시 엣지 (카메라 방위각 트리거)
     for (const [aId, bId] of this.illusionEdges) {
+      if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
       if (a && b) {
@@ -142,6 +145,36 @@ export class PathGraph {
 
     // 순간이동 엣지는 경로탐색에 포함하지 않음.
     // 패드에 직접 도착해야만 발동 (onArrival 트리거).
+  }
+
+  /** 튜토리얼 등 런타임에 동적으로 노드를 추가한다 */
+  addWalkableNode(id: string, mesh: THREE.Object3D, halfHeight: number): void {
+    const wp = new THREE.Vector3();
+    mesh.getWorldPosition(wp);
+    this.nodes.set(id, {
+      id,
+      position: new THREE.Vector3(wp.x, wp.y + halfHeight, wp.z),
+      neighbors: [],
+      mesh,
+      halfHeight,
+    });
+    this.buildEdges();
+  }
+
+  /** 스위치/소환 게이트: 노드를 경로탐색에서 제외 (mesh는 유지) */
+  disableNode(id: string): void {
+    this.disabledNodes.add(id);
+    this.buildEdges();
+  }
+
+  /** 스위치/소환 게이트: 노드를 경로탐색에 재포함 */
+  enableNode(id: string): void {
+    this.disabledNodes.delete(id);
+    this.buildEdges();
+  }
+
+  isNodeDisabled(id: string): boolean {
+    return this.disabledNodes.has(id);
   }
 
   getNode(id: string): PathNode | undefined {

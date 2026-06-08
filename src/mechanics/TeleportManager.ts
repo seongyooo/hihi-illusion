@@ -3,10 +3,22 @@ import gsap from 'gsap';
 import type { PathNode } from '../world/PathGraph';
 import type { ParticleSystem } from '../fx/ParticleSystem';
 
+// 텔레포터 쌍마다 순서대로 배정되는 색상 팔레트
+const PAIR_COLORS = [
+  0x44DDEE, // 청록
+  0xFF6B6B, // 산호
+  0x6BCB77, // 초록
+  0xFFD93D, // 황금
+  0xC77DFF, // 보라
+  0xFF9A3C, // 주황
+];
+
 export class TeleportManager {
-  private scene:     THREE.Scene;
-  private particles: ParticleSystem;
-  private rings:     THREE.Mesh[] = [];
+  private scene:      THREE.Scene;
+  private particles:  ParticleSystem;
+  private rings:      THREE.Mesh[] = [];
+  // nodeId → 해당 패드의 색상 (playEffect에서 재사용)
+  private nodeColors: Map<string, number> = new Map();
 
   constructor(scene: THREE.Scene, particles: ParticleSystem) {
     this.scene     = scene;
@@ -14,20 +26,23 @@ export class TeleportManager {
   }
 
   setupPads(pairs: Array<[PathNode, PathNode]>): void {
-    for (const [a, b] of pairs) {
-      this.createPadRings(a);
-      this.createPadRings(b);
-    }
+    pairs.forEach(([a, b], i) => {
+      const color = PAIR_COLORS[i % PAIR_COLORS.length];
+      this.nodeColors.set(a.id, color);
+      this.nodeColors.set(b.id, color);
+      this.createPadRings(a, color);
+      this.createPadRings(b, color);
+    });
   }
 
-  private createPadRings(node: PathNode): void {
+  private createPadRings(node: PathNode, color: number): void {
     const wp = new THREE.Vector3();
     node.mesh.getWorldPosition(wp);
     const baseY = wp.y + node.halfHeight;
 
     for (let i = 0; i < 2; i++) {
       const geo = new THREE.TorusGeometry(0.24, 0.04, 8, 24);
-      const mat = new THREE.MeshLambertMaterial({ color: 0x44DDEE });
+      const mat = new THREE.MeshLambertMaterial({ color });
       const ring = new THREE.Mesh(geo, mat);
       ring.rotation.x = Math.PI / 2;
       ring.position.set(wp.x, baseY + 0.25 + i * 0.18, wp.z);
@@ -45,11 +60,12 @@ export class TeleportManager {
   }
 
   playEffect(fromNode: PathNode, toNode: PathNode): void {
+    const color = this.nodeColors.get(fromNode.id) ?? 0x44DDEE;
     const burst = (node: PathNode, delay: number) => {
       const wp = new THREE.Vector3();
       node.mesh.getWorldPosition(wp);
       wp.y += node.halfHeight;
-      setTimeout(() => this.particles.burst(wp, 0x44DDEE, 22, 1.8, 0.55), delay);
+      setTimeout(() => this.particles.burst(wp, color, 22, 1.8, 0.55), delay);
     };
     burst(fromNode, 0);
     burst(toNode, 120);
@@ -63,5 +79,6 @@ export class TeleportManager {
       (ring.material as THREE.Material).dispose();
     }
     this.rings = [];
+    this.nodeColors.clear();
   }
 }
