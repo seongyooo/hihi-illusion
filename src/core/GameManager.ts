@@ -322,6 +322,8 @@ export class GameManager {
               this.teleportMgr?.playEffect(this.graph!.getNode(nodeId)!, destNode);
               this.audio.playTeleport();
               this.controller!.teleportTo(destNode);
+              // 텔레포트 후 남은 경로를 제거 — 목적지 너머를 클릭했을 때 자동 이동 방지
+              this.controller!.stop();
               // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
               if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId) {
                 this.onMidpointReached();
