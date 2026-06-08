@@ -194,6 +194,14 @@
       "nodeB": "b051"
     }
   ],
+  "stars": [
+    {
+      "nodeId": "b060"
+    },
+    {
+      "nodeId": "b048"
+    }
+  ],
   "illusionConnections": [],
   "character": {
     "startNodeId": "b045"

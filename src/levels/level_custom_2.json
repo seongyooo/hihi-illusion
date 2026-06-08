@@ -69,33 +69,33 @@
     {
       "nodeA": "b001",
       "nodeB": "b002",
-      "activateAzimuth": 44.8,
+      "activateAzimuth": 45,
       "azimuthTolerance": 2,
-      "activateElevation": 30,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b002",
-      "activateAzimuth": 71.4,
-      "azimuthTolerance": 2,
-      "activateElevation": 27.8,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b003",
-      "activateAzimuth": 71.4,
-      "azimuthTolerance": 2,
-      "activateElevation": 27.8,
+      "activateElevation": 28.1,
       "elevationTolerance": 2
     },
     {
       "nodeA": "b001",
       "nodeB": "b004",
-      "activateAzimuth": 71.4,
+      "activateAzimuth": 89.8,
       "azimuthTolerance": 2,
-      "activateElevation": 27.8,
+      "activateElevation": 20.5,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b002",
+      "activateAzimuth": 71.6,
+      "azimuthTolerance": 2,
+      "activateElevation": 25.4,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b001",
+      "nodeB": "b004",
+      "activateAzimuth": 71.6,
+      "azimuthTolerance": 2,
+      "activateElevation": 25.4,
       "elevationTolerance": 2
     }
   ],

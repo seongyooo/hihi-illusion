@@ -185,6 +185,11 @@
       "nodeB": "b005"
     }
   ],
+  "stars": [
+    {
+      "nodeId": "b010"
+    }
+  ],
   "illusionConnections": [
     {
       "nodeA": "b003",

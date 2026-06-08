@@ -198,6 +198,14 @@
       "nodeB": "b007"
     }
   ],
+  "stars": [
+    {
+      "nodeId": "b007"
+    },
+    {
+      "nodeId": "b003"
+    }
+  ],
   "illusionConnections": [
     {
       "nodeA": "b001",
@@ -285,6 +293,14 @@
       "activateAzimuth": 18.7,
       "azimuthTolerance": 2,
       "activateElevation": 25.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b004",
+      "nodeB": "b012",
+      "activateAzimuth": 52.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 11.4,
       "elevationTolerance": 2
     }
   ],

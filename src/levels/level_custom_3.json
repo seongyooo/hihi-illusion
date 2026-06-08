@@ -90,6 +90,14 @@
       "azimuthTolerance": 2,
       "activateElevation": 21.3,
       "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b005",
+      "nodeB": "b004",
+      "activateAzimuth": 166.1,
+      "azimuthTolerance": 2,
+      "activateElevation": 13.6,
+      "elevationTolerance": 2
     }
   ],
   "character": {
