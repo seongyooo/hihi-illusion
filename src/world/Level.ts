@@ -131,8 +131,13 @@ export class Level {
         color: parseInt(bd.color.replace('#', ''), 16),
         size: bd.size,
       });
-      block.mesh.userData.blockId = bd.id;
-      block.mesh.traverse(child => { child.userData.blockId = bd.id; });
+      const blockTopY = bd.position[1] + bd.size[1] / 2;
+      block.mesh.userData.blockId   = bd.id;
+      block.mesh.userData.blockTopY = blockTopY;
+      block.mesh.traverse(child => {
+        child.userData.blockId   = bd.id;
+        child.userData.blockTopY = blockTopY;
+      });
 
       this.blocks.set(bd.id, block);
       this.group.add(block.mesh);

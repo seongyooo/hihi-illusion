@@ -92,11 +92,9 @@ export class IllusionManager {
         : azDiff < AZ_ACT  && elDiff < EL_ACT;
 
       if (desired === conn.wasActive) {
-        // 현재 상태 유지 — 대기 리셋
         conn.pendingActive = null;
         conn.pendingStart  = 0;
       } else {
-        // 상태 변경 후보: DEBOUNCE_MS 동안 동일 방향 유지 시 확정
         if (conn.pendingActive !== desired) {
           conn.pendingActive = desired;
           conn.pendingStart  = now;

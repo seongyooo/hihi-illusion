@@ -220,7 +220,7 @@ export class GameManager {
         elevationTolerance: c.elevationTolerance,
       })),
       {
-        onActivate:   () => { this.cameraCtrl.pulse(0.3); this.audio.playIllusionActivate(); },
+        onActivate:   () => { this.audio.playIllusionActivate(); },
         onDeactivate: () => {},
       }
     );
@@ -793,6 +793,7 @@ export class GameManager {
 
   private animate(): void {
     requestAnimationFrame(this.animate);
+
     this.orbit.update();
 
     if (this.orbit.enabled && this.illusionMgr && this.graph) {

@@ -37,11 +37,14 @@ export class RotatingSection {
         color: parseInt(bd.color.replace('#', ''), 16),
         size: bd.size,
       });
-      block.mesh.userData.blockId = bd.id;
+      const blockTopY = pivotPosition[1] + bd.localPosition[1] + bd.size[1] / 2;
+      block.mesh.userData.blockId   = bd.id;
       block.mesh.userData.sectionId = id;
+      block.mesh.userData.blockTopY = blockTopY;
       block.mesh.traverse(child => {
-        child.userData.blockId = bd.id;
+        child.userData.blockId   = bd.id;
         child.userData.sectionId = id;
+        child.userData.blockTopY = blockTopY;
       });
       this.pivot.add(block.mesh);
       this.blockMeshes.set(bd.id, { mesh: block.mesh, halfHeight: bd.size[1] / 2 });
