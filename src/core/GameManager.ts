@@ -324,12 +324,17 @@ export class GameManager {
               this.controller!.teleportTo(destNode);
               // 텔레포트 후 남은 경로를 제거 — 목적지 너머를 클릭했을 때 자동 이동 방지
               this.controller!.stop();
+              // QA-07: 텔레포트 목적지 노드의 별 수집 판정
+              if (this.starMgr?.tryCollect(teleportDest)) {
+                this.hud.updateStarCounter(this.starMgr.getCollected(), this.starMgr.getTotal());
+                this.audio.playStarCollect();
+              }
               // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
               if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId) {
                 this.onMidpointReached();
               }
-              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this.starMgr?.allCollected() ?? true)) {
-                this.onGoalReached();
+              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached)) {
+                this._tryGoalReached();
               }
               return;
             }
@@ -338,8 +343,8 @@ export class GameManager {
           if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId) {
             this.onMidpointReached();
           }
-          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this.starMgr?.allCollected() ?? true)) {
-            this.onGoalReached();
+          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached)) {
+            this._tryGoalReached();
           }
           if (this.isTutorial && !this.tutorialMoved) {
             this.tutorialMoved = true;
@@ -374,6 +379,8 @@ export class GameManager {
           if (section) {
             section.snapToNearest().then(() => {
               this.graph!.refresh();
+              // QA-08: 섹션 회전 후 별 메시 위치 갱신
+              this.starMgr?.refreshPositions((id) => this.graph!.getNode(id));
               this.cameraCtrl.pulse(0.3);
             });
           }
@@ -723,6 +730,19 @@ export class GameManager {
         }, 900);
       },
     });
+  }
+
+  /**
+   * QA-09: 별을 모두 수집했으면 골 클리어, 아니면 힌트 표시.
+   * 텔레포트/일반 두 경로 모두 이 메서드를 통해 처리한다.
+   */
+  private _tryGoalReached(): void {
+    if (this.starMgr && !this.starMgr.allCollected()) {
+      this.tutorialHint.showHint('★ 별을 모두 모아야 해요');
+      setTimeout(() => this.tutorialHint.hideHint(), 2000);
+      return;
+    }
+    this.onGoalReached();
   }
 
   private onGoalReached(): void {

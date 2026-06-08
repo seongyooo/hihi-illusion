@@ -7,7 +7,9 @@ export class StarManager {
   private scene:     THREE.Scene;
   private particles: ParticleSystem;
   // nodeId → 3D 메시 (수집 전까지 유지)
-  private starMeshes:   Map<string, THREE.Mesh> = new Map();
+  private starMeshes:    Map<string, THREE.Mesh> = new Map();
+  // QA-10: scale-down 애니메이션 중인 메시 — dispose 시 강제 종료 대상
+  private collectingMeshes: Set<THREE.Mesh> = new Set();
   private collectedIds: Set<string> = new Set();
   private total = 0;
 
@@ -112,14 +114,16 @@ export class StarManager {
     // 파티클 버스트
     this.particles.burst(mesh.position.clone(), 0xFFD700, 18, 1.5, 0.5);
 
-    // 크기 0으로 축소 후 제거
+    // 크기 0으로 축소 후 제거 (QA-10: collectingMeshes로 추적)
     gsap.killTweensOf(mesh.position);
     gsap.killTweensOf(mesh.rotation);
+    this.collectingMeshes.add(mesh);
     gsap.to(mesh.scale, {
       x: 0, y: 0, z: 0,
       duration: 0.28,
       ease: 'back.in',
       onComplete: () => {
+        this.collectingMeshes.delete(mesh);
         this.scene.remove(mesh);
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
@@ -134,6 +138,18 @@ export class StarManager {
   /** 별이 없는 레벨(total=0)은 항상 true */
   allCollected(): boolean { return this.collectedIds.size >= this.total; }
 
+  /**
+   * 미수집 별 메시를 모두 현재 노드 위치로 재배치한다.
+   * QA-08: RotatingSection 스냅 완료 후 호출.
+   */
+  refreshPositions(getNode: (id: string) => PathNode | undefined): void {
+    for (const nodeId of this.starMeshes.keys()) {
+      const node = getNode(nodeId);
+      if (!node) continue;
+      this.repositionStar(nodeId, node);
+    }
+  }
+
   dispose(): void {
     for (const mesh of this.starMeshes.values()) {
       gsap.killTweensOf(mesh.position);
@@ -143,6 +159,16 @@ export class StarManager {
       (mesh.material as THREE.Material).dispose();
     }
     this.starMeshes.clear();
+
+    // QA-10: scale-down 중인 메시도 강제 종료
+    for (const mesh of this.collectingMeshes) {
+      gsap.killTweensOf(mesh.scale);
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    this.collectingMeshes.clear();
+
     this.collectedIds.clear();
     this.total = 0;
   }

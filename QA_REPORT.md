@@ -33,6 +33,128 @@
 | QA-04 | P3 | ✅ 수정됨 | 미매칭 stageNum 진입 시 `currentStageNum` 미변경 + `console.warn` | `GameManager.ts` |
 | QA-05 | P3 | ✅ 수정됨 | `azimuthTol` / `elevationTol` 숫자 입력 필드 추가 (기본값 2) | `LevelEditor.ts` |
 | QA-06 | P1 | ✅ 수정됨 | Phase 8 리팩터링 회귀 — `_advance()` 마지막 노드에서 `onArrival` 이중 발동 → `tl.onComplete`에서 `_movePath.length > 0`일 때만 호출하도록 수정 | `CharacterController.ts:112` |
+| QA-07 | P2 | ✅ 수정됨 | StarManager — 텔레포트 목적지 노드의 별 미수집 → `teleportTo` 후 `tryCollect(teleportDest)` 추가 | `GameManager.ts` |
+| QA-08 | P2 | ✅ 수정됨 | StarManager — RotatingSection 회전 시 별 mesh 위치 미갱신 → `onSectionSnap`에서 `refreshPositions()` 호출 | `StarManager.ts`, `GameManager.ts` |
+| QA-09 | P3 | ✅ 수정됨 | 별 미수집 상태로 goal 도달 시 피드백 없음 → `_tryGoalReached()` 헬퍼로 분기, 힌트 2초 표시 | `GameManager.ts` |
+| QA-10 | P3 | ✅ 수정됨 | `StarManager.dispose()` scale tween 미종료 → `collectingMeshes` Set 추적, dispose 시 강제 종료 | `StarManager.ts` |
+
+---
+
+## 6차 QA (2026-06-08) — StarManager 신규 구현 검토
+
+### 수정 확인
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| QA-06 `_movePath.length > 0` 가드 | `CharacterController.ts:116` | ✅ |
+| Elevation 60° — 생성자 `minPolarAngle` | `GameManager.ts:93` | ✅ |
+| Elevation 60° — `unloadCurrent()` 유지 | `GameManager.ts:554` | ✅ |
+| `AudioManager.playStarCollect()` 존재 | `AudioManager.ts:70` | ✅ |
+| `HUD.reset()` → `hideStarCounter()` | `HUD.ts:136` | ✅ |
+| `StarManager.dispose()` — 씬 정리 | `StarManager.ts:137` | ✅ |
+
+---
+
+## 6차 QA 신규 버그 상세 (2026-06-08)
+
+---
+
+### QA-07 — StarManager: 텔레포트 목적지 노드의 별 미수집 (`GameManager.ts:317`)
+
+`onArrival` 콜백에서 별 수집(`tryCollect`) 판정은 teleport 분기 **이전**에 source 노드에 대해서만 수행된다:
+
+```typescript
+// GameManager.ts onArrival
+if (this.starMgr?.tryCollect(nodeId)) { ... }      // source pad 기준 (line 312)
+
+const teleportDest = this.graph!.getTeleportDest(nodeId);
+if (teleportDest) {
+  this.controller!.teleportTo(destNode);
+  // QA-03: goal/midpoint 판정은 있지만 별 수집 판정 없음
+  return;                                            // ← 여기서 종료 (line 332)
+}
+```
+
+`teleportTo(destNode)` 이후 목적지 노드에 대한 `tryCollect(teleportDest)` 호출이 없다. **teleporter 패드를 통해 별 위에 도착해도 별이 수집되지 않는다.**
+
+**수정 방향:** `teleportTo` 호출 직후 목적지 노드에 대한 별 수집 판정 추가:
+```typescript
+this.controller!.teleportTo(destNode);
+if (this.starMgr?.tryCollect(teleportDest)) {
+  this.hud.updateStarCounter(...);
+  this.audio.playStarCollect();
+}
+```
+
+---
+
+### QA-08 — StarManager: RotatingSection 회전 시 별 위치 미갱신 (`StarManager.ts:31`)
+
+`_createStarMesh()`에서 별은 **씬 루트에 world position 절댓값으로 고정**된다:
+
+```typescript
+// StarManager.ts:43
+node.mesh.getWorldPosition(wp);
+mesh.position.set(wp.x, baseY, wp.z); // 씬 루트 고정
+this.scene.add(mesh);                 // section.pivot 하위가 아님
+```
+
+RotatingSection이 회전하여 `graph.refresh()`가 호출되어도 StarManager에는 알림이 없다. 별 mesh는 원래 위치에 그대로 남아 **블록과 분리**된다.
+
+`repositionStar()` 메서드가 존재하지만, 현재 TutorialSequencer에서만 호출되며 일반 RotatingSection 회전에는 연동되지 않는다.
+
+**재현 조건:** RotatingSection 위에 별을 배치한 레벨에서 섹션 회전 시 재현. 현재 내장 레벨에 `stars` 필드가 없어 즉시 재현 불가.
+
+**수정 방향:** `onSectionSnap` 콜백에서 `graph.refresh()` 후 해당 섹션 블록의 별 위치를 `repositionStar()`로 갱신. 또는 별 mesh를 씬 루트가 아닌 `section.pivot` 하위에 추가하는 방식.
+
+---
+
+### QA-09 — 별 미수집 상태로 goal 도달 시 사용자 피드백 없음 (`GameManager.ts:339`)
+
+```typescript
+if (nodeId === this.goalBlockId && ... && (this.starMgr?.allCollected() ?? true)) {
+  this.onGoalReached(); // 별이 남아있으면 진입 안 함
+}
+// else: 아무것도 하지 않음
+```
+
+별을 다 모으지 않은 상태에서 goal 블록을 밟아도 **클리어 불가 이유가 표시되지 않는다**. 플레이어는 왜 클리어가 안 되는지 알 방법이 없다.
+
+**수정 방향:** `allCollected()`가 false일 때 HUD에 일시적 힌트 표시:
+```typescript
+} else if (this.starMgr && !this.starMgr.allCollected()) {
+  // 예: HUD에 "★ 별을 모두 수집하세요" 잠시 표시
+}
+```
+
+---
+
+### QA-10 — `StarManager.dispose()` scale tween 미종료 (`StarManager.ts:116,137`)
+
+`tryCollect()` 실행 시 별의 scale-down tween(0.28s)이 시작되고 mesh는 `starMeshes`에서 즉시 제거된다:
+
+```typescript
+// StarManager.ts:116
+this.starMeshes.delete(nodeId);  // starMeshes에서 제거
+gsap.to(mesh.scale, {
+  x: 0, y: 0, z: 0,
+  duration: 0.28,
+  onComplete: () => {
+    this.scene.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as THREE.Material).dispose();
+  },
+});
+```
+
+`dispose()` (레벨 언로드)가 0.28s 이내에 호출되면:
+1. `starMeshes`에 이미 없어서 `dispose()`가 이 mesh를 찾지 못함
+2. `gsap.killTweensOf(mesh.scale)` 미호출
+3. 0.28s 뒤 tween onComplete가 실행되어 이미 언로드된 씬 객체에 접근
+
+씬 참조가 유효하면 실제 크래시는 없지만, 언로드 후 씬을 건드리는 코드가 실행되는 것은 의도치 않은 동작이다.
+
+**수정 방향:** `dispose()` 내에서 이미 제거된 수집 중인 별의 tween도 종료할 수 있도록, 수집된 mesh를 별도 Set에 임시 보관하거나 `gsap.globalTimeline.kill()`을 활용.
 
 ---
 
