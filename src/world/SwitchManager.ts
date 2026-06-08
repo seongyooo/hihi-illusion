@@ -13,14 +13,15 @@ export interface SwitchDef {
 }
 
 interface SwitchState {
-  def:          SwitchDef;
-  active:       boolean;                // 현재 활성 여부
-  toggleLocked: boolean;                // toggle 모드: 이미 발동됨
-  switchMesh:   THREE.Mesh;             // 스위치 비주얼
-  switchLight:  THREE.PointLight;
-  targetMesh:   THREE.Object3D | null;  // 타깃 블록 mesh
-  origPosition: THREE.Vector3;          // type=move: 원래 위치
-  isMoving:     boolean;                // type=move: tween 진행 중
+  def:             SwitchDef;
+  active:          boolean;                // 현재 활성 여부
+  toggleLocked:    boolean;                // toggle 모드: 이미 발동됨
+  switchMesh:      THREE.Mesh;             // 스위치 비주얼
+  switchLight:     THREE.PointLight;
+  targetMesh:      THREE.Object3D | null;  // 타깃 블록 mesh
+  targetOrigParent: THREE.Object3D | null; // 타깃 블록의 원래 부모 (level.group 등)
+  origPosition:    THREE.Vector3;          // type=move: 원래 위치
+  isMoving:        boolean;                // type=move: tween 진행 중
 }
 
 // 스위치 색상
@@ -31,6 +32,8 @@ export class SwitchManager {
   private states: SwitchState[] = [];
   private scene: THREE.Scene;
   private particles: ParticleSystem;
+  // targetNodeId → 함께 숨겨야 할 메시 목록 (별, 텔레포트 링, 목표 링 등)
+  private attachedMeshes: Map<string, THREE.Object3D[]> = new Map();
 
   constructor(scene: THREE.Scene, particles: ParticleSystem) {
     this.scene     = scene;
@@ -63,13 +66,15 @@ export class SwitchManager {
       this.scene.add(light);
 
       const targetMesh = getMesh(def.targetNodeId) ?? null;
+      const targetOrigParent = targetMesh?.parent ?? null;
       const origPosition = targetMesh
         ? targetMesh.position.clone()
         : new THREE.Vector3();
 
       // type='spawn': 초기 상태에서 타깃 블록 숨김
+      // scene.remove()는 직접 자식이 아니면 무효 → removeFromParent() 사용
       if (def.type === 'spawn' && targetMesh) {
-        this.scene.remove(targetMesh);
+        targetMesh.removeFromParent();
         graph.disableNode(def.targetNodeId);
       }
 
@@ -80,10 +85,24 @@ export class SwitchManager {
         switchMesh: mesh,
         switchLight: light,
         targetMesh,
+        targetOrigParent,
         origPosition,
         isMoving: false,
       });
     }
+  }
+
+  /**
+   * 스폰 타겟 블록에 연동된 메시(별, 텔레포트 링, 목표 마커 등)를 등록.
+   * setup() 이후에 호출해야 한다. 현재 비활성 상태이면 즉시 숨긴다.
+   */
+  attachMeshes(targetNodeId: string, meshes: THREE.Object3D[]): void {
+    this.attachedMeshes.set(targetNodeId, meshes);
+    // 현재 비활성 상태(스폰 전)면 즉시 숨김
+    const state = this.states.find(
+      s => s.def.targetNodeId === targetNodeId && s.def.type === 'spawn' && !s.active,
+    );
+    if (state) meshes.forEach(m => { m.visible = false; });
   }
 
   /** CharacterController의 onArrival / onDepart 에서 호출 */
@@ -135,7 +154,8 @@ export class SwitchManager {
     const mesh = state.targetMesh;
     if (!mesh) return;
 
-    this.scene.add(mesh);
+    // 원래 부모(level.group)로 복원, 없으면 scene에 직접 추가
+    (state.targetOrigParent ?? this.scene).add(mesh);
     graph.enableNode(state.def.targetNodeId);
     graph.refresh();
 
@@ -146,6 +166,10 @@ export class SwitchManager {
     const wp = new THREE.Vector3();
     mesh.getWorldPosition(wp);
     this.particles.burst(wp, COLOR_SPAWN, 18, 1.2, 0.6);
+
+    // 연동된 메시(별, 링 등) 표시
+    const attached = this.attachedMeshes.get(state.def.targetNodeId) ?? [];
+    attached.forEach(m => { m.visible = true; });
   }
 
   private despawnTarget(state: SwitchState, graph: PathGraph): void {
@@ -155,12 +179,16 @@ export class SwitchManager {
     graph.disableNode(state.def.targetNodeId);
     graph.refresh();
 
+    // 연동된 메시(별, 링 등) 즉시 숨김
+    const attached = this.attachedMeshes.get(state.def.targetNodeId) ?? [];
+    attached.forEach(m => { m.visible = false; });
+
     // scale-out 연출 후 제거
     gsap.to(mesh.scale, {
       x: 0, y: 0, z: 0,
       duration: 0.3,
       ease: 'back.in',
-      onComplete: () => { this.scene.remove(mesh); mesh.scale.set(1, 1, 1); },
+      onComplete: () => { mesh.removeFromParent(); mesh.scale.set(1, 1, 1); },
     });
   }
 
@@ -196,9 +224,10 @@ export class SwitchManager {
 
       // spawn 타입: 씬에 없을 수도 있는 targetMesh도 정리
       if (state.targetMesh) {
-        this.scene.remove(state.targetMesh);
+        state.targetMesh.removeFromParent();
       }
     }
     this.states = [];
+    this.attachedMeshes.clear();
   }
 }

@@ -65,9 +65,10 @@ export class EditorLobby {
       { num: 6,  name: 'Custom Level' },
       { num: 7,  name: 'The Relay'    },
       { num: 8,  name: 'The Elevator' },
-      { num: 9,  name: 'Mirage'       },
-      { num: 10, name: 'Convergence'  },
-      { num: 11, name: 'Custom Level' },
+      { num: 9,  name: 'Mirage'         },
+      { num: 10, name: 'Convergence'    },
+      { num: 11, name: 'Custom Level'   },
+      { num: 12, name: 'Pressure Gate'  },
     ];
     for (const s of builtinStages) {
       const card = document.createElement('div');

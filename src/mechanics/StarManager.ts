@@ -63,6 +63,11 @@ export class StarManager {
     });
   }
 
+  /** 해당 노드의 별 메시를 반환 (없으면 undefined). SwitchManager 연동용. */
+  getStarMesh(nodeId: string): THREE.Mesh | undefined {
+    return this.starMeshes.get(nodeId);
+  }
+
   /**
    * 별 메시를 지하로 숨긴다.
    * 튜토리얼에서 블록을 underground로 내릴 때 별도 함께 숨기기 위해 사용.

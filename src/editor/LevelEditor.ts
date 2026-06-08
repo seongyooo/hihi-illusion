@@ -27,6 +27,13 @@ interface IllusionConn {
   elevationTol: number;
 }
 
+interface SwitchConn {
+  switchNodeId: string;
+  targetNodeId: string;
+  mode: 'hold' | 'toggle';
+  type: 'spawn' | 'move';
+}
+
 type Tool = 'place' | 'erase' | 'select';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -87,6 +94,7 @@ export class LevelEditor {
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starNodeIds:     string[] = [];
+  private switchConns:    SwitchConn[] = [];
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
   private goalBlockId:    string | null = null;
@@ -108,10 +116,12 @@ export class LevelEditor {
   private ladderListEl!: HTMLElement;
   private teleporterListEl!: HTMLElement;
   private starListEl!:       HTMLElement;
+  private switchListEl!:     HTMLElement;
   private illusionFormEl!:   HTMLElement;
   private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
   private starFormEl!:       HTMLElement;
+  private switchFormEl!:     HTMLElement;
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private selIdEl!: HTMLElement;
@@ -604,6 +614,78 @@ export class LevelEditor {
       });
     }));
 
+    // Switches
+    p.appendChild(this.buildSection('SWITCHES', (sec) => {
+      this.switchListEl = document.createElement('div');
+      sec.appendChild(this.switchListEl);
+      this.rebuildSwitchList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Switch';
+      addBtn.style.width = '100%';
+      addBtn.style.marginTop = '6px';
+      sec.appendChild(addBtn);
+
+      this.switchFormEl = document.createElement('div');
+      this.switchFormEl.className = 'editor-add-form';
+      this.switchFormEl.innerHTML = `
+        <div class="editor-row">
+          <label>Switch:</label><input class="editor-input" id="sw-switch" style="width:80px" placeholder="e.g. b004">
+          <label>Target:</label><input class="editor-input" id="sw-target" style="width:80px" placeholder="e.g. b005">
+        </div>
+        <div class="editor-row" style="gap:8px;">
+          <label>Mode:</label>
+          <select class="editor-input" id="sw-mode" style="width:80px">
+            <option value="toggle">toggle</option>
+            <option value="hold">hold</option>
+          </select>
+          <label>Type:</label>
+          <select class="editor-input" id="sw-type" style="width:70px">
+            <option value="spawn">spawn</option>
+            <option value="move">move</option>
+          </select>
+        </div>
+      `;
+
+      const swAddBtn = document.createElement('button');
+      swAddBtn.className = 'editor-btn primary';
+      swAddBtn.textContent = 'Add';
+      swAddBtn.style.marginTop = '6px';
+      swAddBtn.addEventListener('click', () => {
+        const switchNodeId = (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value.trim();
+        const targetNodeId = (this.switchFormEl.querySelector('#sw-target') as HTMLInputElement).value.trim();
+        const mode = (this.switchFormEl.querySelector('#sw-mode') as HTMLSelectElement).value as 'hold' | 'toggle';
+        const type = (this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement).value as 'spawn' | 'move';
+        if (switchNodeId && targetNodeId) {
+          this.switchConns.push({ switchNodeId, targetNodeId, mode, type });
+          this.rebuildSwitchList();
+          (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = '';
+          (this.switchFormEl.querySelector('#sw-target') as HTMLInputElement).value = '';
+          this.switchFormEl.classList.remove('open');
+        }
+      });
+
+      // 선택한 블록을 Switch로, 다른 블록을 Target으로 빠르게 추가하는 헬퍼 버튼
+      const swAddSelectedBtn = document.createElement('button');
+      swAddSelectedBtn.className = 'editor-btn';
+      swAddSelectedBtn.textContent = 'Use Selected as Switch Node';
+      swAddSelectedBtn.style.marginTop = '4px';
+      swAddSelectedBtn.style.width = '100%';
+      swAddSelectedBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = this.selectedBlock.id;
+      });
+
+      this.switchFormEl.appendChild(swAddBtn);
+      this.switchFormEl.appendChild(swAddSelectedBtn);
+      sec.appendChild(this.switchFormEl);
+
+      addBtn.addEventListener('click', () => {
+        this.switchFormEl.classList.toggle('open');
+      });
+    }));
+
     // Export
     p.appendChild(this.buildSection('EXPORT', (sec) => {
       const nameRow = document.createElement('div');
@@ -792,6 +874,24 @@ export class LevelEditor {
     });
   }
 
+  private rebuildSwitchList(): void {
+    this.switchListEl.innerHTML = '';
+    this.switchConns.forEach((sw, i) => {
+      const item = document.createElement('div');
+      item.className = 'editor-conn-item';
+      const typeColor = sw.type === 'spawn' ? '#44DDBB' : '#FFAA44';
+      item.innerHTML = `<span style="color:${typeColor}">⬡</span> <span>${sw.switchNodeId} → ${sw.targetNodeId} <small>[${sw.mode}/${sw.type}]</small></span>`;
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        this.switchConns.splice(i, 1);
+        this.rebuildSwitchList();
+      });
+      item.appendChild(del);
+      this.switchListEl.appendChild(item);
+    });
+  }
+
   private updateSelectedPanel(): void {
     const b = this.selectedBlock;
     if (b) {
@@ -886,7 +986,10 @@ export class LevelEditor {
     if (this.startNodeId    === block.id) this.startNodeId    = this.blocks[0]?.id ?? null;
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
     if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
-    this.starNodeIds = this.starNodeIds.filter(id => id !== block.id);
+    this.starNodeIds  = this.starNodeIds.filter(id => id !== block.id);
+    this.switchConns  = this.switchConns.filter(
+      sw => sw.switchNodeId !== block.id && sw.targetNodeId !== block.id,
+    );
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -1173,6 +1276,12 @@ export class LevelEditor {
       ladders: this.ladderConns,
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
+      switches: this.switchConns.length > 0 ? this.switchConns.map(sw => ({
+        switchNodeId: sw.switchNodeId,
+        targetNodeId: sw.targetNodeId,
+        mode: sw.mode,
+        type: sw.type,
+      })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -1208,6 +1317,7 @@ export class LevelEditor {
     this.ladderConns     = [];
     this.teleporterConns = [];
     this.starNodeIds     = [];
+    this.switchConns     = [];
     this.selectedBlock   = null;
     this.hoveredBlock    = null;
     this.midpointBlockId = null;
@@ -1265,12 +1375,19 @@ export class LevelEditor {
     this.ladderConns     = data.ladders ?? [];
     this.teleporterConns = data.teleporters ?? [];
     this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
+    this.switchConns     = (data.switches ?? []).map(sw => ({
+      switchNodeId: sw.switchNodeId,
+      targetNodeId: sw.targetNodeId,
+      mode: sw.mode,
+      type: sw.type,
+    }));
 
     // Rebuild panel lists
     this.rebuildIllusionList();
     this.rebuildLadderList();
     this.rebuildTeleporterList();
     this.rebuildStarList();
+    this.rebuildSwitchList();
     this.updateSelectedPanel();
     this.updateMarkers();
     for (const b of this.blocks) this.addLabel(b.id);
@@ -1321,6 +1438,7 @@ export class LevelEditor {
       9:  () => import('../levels/level_custom_9.json'),
       10: () => import('../levels/level_custom_10.json'),
       11: () => import('../levels/level_custom_11.json'),
+      12: () => import('../levels/level_custom_12.json'),
     };
     const loader = fileMap[stageNum];
     if (!loader) return;

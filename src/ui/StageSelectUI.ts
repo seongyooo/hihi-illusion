@@ -1,7 +1,7 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
 
 const TOTAL_STAGES     = 30;
-const BUILTIN_STAGES   = 11;  // stage 1-11 에만 실제 레벨 파일이 있음
+const BUILTIN_STAGES   = 12;  // stage 1-12 에만 실제 레벨 파일이 있음
 
 export class StageSelectUI {
   private el: HTMLElement;

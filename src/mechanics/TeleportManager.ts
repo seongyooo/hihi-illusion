@@ -19,6 +19,8 @@ export class TeleportManager {
   private rings:      THREE.Mesh[] = [];
   // nodeId → 해당 패드의 색상 (playEffect에서 재사용)
   private nodeColors: Map<string, number> = new Map();
+  // nodeId → 해당 노드 위의 링 메시 목록 (SwitchManager 연동용)
+  private nodeRings:  Map<string, THREE.Mesh[]> = new Map();
 
   constructor(scene: THREE.Scene, particles: ParticleSystem) {
     this.scene     = scene;
@@ -40,6 +42,8 @@ export class TeleportManager {
     node.mesh.getWorldPosition(wp);
     const baseY = wp.y + node.halfHeight;
 
+    if (!this.nodeRings.has(node.id)) this.nodeRings.set(node.id, []);
+
     for (let i = 0; i < 2; i++) {
       const geo = new THREE.TorusGeometry(0.24, 0.04, 8, 24);
       const mat = new THREE.MeshLambertMaterial({ color });
@@ -48,6 +52,7 @@ export class TeleportManager {
       ring.position.set(wp.x, baseY + 0.25 + i * 0.18, wp.z);
       this.scene.add(ring);
       this.rings.push(ring);
+      this.nodeRings.get(node.id)!.push(ring);
 
       const dir = i % 2 === 0 ? 1 : -1;
       gsap.to(ring.rotation, {
@@ -57,6 +62,11 @@ export class TeleportManager {
         ease: 'none',
       });
     }
+  }
+
+  /** 해당 노드 위의 패드 링 목록을 반환. SwitchManager 연동용. */
+  getRingsForNode(nodeId: string): THREE.Mesh[] {
+    return this.nodeRings.get(nodeId) ?? [];
   }
 
   playEffect(fromNode: PathNode, toNode: PathNode): void {
@@ -80,5 +90,6 @@ export class TeleportManager {
     }
     this.rings = [];
     this.nodeColors.clear();
+    this.nodeRings.clear();
   }
 }

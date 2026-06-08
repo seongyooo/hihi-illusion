@@ -1,0 +1,80 @@
+{
+  "id": "custom_stage_12",
+  "name": "Pressure Gate",
+  "backgroundColor": "#E8F0EE",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [4, 0.25, 5],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [4, 0.25, 4],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b003",
+      "position": [4, 0.25, 3],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [4, 0.25, 2],
+      "color": "#A8DAC8",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b005",
+      "position": [4, 0.25, 1],
+      "color": "#C8E8D8",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b006",
+      "position": [4, 0.25, 0],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b007",
+      "position": [3, 0.25, 0],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    },
+    {
+      "id": "b008",
+      "position": [4, 0.25, -1],
+      "color": "#A8C5DA",
+      "size": [1, 0.5, 1],
+      "walkable": true
+    }
+  ],
+  "switches": [
+    {
+      "switchNodeId": "b004",
+      "targetNodeId": "b005",
+      "mode": "toggle",
+      "type": "spawn"
+    }
+  ],
+  "stars": [
+    { "nodeId": "b007" }
+  ],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b008"
+  }
+}
