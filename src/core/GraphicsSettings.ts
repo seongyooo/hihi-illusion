@@ -5,6 +5,7 @@ const KEY_BLOCK_COLOR   = 'hihi_block_color';
 const KEY_BLOCK_VARIANT = 'hihi_block_variant';
 const KEY_CHAR_BODY     = 'hihi_char_body';
 const KEY_CHAR_HEAD     = 'hihi_char_head';
+const KEY_CHAR_TYPE     = 'hihi_char_type';
 const KEY_LIGHT_AMB      = 'hihi_light_amb';
 const KEY_LIGHT_DIR      = 'hihi_light_dir';
 const KEY_LIGHT_HEMI     = 'hihi_light_hemi';
@@ -77,6 +78,14 @@ export class GraphicsSettings {
   }
   static set characterHeadColor(val: string) { localStorage.setItem(KEY_CHAR_HEAD, val); }
 
+  static get characterType(): string {
+    return localStorage.getItem(KEY_CHAR_TYPE) ?? 'default';
+  }
+  static set characterType(val: string) {
+    if (val === 'default') localStorage.removeItem(KEY_CHAR_TYPE);
+    else localStorage.setItem(KEY_CHAR_TYPE, val);
+  }
+
   // ── Light intensity overrides (null = use mode default) ───────────────
   static get lightAmbient(): number | null { return getNum(KEY_LIGHT_AMB); }
   static set lightAmbient(val: number | null) { setNum(KEY_LIGHT_AMB, val); }
@@ -113,6 +122,7 @@ export class GraphicsSettings {
     localStorage.removeItem(KEY_BLOCK_VARIANT);
     localStorage.removeItem(KEY_CHAR_BODY);
     localStorage.removeItem(KEY_CHAR_HEAD);
+    localStorage.removeItem(KEY_CHAR_TYPE);
   }
 
   static resetLights(): void {

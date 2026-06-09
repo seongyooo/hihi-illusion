@@ -59,6 +59,7 @@ export interface BlockData {
   color: string;
   size: [number, number, number];
   walkable: boolean;
+  variant?: string;
 }
 
 export interface RotatingSectionData {

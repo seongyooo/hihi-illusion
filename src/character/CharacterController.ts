@@ -61,10 +61,32 @@ export class CharacterController {
     this.pendingTarget = null;
     gsap.killTweensOf(this.character.mesh.position);
     gsap.killTweensOf(this.character.mesh.rotation);
+    this.character.stopWalk();
     this.isMoving = false;
     // 현재 노드 위치로 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
     this.character.setPosition(
+      this._wp.x,
+      this._wp.y + this.currentNode.halfHeight,
+      this._wp.z,
+    );
+  }
+
+  /**
+   * 현재 캐릭터를 새 캐릭터로 교체한다.
+   * 설정 화면에서 타입 변경 시 사용.
+   */
+  replaceCharacter(char: import('./Character').Character): void {
+    gsap.killTweensOf(this.character.mesh.position);
+    gsap.killTweensOf(this.character.mesh.rotation);
+    this.character.stopWalk();
+    this.character    = char;
+    this.isMoving     = false;
+    this.pendingTarget = null;
+    this._movePath    = [];
+    // 현재 노드 위치로 즉시 스냅
+    this.currentNode.mesh.getWorldPosition(this._wp);
+    char.setPosition(
       this._wp.x,
       this._wp.y + this.currentNode.halfHeight,
       this._wp.z,
@@ -76,6 +98,7 @@ export class CharacterController {
     if (path.length === 0) return;
 
     this.isMoving  = true;
+    this.character.startWalk();
     this._movePath = path.slice(1); // start 제외, 방문할 노드 목록
     this._advance();
   }
@@ -90,6 +113,7 @@ export class CharacterController {
     if (this._movePath.length === 0) {
       // 최종 목적지 도달
       this.isMoving = false;
+      this.character.stopWalk();
       this.onArrival?.(this.currentNode.id);
       if (this.pendingTarget && this.pendingTarget !== this.currentNode) {
         const next = this.pendingTarget;

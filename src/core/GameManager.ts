@@ -9,6 +9,7 @@ import { Level }              from '../world/Level';
 import type { LevelData }     from '../world/Level';
 import { PathGraph }          from '../world/PathGraph';
 import { Character }          from '../character/Character';
+import type { CharacterType } from '../character/Character';
 import { CharacterController } from '../character/CharacterController';
 import { IllusionManager }    from '../illusion/IllusionManager';
 import { HUD }                from '../ui/HUD';
@@ -185,6 +186,35 @@ export class GameManager {
       GraphicsSettings.starBackground = enabled;
       this.starBackground.setVisible(enabled);
       this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
+    };
+
+    this.settingsScreen.onCharacterTypeChange = (type) => {
+      GraphicsSettings.characterType = type;
+      if (!this.character || !this.controller) return;
+
+      // 새 캐릭터 생성
+      const next = new Character(type as CharacterType);
+      if (this.isTutorial) {
+        next.setBodyColor(COLOR_DEFAULTS.charBody);
+        next.setHeadColor(COLOR_DEFAULTS.charHead);
+      } else {
+        next.setBodyColor(GraphicsSettings.characterBodyColor);
+        next.setHeadColor(GraphicsSettings.characterHeadColor);
+      }
+
+      // 씬에서 구 캐릭터 제거 + 신 캐릭터 추가
+      this.renderer.scene.remove(this.character.mesh);
+      this.character.mesh.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(m => (m as THREE.Material).dispose());
+        }
+      });
+
+      this.renderer.scene.add(next.mesh);
+      this.character = next;
+      this.controller.replaceCharacter(next);
     };
 
     // 로비: 새 스테이지 만들기
@@ -383,8 +413,8 @@ export class GameManager {
       this.elevatorMgr.setup(data.elevators!, this.graph);
     }
 
-    // Character — 튜토리얼은 기본 외형 유지 (색상 설정 미적용)
-    this.character = new Character();
+    // Character — 타입은 항상 settings 값 사용, 튜토리얼은 색상만 기본값 유지
+    this.character = new Character(GraphicsSettings.characterType as CharacterType);
     if (this.isTutorial) {
       this.character.setBodyColor(COLOR_DEFAULTS.charBody);
       this.character.setHeadColor(COLOR_DEFAULTS.charHead);

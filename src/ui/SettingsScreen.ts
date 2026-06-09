@@ -14,6 +14,7 @@ export class SettingsScreen {
   private blockToggle!:       HTMLInputElement;
   private blockRow!:          ColorRow;
   private variantBtns!:       HTMLButtonElement[];
+  private charTypeBtns!:      HTMLButtonElement[];
   private charBodyRow!:       ColorRow;
   private charHeadRow!:       ColorRow;
   private ambRow!:            SliderRow;
@@ -31,6 +32,7 @@ export class SettingsScreen {
   onLightChange:          (type: 'ambient' | 'dir' | 'hemi', val: number | null) => void = () => {};
   onExposureChange:       (val: number | null)     => void = () => {};
   onStarBgChange:         (enabled: boolean)       => void = () => {};
+  onCharacterTypeChange:  (type: string)            => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -126,6 +128,13 @@ export class SettingsScreen {
     );
     this.variantBtns = variantR.btns;
     body.appendChild(variantR.el);
+
+    const charTypeR = this.makeCharTypeRow(
+      GraphicsSettings.characterType,
+      (t) => { this.onCharacterTypeChange(t); this.preview.refresh(); },
+    );
+    this.charTypeBtns = charTypeR.btns;
+    body.appendChild(charTypeR.el);
 
     const charBodyR = this.makeColorRow(
       'Character Body',
@@ -383,6 +392,46 @@ export class SettingsScreen {
     return { el: row, checkbox, colorRow: { swatch, picker } };
   }
 
+  private makeCharTypeRow(
+    initial: string,
+    onChange: (type: string) => void,
+  ): { el: HTMLElement; btns: HTMLButtonElement[] } {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'settings-row__label';
+    lbl.textContent = 'Character';
+
+    const right = document.createElement('div');
+    right.className = 'settings-row__right';
+
+    const types: { key: string; label: string }[] = [
+      { key: 'default', label: 'DEFAULT' },
+      { key: 'robot',   label: 'ROBOT'   },
+      { key: 'human',   label: 'HUMAN'   },
+    ];
+
+    const btns: HTMLButtonElement[] = types.map(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.className = 'variant-btn';
+      btn.dataset.charType = key;
+      btn.textContent = label;
+      if (key === initial) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        onChange(key);
+      });
+      right.appendChild(btn);
+      return btn;
+    });
+
+    row.appendChild(lbl);
+    row.appendChild(right);
+    return { el: row, btns };
+  }
+
   private makeVariantRow(
     initial: string,
     onChange: (variant: string) => void,
@@ -498,6 +547,10 @@ export class SettingsScreen {
     // Variant reset to 'default'
     this.variantBtns.forEach(b => b.classList.toggle('active', b.dataset.variant === 'default'));
     this.onBlockVariantChange('default');
+
+    // Character type reset to 'default'
+    this.charTypeBtns.forEach(b => b.classList.toggle('active', b.dataset.charType === 'default'));
+    this.onCharacterTypeChange('default');
 
     this.charBodyRow.swatch.style.backgroundColor = COLOR_DEFAULTS.charBody;
     this.charBodyRow.picker.value = COLOR_DEFAULTS.charBody;
