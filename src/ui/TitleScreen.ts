@@ -1,7 +1,8 @@
 export class TitleScreen {
   private el: HTMLElement;
-  onPlay: () => void = () => {};
-  onDev: () => void = () => {};
+  onPlay:     () => void = () => {};
+  onDev:      () => void = () => {};
+  onSettings: () => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -12,17 +13,23 @@ export class TitleScreen {
     title.textContent = 'ILLUSION';
     this.el.appendChild(title);
 
-    const btn = document.createElement('button');
-    btn.className = 'title-screen__play';
-    btn.textContent = 'PLAY';
-    btn.addEventListener('click', () => this.onPlay());
-    this.el.appendChild(btn);
+    const playBtn = document.createElement('button');
+    playBtn.className = 'title-screen__play';
+    playBtn.textContent = 'PLAY';
+    playBtn.addEventListener('click', () => this.onPlay());
+    this.el.appendChild(playBtn);
 
     const devBtn = document.createElement('button');
     devBtn.className = 'title-screen__dev';
     devBtn.textContent = 'DEV';
     devBtn.addEventListener('click', () => this.onDev());
     this.el.appendChild(devBtn);
+
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'title-screen__settings-btn';
+    settingsBtn.textContent = 'SETTINGS';
+    settingsBtn.addEventListener('click', () => this.onSettings());
+    this.el.appendChild(settingsBtn);
 
     container.appendChild(this.el);
   }

@@ -114,7 +114,7 @@ export class Level {
     this.scene = scene;
   }
 
-  load(data: LevelData): void {
+  load(data: LevelData, variantOverride?: string): void {
     this.blocks.clear();
     this.sections = [];
     this.walkableMeshes = [];
@@ -126,10 +126,13 @@ export class Level {
 
     // Static blocks
     for (const bd of data.blocks) {
+      // per-block JSON variant takes priority; then variantOverride (from settings, non-tutorial only)
+      const resolvedVariant = (bd.variant ?? variantOverride ?? 'default') as import('./Block').BlockVariant;
       const block = new Block({
         position: bd.position,
-        color: parseInt(bd.color.replace('#', ''), 16),
-        size: bd.size,
+        color:    parseInt(bd.color.replace('#', ''), 16),
+        size:     bd.size,
+        variant:  resolvedVariant,
       });
       const blockTopY = bd.position[1] + bd.size[1] / 2;
       block.mesh.userData.blockId   = bd.id;
@@ -163,6 +166,16 @@ export class Level {
 
   getGroup(): THREE.Group               { return this.group; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
+
+  /** Apply a global hex color to all blocks, or restore each block's original JSON color. */
+  recolorAllBlocks(hexOverride: number | null): void {
+    this.blocks.forEach(block => block.recolor(hexOverride));
+  }
+
+  /** Apply a global material variant to all blocks. */
+  revariantAllBlocks(variant: import('./Block').BlockVariant): void {
+    this.blocks.forEach(block => block.revariant(variant));
+  }
 
   dispose(): void {
     this.group.traverse(child => {

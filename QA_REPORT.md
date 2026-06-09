@@ -1,7 +1,7 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-08  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적)
+> 최종 업데이트: 2026-06-09  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + **9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션)**
 
 ---
 
@@ -9,6 +9,13 @@
 
 | ID | 우선순위 | 상태 | 내용 | 파일 |
 |---|---|---|---|---|
+| QA-SP1 | P2 | 🔴 미수정 | `SwitchManager.dispose()` spawn 타입 targetMesh geometry/material 미해제 — `Level.dispose()` 순회 범위 밖에서 누수 | `SwitchManager.ts:226` |
+| QA-SP2 | P4 | 🔴 미수정 | `SwitchManager.dispose()` / `despawnTarget()` — scale-out GSAP tween 진행 중 dispose 시 `killTweensOf()` 미호출 | `SwitchManager.ts:218,187` |
+| QA-13 | P2 | ✅ 수정됨 | `Renderer.applyQuality()` 반복 호출 시 이전 환경맵 텍스처 미해제 — GPU 메모리 누수 | `Renderer.ts:87` |
+| QA-14 | P2 | ✅ 수정됨 | `_swapSceneMaterials()` Standard→Lambert 변환 시 `emissive`/`emissiveIntensity` 미복사 — 발광 효과 소실 | `GameManager.ts:923` |
+| QA-15 | P3 | ✅ 수정됨 | `SettingsScreen.resetAll()` Enhanced Rendering 체크박스·저장값 미초기화 | `SettingsScreen.ts:399` |
+| QA-16 | P4 | ✅ 수정됨 | `SettingsPreview` RAF 루프가 설정 화면 숨김 후에도 계속 실행 — 불필요한 GPU 렌더링 | `SettingsPreview.ts:189` |
+| QA-17 | P4 | ✅ 수정됨 | `Renderer.ts` `visualViewport` resize 리스너 미정리 (기존 LOW-03 패턴 재발) | `Renderer.ts:54` |
 | BUG-01 | P1 | ✅ 수정됨 | `tolerance` 1° → 2°로 소폭 상향 | `level03.json` |
 | BUG-03 | P1 | ✅ 수정됨 | `playIllusionActivate()` 미호출 | `GameManager.ts:208` |
 | BUG-04 | P1 | ✅ 수정됨 | 디버그 UI(BlockLabels, HUD setDebug) 항상 노출 | `GameManager.ts:65,193,688` |
@@ -37,6 +44,569 @@
 | QA-08 | P2 | ✅ 수정됨 | StarManager — RotatingSection 회전 시 별 mesh 위치 미갱신 → `onSectionSnap`에서 `refreshPositions()` 호출 | `StarManager.ts`, `GameManager.ts` |
 | QA-09 | P3 | ✅ 수정됨 | 별 미수집 상태로 goal 도달 시 피드백 없음 → `_tryGoalReached()` 헬퍼로 분기, 힌트 2초 표시 | `GameManager.ts` |
 | QA-10 | P3 | ✅ 수정됨 | `StarManager.dispose()` scale tween 미종료 → `collectingMeshes` Set 추적, dispose 시 강제 종료 | `StarManager.ts` |
+
+---
+
+## 9차 QA (2026-06-09) — Pressure Switch Type A (spawn gate) / Stage 12 / LevelEditor SWITCHES 섹션
+
+### 변경 내용 (커밋 87027bf)
+
+| 항목 | 파일 |
+|------|------|
+| `SwitchManager` — `removeFromParent()` 수정, `targetOrigParent` 추가, `attachedMeshes` 연동 | `SwitchManager.ts` |
+| `StarManager` — `getStarMesh()` API 추가 | `StarManager.ts` |
+| `TeleportManager` — `nodeRings` 맵 + `getRingsForNode()` API 추가 | `TeleportManager.ts` |
+| `GameManager` — `_linkSwitchAttachments()` 추가, `builtinIds[12]` 등록 | `GameManager.ts` |
+| `LevelEditor` — SWITCHES 섹션 추가 (DEV 전용) | `LevelEditor.ts` |
+| Stage 12 `level_custom_12.json` 추가 — "Pressure Gate" (toggle spawn 시연) | `levels/level_custom_12.json` |
+| `StageSelectUI` — `BUILTIN_STAGES = 12` | `StageSelectUI.ts` |
+| `EditorLobby` — Stage 12 카드 추가 | `EditorLobby.ts` |
+| `levels/registry.ts` — `custom_stage_12` 등록 | `registry.ts` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `scene.remove()` 대신 `removeFromParent()` 사용 (버그 수정) | `SwitchManager.ts:77,191,227` | ✅ |
+| `targetOrigParent` 포착 시점 — `removeFromParent()` 이전 | `SwitchManager.ts:69` | ✅ |
+| `spawnTarget()` — `origParent.add(mesh)` 후 `mesh.scale.set(0,0,0)` + gsap scale-in | `SwitchManager.ts:158-164` | ✅ |
+| `despawnTarget()` — scale-out 후 `onComplete`에서 `mesh.scale.set(1,1,1)` 복원 | `SwitchManager.ts:191` | ✅ |
+| `attachMeshes()` — 비활성 상태면 즉시 `visible=false` 설정 | `SwitchManager.ts:99-106` | ✅ |
+| `spawnTarget()` / `despawnTarget()` — attached 메시 show/hide | `SwitchManager.ts:170-172, 183-184` | ✅ |
+| `attachedMeshes.clear()` in `dispose()` | `SwitchManager.ts:231` | ✅ |
+| `_linkSwitchAttachments()` 호출 위치 — `_initLevelObjects` 마지막 (모든 mgr 초기화 후) | `GameManager.ts:469` | ✅ |
+| `getStarMesh()` — `starMeshes.get(nodeId)` 반환 | `StarManager.ts:64` | ✅ |
+| `getRingsForNode()` — `nodeRings.get(nodeId) ?? []` 반환 | `TeleportManager.ts:68` | ✅ |
+| `nodeRings.clear()` in `dispose()` | `TeleportManager.ts:93` | ✅ |
+| `fileMap[12]` 등록 | `LevelEditor.ts` | ✅ |
+| Stage 12 character.startNodeId `b001` 존재 | `level_custom_12.json` | ✅ |
+| Stage 12 goal.blockId `b008` 존재 | `level_custom_12.json` | ✅ |
+| Stage 12 switch.switchNodeId `b004` 존재 | `level_custom_12.json` | ✅ |
+| Stage 12 switch.targetNodeId `b005` 존재 | `level_custom_12.json` | ✅ |
+| Stage 12 star.nodeId `b007` 존재 | `level_custom_12.json` | ✅ |
+| Stage 12 b005(spawn target) 없이 b001→b004까지 경로 확인 (XZ ≤ 1.1) | `level_custom_12.json` | ✅ |
+| Stage 12 b004→b006 직접 연결 불가 (XZ 거리 = 2.0 > 1.1) — 스위치 강제 | `level_custom_12.json` | ✅ |
+| Stage 12 b005 스폰 후 b004→b005→b006→b007→b006→b008 완성 경로 | `level_custom_12.json` | ✅ |
+| Stage 12 b007(star) ↔ b008(goal) 비인접 (XZ ≈ 1.41 > 1.1) — 반드시 b006 경유 | `level_custom_12.json` | ✅ |
+| `BUILTIN_STAGES = 12` | `StageSelectUI.ts:4` | ✅ |
+| `builtinIds[12]` 등록 | `GameManager.ts:228` | ✅ |
+| `EditorLobby` Stage 12 카드 | `EditorLobby.ts:68` | ✅ |
+| `registry.ts` `custom_stage_12` 등록 | `registry.ts` | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-SP1 — `SwitchManager.dispose()` spawn targetMesh geometry/material 미해제 (`SwitchManager.ts:226`)
+
+`SwitchManager.dispose()`는 spawn 타입 타깃 블록을 씬에서 제거만 하고 GPU 리소스를 해제하지 않는다.
+
+```typescript
+// SwitchManager.ts:226
+if (state.targetMesh) {
+  state.targetMesh.removeFromParent(); // ← geometry/material dispose 없음
+}
+```
+
+`Level.dispose()`는 `level.group.traverse(child => { if instanceof Mesh → dispose })`로 정리하지만, **spawn 타겟 블록은 `setup()` 시 `removeFromParent()`로 이미 `level.group`에서 제거된 상태**다. 따라서 `Level.dispose()`의 traverse 범위에 포함되지 않아 geometry/material이 GPU에 잔류한다.
+
+```
+Level.dispose() 시:
+  level.group.traverse()
+    ↓ b001~b004, b006~b008 → 정상 해제 ✅
+    ↗ b005 → level.group에 없음 (SwitchManager가 이미 제거) → 미해제 ❌
+```
+
+**재현:** Stage 12 플레이 후 다른 스테이지로 이동 시 매 레벨 언로드마다 b005의 BoxGeometry + 6개 MeshLambertMaterial (per-face) 잔류.
+
+**수정 방향:**
+
+```typescript
+// SwitchManager.ts dispose() 내
+if (state.targetMesh) {
+  state.targetMesh.removeFromParent();
+  // spawn 타입은 Level.dispose() 범위 밖 → 직접 해제
+  if (state.def.type === 'spawn') {
+    state.targetMesh.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach(m => (m as THREE.Material).dispose());
+      }
+    });
+  }
+}
+```
+
+---
+
+#### QA-SP2 — `despawnTarget()` / `dispose()` scale-out GSAP tween 진행 중 dispose 시 `killTweensOf()` 미호출 (`SwitchManager.ts:187`)
+
+`despawnTarget()`이 진행 중(scale-out 0.3s)일 때 레벨이 언로드(`unloadCurrent()`)되면:
+
+1. `switchMgr.dispose()` → `state.targetMesh.removeFromParent()` (mesh 제거)
+2. 기존 `gsap.to(mesh.scale, { onComplete: () => { mesh.removeFromParent(); mesh.scale.set(1,1,1) } })` 계속 실행
+3. 0.3s 후 tween `onComplete` → `mesh.removeFromParent()` (harmless), `mesh.scale.set(1,1,1)` (harmless)
+
+실제 크래시나 데이터 손상은 없으나 의도치 않은 tween이 레벨 언로드 이후에도 실행된다.
+
+`spawnTarget()`의 scale-in tween(0.4s)도 동일한 상황이 발생 가능.
+
+**수정 방향:**
+
+```typescript
+// SwitchManager.ts dispose() 내, removeFromParent() 이전에 추가
+if (state.targetMesh) {
+  gsap.killTweensOf(state.targetMesh.scale); // ← 추가
+  state.targetMesh.removeFromParent();
+  ...
+}
+```
+
+---
+
+### Stage 12 레벨 설계 검증
+
+```
+b001(start) → b002 → b003 → b004(switch)
+                               ↓ toggle spawn b005
+                             b005 → b006 ←→ b007(star)
+                                      ↓
+                                    b008(goal, 별 필요)
+```
+
+| 경로 | XZ 거리 | 연결 여부 |
+|------|---------|---------|
+| b001↔b002 | 1.0 | ✅ |
+| b002↔b003 | 1.0 | ✅ |
+| b003↔b004 | 1.0 | ✅ |
+| b004↔b006 (스폰 전) | **2.0** | ❌ (통행 불가 → 스위치 강제) |
+| b004↔b005 (스폰 후) | 1.0 | ✅ |
+| b005↔b006 | 1.0 | ✅ |
+| b006↔b007 | 1.0 | ✅ |
+| b007↔b008 | ≈1.41 | ❌ (b006 경유 필수) |
+| b006↔b008 | 1.0 | ✅ |
+
+퍼즐 흐름: 스위치(b004) → 스폰(b005) → 별(b007) 수집 → 골(b008) 도달 ✅
+
+---
+
+### LevelEditor SWITCHES 섹션 검증
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| switchNodeId / targetNodeId 입력 폼 | `LevelEditor.ts` | ✅ |
+| mode (hold/toggle) 선택 | `LevelEditor.ts` | ✅ |
+| type (spawn/move) 선택 | `LevelEditor.ts` | ✅ |
+| "Use Selected as Switch Node" 헬퍼 | `LevelEditor.ts` | ✅ |
+| `rebuildSwitchList()` 연동 | `LevelEditor.ts` | ✅ |
+| type=move 시 `moveTarget` 입력 UI 없음 | `LevelEditor.ts` | ⚠️ 기존 기획 이슈 (별도 추적) |
+
+type=move 선택 후 저장 시 `moveTarget` 필드가 없어 SwitchManager에서 `!state.def.moveTarget` 분기로 무시됨 — 기존 기획 체크리스트에 명시된 항목으로 현재 미노출 처리.
+
+---
+
+### 9차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-SP1 | P2 | 🔴 미수정 | `dispose()` spawn targetMesh geometry/material 미해제 (GPU 누수) | `SwitchManager.ts:226` |
+| QA-SP2 | P4 | 🔴 미수정 | `despawnTarget()` / `dispose()` scale-out tween 중 `killTweensOf()` 미호출 | `SwitchManager.ts:187,218` |
+
+---
+
+## 8차 QA (2026-06-09) — GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환
+
+### 변경 내용
+
+| 항목 | 파일 |
+|------|------|
+| `GraphicsSettings` — localStorage 기반 설정 영속성 | `src/core/GraphicsSettings.ts` (신규) |
+| `SettingsScreen` — 품질·색상·조명 설정 UI | `src/ui/SettingsScreen.ts` (신규) |
+| `SettingsPreview` — 설정 미리보기 Three.js 씬 | `src/ui/SettingsPreview.ts` (신규) |
+| `TitleScreen` — SETTINGS 버튼 추가 | `src/ui/TitleScreen.ts` |
+| `Renderer` — `applyQuality()`, `applyLightingOverrides()`, `applyBackgroundColor()` 분리 | `src/core/Renderer.ts` |
+| `GameManager` — SettingsScreen 연동, `_swapSceneMaterials()` 추가 | `src/core/GameManager.ts` |
+| `Block` — `GraphicsSettings.enhanced` 기반 머티리얼 분기 | `src/world/Block.ts` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `TitleScreen.onSettings` 콜백 연결 | `GameManager.ts:122` | ✅ |
+| `settingsScreen.onClose` → `titleScreen.show()` | `GameManager.ts:127` | ✅ |
+| `onQualityChange` → `applyQuality` + `applyLightingOverrides` + `_swapSceneMaterials` + `applyBackgroundColor` 4단계 적용 | `GameManager.ts:132` | ✅ |
+| `onLightChange` → `GraphicsSettings` 저장 + `applyLightingOverrides()` | `GameManager.ts:142` | ✅ |
+| `onBgColorChange(null)` → `getEffectiveBgColor()` 폴백 처리 | `GameManager.ts:151` | ✅ |
+| `onBlockColorChange` → 로드 중인 레벨 즉시 재색상 (`level?.recolorAllBlocks`) | `GameManager.ts:154` | ✅ |
+| 레벨 로드 시 `blockColorOverride` 재적용 | `GameManager.ts:266` | ✅ |
+| 튜토리얼 레벨에서 색상 오버라이드 미적용 (분기 처리) | `GameManager.ts:259` | ✅ |
+| `Block` 생성 시 `blockColorOverride` 반영 | `Block.ts:50` | ✅ |
+| `SettingsPreview.refresh()` — `envTexture` null 체크로 중복 PMREM 생성 방지 | `SettingsPreview.ts:126` | ✅ |
+| `SettingsPreview.dispose()` — geometry·material·envTexture·renderer 정리 | `SettingsPreview.ts:161` | ✅ |
+| `resetAll()` — 색상·조명 양방향 동기화 (UI 상태 + GraphicsSettings + 콜백) | `SettingsScreen.ts:399` | ✅ |
+| `GraphicsSettings.resetColors/resetLights()` localStorage 키 전체 제거 | `GraphicsSettings.ts:84` | ✅ |
+| `toHex6()` 3자리 hex 확장 처리 | `SettingsScreen.ts:441` | ✅ |
+| `unloadCurrent()` 후 `minPolarAngle` 유지 (`Math.PI / 6`) | `GameManager.ts:671` | ✅ |
+| `applyQuality()` 후 `applyLightingOverrides()` 재호출로 저장된 오버라이드 복원 | `GameManager.ts:136` | ✅ |
+| `applyBackgroundColor()` fog 색상 동기 처리 | `Renderer.ts:140` | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-13 — `Renderer.applyQuality()` 환경맵 텍스처 메모리 누수 (`Renderer.ts:87`)
+
+`applyQuality(true)` 호출 시 매번 새 `RoomEnvironment`와 PMREM 텍스처를 생성하지만, `scene.environment`에 이미 할당된 **이전 텍스처를 dispose하지 않는다**.
+
+```typescript
+// Renderer.ts:87-90 (enhanced=true 경로)
+const env = new RoomEnvironment();
+const envTexture = this.pmremGenerator.fromScene(env).texture;
+env.dispose();
+this.scene.environment = envTexture; // ← 이전 scene.environment 텍스처 GPU에 잔류
+```
+
+`enhanced=false` 경로도 동일:
+
+```typescript
+// Renderer.ts:105
+this.scene.environment = null; // ← 이전 텍스처 dispose 없이 참조만 끊김
+```
+
+**재현 경로:**
+1. Settings 진입 → Enhanced Rendering 토글 ON (envTexture A 생성)
+2. Enhanced Rendering 토글 OFF (`scene.environment = null`, A는 GPU에 잔류)
+3. Enhanced Rendering 토글 ON (envTexture B 생성)
+4. A는 영구 누수
+
+Settings 화면이 타이틀에서만 열리므로 레벨 로드/언로드와 무관하게 누수 발생.
+
+**수정 방향:**
+
+```typescript
+// applyQuality() 최상단에 추가
+if (this.scene.environment) {
+  (this.scene.environment as THREE.Texture).dispose();
+  this.scene.environment = null;
+}
+```
+
+---
+
+#### QA-14 — `_swapSceneMaterials()` `emissive` / `emissiveIntensity` 미복사 (`GameManager.ts:923`)
+
+Standard→Lambert 변환 시 `emissive` 색상과 `emissiveIntensity`를 복사하지 않는다.
+
+```typescript
+// GameManager.ts:923-931 (enhanced=false, Standard→Lambert)
+if (!enhanced && m instanceof THREE.MeshStandardMaterial) {
+  const next = new THREE.MeshLambertMaterial({
+    color:       m.color.clone(),
+    transparent: m.transparent,
+    opacity:     m.opacity,
+    // ← emissive: m.emissive.clone()  누락
+    // ← emissiveIntensity: m.emissiveIntensity  누락
+  });
+  m.dispose();
+  return next;
+}
+```
+
+`SwitchManager`의 스위치 발판, `TeleportManager`의 텔레포트 링, `ElevatorManager`의 레일 등 씬 내 emissive를 사용하는 오브젝트가 standard 모드로 전환되면 **발광 효과가 소실**된다.
+
+**현재 영향 범위:**
+Settings는 타이틀 화면에서만 접근 가능하므로 전환 시 씬에 게임 오브젝트가 없음 → **현재 플로우에서는 재현 안 됨**. 그러나 설정이 인게임에서 접근 가능해질 경우 즉시 발현되는 **잠재 버그**다.
+
+**수정 방향:**
+
+```typescript
+if (!enhanced && m instanceof THREE.MeshStandardMaterial) {
+  const next = new THREE.MeshLambertMaterial({
+    color:              m.color.clone(),
+    transparent:        m.transparent,
+    opacity:            m.opacity,
+    emissive:           m.emissive.clone(),        // ← 추가
+    emissiveIntensity:  m.emissiveIntensity,        // ← 추가
+  });
+  m.dispose();
+  return next;
+}
+```
+
+Lambert→Standard 경로도 동일하게 `emissive` 복사 필요.
+
+---
+
+#### QA-15 — `SettingsScreen.resetAll()` Enhanced Rendering 미초기화 (`SettingsScreen.ts:399`)
+
+```typescript
+private resetAll(): void {
+  GraphicsSettings.resetColors();   // ✅
+  GraphicsSettings.resetLights();   // ✅
+  // ❌ GraphicsSettings.enhanced 리셋 없음
+  // ❌ this.qualityCheckbox.checked = false 없음
+  // ❌ this.onQualityChange(false) 콜백 미호출
+  ...
+}
+```
+
+"RESET ALL" 버튼이 색상·조명은 초기화하지만 Enhanced Rendering은 그대로 유지한다. 사용자는 전체 초기화로 이해하여 렌더링 품질이 리셋되지 않으면 혼란을 느낄 수 있다.
+
+**수정 방향 (옵션 A — 완전 초기화):**
+
+```typescript
+// resetAll() 상단에 추가
+GraphicsSettings.enhanced = false;
+this.qualityCheckbox.checked = false;
+this.onQualityChange(false);
+```
+
+**수정 방향 (옵션 B — 버튼 명칭 변경):**
+
+"RESET ALL" → "RESET COLORS & LIGHTING" 으로 변경하여 범위를 명시.
+
+---
+
+#### QA-16 — `SettingsPreview` RAF 루프 미정지 (`SettingsPreview.ts:189`)
+
+`SettingsPreview`는 생성자에서 RAF 루프를 시작(`startLoop()`)하고 화면을 닫아도 멈추지 않는다.
+
+```typescript
+// SettingsPreview.ts:189
+private startLoop(): void {
+  const loop = () => {
+    this.rafId = requestAnimationFrame(loop);
+    this.renderer.render(this.scene, this.camera); // ← hide 후에도 계속 실행
+  };
+  loop();
+}
+```
+
+`SettingsScreen.hide()` 후 캔버스가 CSS로 숨겨지지만 `render()` 호출은 매 프레임 계속된다. 게임 플레이 중에는 main render loop + preview render loop 두 개가 동시에 돌아간다.
+
+**재현 조건:** Settings를 한 번이라도 연 후 닫고 레벨 플레이.
+
+**수정 방향:**
+
+```typescript
+// SettingsPreview에 메서드 추가
+pauseLoop(): void { cancelAnimationFrame(this.rafId); this.rafId = 0; }
+resumeLoop(): void { if (this.rafId === 0) this.startLoop(); }
+```
+
+```typescript
+// SettingsScreen에 연동
+show(): void {
+  requestAnimationFrame(() => this.el.classList.add('visible'));
+  this.preview.resumeLoop();  // ← 추가
+}
+hide(): void {
+  this.el.classList.remove('visible');
+  this.preview.pauseLoop();   // ← 추가
+}
+```
+
+---
+
+#### QA-17 — `Renderer.ts` `visualViewport` resize 리스너 미정리 (`Renderer.ts:54`)
+
+```typescript
+// Renderer.ts:53-54
+window.addEventListener('resize', () => this.onResize(container));
+window.visualViewport?.addEventListener('resize', () => this.onResize(container));
+```
+
+`visualViewport` 리스너가 추가됐으나 정리 메서드가 없다. 기존 LOW-03(`window resize`) 패턴의 재발이며, Renderer 인스턴스가 단일이므로 **실질 영향은 낮음**. 그러나 모바일 softKeyboard 노출/숨김 시 `visualViewport` resize가 자주 발동되어 `onResize()`가 불필요하게 호출될 수 있다.
+
+**수정 방향:** 필요하다면 `Renderer.dispose()` 메서드를 추가하고 두 리스너 모두 제거.
+
+---
+
+### _swapSceneMaterials 설계 안전망 분석
+
+현재 `_swapSceneMaterials()`는 `settingsScreen.onQualityChange` 콜백에서만 호출되며, Settings는 타이틀 화면에서만 열린다(→ `this.level === null`). 따라서 호출 시 씬에는 `DirectionalLight`, `HemisphereLight`, `AmbientLight`만 존재하고 Mesh가 없어 traverse가 사실상 no-op이다.
+
+**안전 조건:** Settings 진입 경로가 타이틀 화면으로 제한되는 한, QA-14의 emissive 소실 버그는 발현되지 않는다. 하지만 인게임 설정 접근이 추가될 경우 즉시 발현되므로 예방적 수정이 권장된다.
+
+---
+
+### 8차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-13 | P2 | ✅ 수정됨 | `applyQuality()` 환경맵 텍스처 누수 | `Renderer.ts:87` |
+| QA-14 | P2 | ✅ 수정됨 | `_swapSceneMaterials()` emissive 미복사 (잠재 버그) | `GameManager.ts:923` |
+| QA-15 | P3 | ✅ 수정됨 | `resetAll()` Enhanced Rendering 미초기화 | `SettingsScreen.ts:399` |
+| QA-16 | P4 | ✅ 수정됨 | SettingsPreview RAF 미정지 (hide 후에도 렌더링 지속) | `SettingsPreview.ts:189` |
+| QA-17 | P4 | ✅ 수정됨 | `visualViewport` resize 리스너 미정리 | `Renderer.ts:54` |
+
+---
+
+## 7차 QA (2026-06-09) — Stage 11 / 반응형 UI / EditorLobby 삭제 버튼
+
+### 변경 내용 (커밋 70af6d8)
+
+| 항목 | 파일 |
+|------|------|
+| Stage 11 (`level_custom_11.json`) 추가 | `registry.ts`, `GameManager.ts`, `LevelEditor.ts`, `StageSelectUI.ts`, `EditorLobby.ts` |
+| EditorLobby — 커스텀 스테이지 Delete 버튼 추가 | `EditorLobby.ts` |
+| 반응형 UI 스케일링 — `clamp()`/`vw`, safe-area-inset | `style.css` |
+| Block 테두리 선 완전 제거 (EdgesGeometry + LineSegments 삭제) | `Block.ts` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| Stage 11 블록 refs (character, goal, midpoint) | `level_custom_11.json` | ✅ |
+| Stage 11 teleporter 노드 참조 (`b041`, `b013`) | `level_custom_11.json` | ✅ |
+| Stage 11 star 노드 참조 (`b015`, `b014`, `b030`) | `level_custom_11.json` | ✅ |
+| Stage 11 ladder 노드 참조 (10쌍) | `level_custom_11.json` | ✅ |
+| `CustomLevelStore.delete()` 메서드 존재 | `CustomLevelStore.ts:27` | ✅ |
+| `EditorLobby.rebuildGrid()` 메서드 존재 | `EditorLobby.ts:113` | ✅ |
+| `.editor-btn.danger` CSS 정의 | `style.css:460` | ✅ |
+| `.editor-lobby__card-btns` CSS 정의 | `style.css:599` | ✅ |
+| Block `LineSegments` 제거 후 dispose 안전성 | `Level.ts:168`, `LevelEditor.ts:976` | ✅ (부작용 없음, 오히려 메모리 누수 해소) |
+| ElevatorManager `LineSegments` — 별도 명시적 dispose | `ElevatorManager.ts:130` | ✅ |
+| `BUILTIN_STAGES = 11` 반영 | `StageSelectUI.ts:3` | ✅ |
+| `GameManager.builtinIds[11]` 추가 | `GameManager.ts:170` | ✅ |
+| `LevelEditor.fileMap[11]` 추가 | `LevelEditor.ts:1323` | ✅ |
+| CSS `clamp()`/`vw` 문법 이상 없음 | `style.css` | ✅ |
+| safe-area-inset (star-counter, back btn) | `style.css:41,290` | ✅ |
+
+---
+
+### 신규 버그
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-11 | P3 | ⚠️ 데이터 결함 | `level_custom_11.json` — 존재하지 않는 블록 `b025`를 illusionConnections 2개가 참조. PathGraph `if (a && b)` 가드로 크래시는 없으나 해당 착시 연결 영구 비활성. | `level_custom_11.json` |
+| QA-12 | P4 | 기존 이슈 | `TutorialSequencer.ts:26` — `RevealId` 타입 미사용 TS 경고. 이번 변경과 무관. | `TutorialSequencer.ts` |
+
+---
+
+### Block 테두리 선 완전 제거 — 부수 효과 분석
+
+**변경:** `EdgesGeometry` + `LineBasicMaterial` + `LineSegments` 생성 코드 전체 삭제.
+
+**긍정적 부수 효과 — 기존 메모리 누수 해소:**
+
+`Level.dispose()` 및 `LevelEditor.dispose()` 양쪽 모두 `traverse` + `instanceof THREE.Mesh` 패턴으로만 정리했기 때문에, `LineSegments`(Mesh가 아닌 Object3D)는 레벨 언로드 시 `geometry.dispose()` / `material.dispose()`가 호출되지 않았다.
+
+```typescript
+// Level.ts:168 — LineSegments는 이 분기에 진입하지 않음
+this.group.traverse(child => {
+  if (child instanceof THREE.Mesh) {  // LineSegments ≠ Mesh → 스킵
+    child.geometry.dispose();
+    child.material.forEach(m => m.dispose());
+  }
+});
+```
+
+블록 수 × 레벨 전환 횟수만큼 `EdgesGeometry` + `LineBasicMaterial` 인스턴스가 GPU에 누적됐을 것. LineSegments 삭제로 이 누수가 완전히 해소됨.
+
+**ElevatorManager의 `LineSegments`(레일)는 별도 명시적 dispose로 정상 처리됨** (`ElevatorManager.ts:130`).
+
+---
+
+### QA-11 상세 — `b025` 스테일 참조
+
+```json
+// level_custom_11.json — 문제 illusionConnections
+{ "nodeA": "b039", "nodeB": "b025", "activateAzimuth": -29.9, ... }
+{ "nodeA": "b039", "nodeB": "b025", "activateAzimuth": -39.7, ... }
+```
+
+`b025`는 blocks 배열에 존재하지 않음 (실제 블록 목록: b012~b016, b022, b024, b027, b030, b032~b033, b035~b037, b039~b043).
+
+**영향:** 해당 2개 착시 연결이 절대 활성화되지 않음. `PathGraph.buildEdges()`의 `if (a && b)` 가드로 런타임 오류는 없음.
+
+**수정 방향:** `b025` 대신 실제 존재하는 블록 ID로 교체하거나, 의도적으로 비활성 상태를 원한다면 해당 2개 항목 제거. (현재 사용자 요청으로 그대로 유지)
+
+---
+
+### 신규 기획 아이디어 평가 (2026-06-09)
+
+---
+
+#### 압력 스위치 A타입 — 블록 소환 (Spawn Gate)
+
+**평가: ✅ 강력 권장**
+
+기존 `SwitchManager` + `PathGraph.enableNode/disableNode` 패턴이 이미 구현돼 있어 **골격 코드가 존재**한다. GSAP scale-in 연출(`back.out`)은 기존 StarManager와 동일한 패턴으로 재활용 가능. "밟는 동안만 유지(hold)" vs "영구 활성(toggle)" 두 모드로 퍼즐 설계 폭이 크게 늘어남.
+
+**구현 우선순위: 1순위** — 임팩트/구현 비용 비율 최고.
+
+**QA 리스크:**
+- [ ] `hold` 모드: 블록 위에 캐릭터가 있는 상태에서 스위치 해제 시 캐릭터 처리 (낙하 또는 차단)
+- [ ] `toggle` 모드: 레벨 재시작 시 초기 상태(미소환) 복원 확인
+- [ ] `graph.enableNode()` 호출 타이밍 — scale-in 애니 완료 전 경로 탐색 허용 여부
+
+---
+
+#### 압력 스위치 B타입 — 블록 이동 (Move Gate)
+
+**평가: ✅ 권장 (A타입 이후 구현)**
+
+"스위치를 밟으면 길이 열리고 동시에 다른 길이 막힌다"는 복잡한 퍼즐 구성이 가능. 그러나 블록 이동 시 StarManager 위치 갱신, PathGraph 재계산, 캐릭터 push 처리 등 연동 항목이 많아 A타입보다 구현 비용이 높음.
+
+**구현 우선순위: 3순위** — A타입 안정화 후 진행 권장.
+
+**QA 리스크:**
+- [ ] 이동 tween 중 캐릭터가 해당 블록 위에 있을 때 함께 이동하는지 확인
+- [ ] `hold` 모드: 복귀 tween과 이동 tween 충돌 방지 (`gsap.killTweensOf(mesh)` 선행)
+- [ ] 복수 스위치가 동일 블록을 각기 다른 위치로 이동시킬 때 우선순위 정의
+- [ ] 레벨 재시작 시 블록 원위치 복원
+
+---
+
+#### 중력 반전 / 벽면 이동
+
+**평가: ⚠️ 현재 아키텍처와 충돌 심함 — 시각적 트릭으로 대체 권장**
+
+PathGraph, Character 이동, 카메라 모두 "+Y = 위" 전제로 설계돼 있어 실제 중력 반전은 전 시스템 재설계 수준의 작업.
+
+**현실적 대안:** 특정 스위치를 누르면 카메라가 180° 회전 + 별도 "천장 블록 레이어" 활성화. 시각적으로 뒤집힌 느낌을 주되 내부 로직은 Y축 그대로 유지. 이 방향은 카메라 트윈 + `graph.enableNode/disableNode` 조합으로 구현 가능.
+
+**구현 우선순위: 보류** — 아이디어는 유효하나 현재 Phase에서는 범위 초과.
+
+---
+
+#### 가로 이동 승강기 (X축 Elevator)
+
+**평가: ✅ 권장**
+
+기존 `ElevatorManager`가 Y축 전용인데 `movementAxis: 'x' | 'y' | 'z'` 파라미터 하나 추가로 확장 가능. "타이밍 맞게 타고 내리는" 구조는 퍼즐에 리듬감을 부여함.
+
+**구현 우선순위: 2순위** — 기존 ElevatorManager 확장이므로 비교적 단순.
+
+**선결 과제:** 현재 캐릭터가 승강기와 함께 이동하는 물리(블록 mesh 이동 시 캐릭터가 자동으로 따라오는지)를 `CharacterController.update()` 흐름에서 확인 필요.
+
+**QA 리스크:**
+- [ ] X축 이동 중 PathGraph 엣지 재계산 타이밍 (너무 잦은 `graph.refresh()` 는 병목)
+- [ ] 승강기가 이동 중 다른 블록과 겹칠 때 인접 엣지 오삽입 방지
+- [ ] `auto` 왕복 모드에서 레벨 언로드 시 tween 강제 종료 (`gsap.killTweensOf(mesh)`)
+
+---
+
+### 구현 우선순위 요약
+
+| 순위 | 아이디어 | 근거 |
+|------|---------|------|
+| 1 | 압력 스위치 A타입 (블록 소환) | 기존 SwitchManager 골격 재활용, 임팩트 최고 |
+| 2 | 가로 이동 승강기 | ElevatorManager 파라미터 확장, 단순 |
+| 3 | 압력 스위치 B타입 (블록 이동) | A타입 이후, 연동 항목 다수 |
+| 보류 | 중력 반전 | 시각적 트릭으로 대체 권장, 실구현은 전면 재설계 |
 
 ---
 

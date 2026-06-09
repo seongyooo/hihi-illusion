@@ -27,6 +27,9 @@ import { SwitchManager }      from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS }             from '../levels/registry';
+import { GraphicsSettings, COLOR_DEFAULTS } from './GraphicsSettings';
+import { SettingsScreen }     from '../ui/SettingsScreen';
+import { StarBackground }     from '../world/StarBackground';
 
 export class GameManager {
   // ── Engine singletons (shared across levels) ──────────────────────────
@@ -40,8 +43,10 @@ export class GameManager {
   private stageSelect:   StageSelectUI;
   private titleScreen:   TitleScreen;
   private tutorialHint:  TutorialHint;
-  private editorLobby:   EditorLobby;
-  private editor:        LevelEditor;
+  private editorLobby:    EditorLobby;
+  private editor:         LevelEditor;
+  private settingsScreen:   SettingsScreen;
+  private starBackground:   StarBackground;
   private readonly debug: boolean;
 
   // ── Per-level state (null when unloaded) ──────────────────────────────
@@ -82,7 +87,9 @@ export class GameManager {
     this.renderer   = new Renderer(container);
     this.hud        = new HUD(container);
     this.audio      = new AudioManager();
-    this.particles  = new ParticleSystem(this.renderer.scene);
+    this.particles         = new ParticleSystem(this.renderer.scene);
+    this.starBackground    = new StarBackground(this.renderer.scene);
+    this.starBackground.setVisible(GraphicsSettings.starBackground);
 
     this.orbit = new OrbitControls(this.renderer.camera, this.renderer.renderer.domElement);
     this.orbit.enableDamping = true;
@@ -111,6 +118,73 @@ export class GameManager {
     this.titleScreen.onDev = () => {
       this.titleScreen.hide();
       this.editorLobby.show();
+    };
+
+    // SETTINGS 버튼 → 설정 화면
+    this.settingsScreen = new SettingsScreen(container);
+
+    this.titleScreen.onSettings = () => {
+      this.titleScreen.hide();
+      this.settingsScreen.show();
+    };
+
+    this.settingsScreen.onClose = () => {
+      this.settingsScreen.hide();
+      this.titleScreen.show();
+    };
+
+    this.settingsScreen.onQualityChange = (enhanced) => {
+      GraphicsSettings.enhanced = enhanced;
+      this.renderer.applyQuality(enhanced);
+      // 모드 기본값 위에 저장된 조명 오버라이드 재적용
+      this.renderer.applyLightingOverrides();
+      this._swapSceneMaterials(enhanced);
+      // 배경색: 커스텀 색 또는 새 모드 기본값 재적용
+      this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
+    };
+
+    this.settingsScreen.onLightChange = (type, val) => {
+      if (type === 'ambient') GraphicsSettings.lightAmbient = val;
+      else if (type === 'dir') GraphicsSettings.lightDir    = val;
+      else                     GraphicsSettings.lightHemi   = val;
+      this.renderer.applyLightingOverrides();
+    };
+
+    this.settingsScreen.onBgColorChange = (hexStr) => {
+      GraphicsSettings.backgroundColor = hexStr;
+      this.renderer.applyBackgroundColor(hexStr ?? GraphicsSettings.getEffectiveBgColor());
+    };
+
+    this.settingsScreen.onBlockColorChange = (hexStr) => {
+      GraphicsSettings.blockColorOverride = hexStr;
+      const override = hexStr ? parseInt(hexStr.replace('#', ''), 16) : null;
+      if (!this.isTutorial) this.level?.recolorAllBlocks(override);
+    };
+
+    this.settingsScreen.onBlockVariantChange = (variant) => {
+      GraphicsSettings.blockVariant = variant;
+      if (!this.isTutorial) this.level?.revariantAllBlocks(variant as import('../world/Block').BlockVariant);
+    };
+
+    this.settingsScreen.onCharBodyColorChange = (hexStr) => {
+      GraphicsSettings.characterBodyColor = hexStr;
+      this.character?.setBodyColor(hexStr);
+    };
+
+    this.settingsScreen.onCharHeadColorChange = (hexStr) => {
+      GraphicsSettings.characterHeadColor = hexStr;
+      this.character?.setHeadColor(hexStr);
+    };
+
+    this.settingsScreen.onExposureChange = (val) => {
+      GraphicsSettings.exposureOverride = val;
+      this.renderer.applyLightingOverrides();
+    };
+
+    this.settingsScreen.onStarBgChange = (enabled) => {
+      GraphicsSettings.starBackground = enabled;
+      this.starBackground.setVisible(enabled);
+      this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
     };
 
     // 로비: 새 스테이지 만들기
@@ -196,8 +270,28 @@ export class GameManager {
   private _initLevelObjects(data: LevelData): void {
     // Level
     this.level = new Level(this.renderer.scene);
-    this.level.load(data);
+    // 튜토리얼은 variant 오버라이드 미적용 (JSON 원본 유지), 나머지는 settings 값 사용
+    this.level.load(data, this.isTutorial ? undefined : GraphicsSettings.blockVariant);
     this.hud.setLevelName(data.name);
+
+    // 배경색 적용:
+    // - Level.load()가 scene.background를 교체하므로 반드시 그 이후에 호출
+    // - 튜토리얼은 색상 설정 영향을 받지 않음 → 레벨 JSON 색상 그대로 사용
+    if (GraphicsSettings.starBackground) {
+      // 별 배경 모드: 레벨/커스텀 배경색 무시하고 항상 우주 다크 컬러 유지
+      this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
+    } else if (this.isTutorial) {
+      this.renderer.applyBackgroundColor(data.backgroundColor || GraphicsSettings.getEffectiveBgColor());
+    } else {
+      const customBg = GraphicsSettings.backgroundColor;
+      this.renderer.applyBackgroundColor(customBg || data.backgroundColor || GraphicsSettings.getEffectiveBgColor());
+
+      // 블록 색상 오버라이드 (튜토리얼 제외 — 각 블록의 JSON 색상 그라데이션 유지)
+      const blockOverride = GraphicsSettings.blockColorOverride;
+      if (blockOverride) {
+        this.level.recolorAllBlocks(parseInt(blockOverride.replace('#', ''), 16));
+      }
+    }
 
     // PathGraph
     this.graph = new PathGraph();
@@ -289,8 +383,12 @@ export class GameManager {
       this.elevatorMgr.setup(data.elevators!, this.graph);
     }
 
-    // Character
-    this.character  = new Character();
+    // Character — 튜토리얼은 기본 외형 유지 (색상 설정 미적용)
+    this.character = new Character();
+    if (this.isTutorial) {
+      this.character.setBodyColor(COLOR_DEFAULTS.charBody);
+      this.character.setHeadColor(COLOR_DEFAULTS.charHead);
+    }
     const startNode = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
@@ -821,6 +919,53 @@ export class GameManager {
         this.hud.showClear(onNext, onSelect);
       }
     }, 800);
+  }
+
+  // ── Graphics quality ──────────────────────────────────────────────────
+
+  /**
+   * Traverse every Mesh in the scene and swap materials between Lambert (standard)
+   * and Standard/PBR (enhanced). Called when the user toggles quality at runtime.
+   * Per-face color arrays are preserved; roughness/metalness are added or stripped.
+   */
+  private _swapSceneMaterials(enhanced: boolean): void {
+    this.renderer.scene.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh)) return;
+
+      const swap = (m: THREE.Material): THREE.Material => {
+        if (enhanced && m instanceof THREE.MeshLambertMaterial) {
+          const next = new THREE.MeshStandardMaterial({
+            color:             m.color.clone(),
+            transparent:       m.transparent,
+            opacity:           m.opacity,
+            emissive:          m.emissive.clone(),
+            emissiveIntensity: m.emissiveIntensity,
+            roughness:         0.72,
+            metalness:         0.04,
+          });
+          m.dispose();
+          return next;
+        }
+        if (!enhanced && m instanceof THREE.MeshStandardMaterial) {
+          const next = new THREE.MeshLambertMaterial({
+            color:             m.color.clone(),
+            transparent:       m.transparent,
+            opacity:           m.opacity,
+            emissive:          m.emissive.clone(),
+            emissiveIntensity: m.emissiveIntensity,
+          });
+          m.dispose();
+          return next;
+        }
+        return m;
+      };
+
+      if (Array.isArray(obj.material)) {
+        obj.material = obj.material.map(swap);
+      } else {
+        obj.material = swap(obj.material);
+      }
+    });
   }
 
   // ── Render loop ───────────────────────────────────────────────────────
