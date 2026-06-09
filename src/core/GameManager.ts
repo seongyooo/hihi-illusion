@@ -172,6 +172,11 @@ export class GameManager {
       this.level?.regeometryAllBlocks();
     };
 
+    this.settingsScreen.onBlockXZChange = (val) => {
+      GraphicsSettings.blockXZRatio = val;
+      this.level?.regeometryAllBlocks();
+    };
+
     this.settingsScreen.onCharBodyColorChange = (hexStr) => {
       GraphicsSettings.characterBodyColor = hexStr;
       this.character?.setBodyColor(hexStr);
@@ -552,6 +557,10 @@ export class GameManager {
       if (sw.targetNodeId === this.midpointBlockId) {
         if (this.midpointMarker) meshes.push(this.midpointMarker);
       }
+
+      // 사다리 (타겟 블록과 연결된 사다리 전체)
+      const ladderGroups = this.level!.getLaddersForBlock(sw.targetNodeId);
+      meshes.push(...ladderGroups);
 
       if (meshes.length > 0) this.switchMgr.attachMeshes(sw.targetNodeId, meshes);
     }

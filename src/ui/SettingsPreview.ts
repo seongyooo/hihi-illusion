@@ -23,7 +23,8 @@ export class SettingsPreview {
 
   private block1:    THREE.Group;
   private block2:    THREE.Group;
-  private previewRadius = -1; // 마지막으로 구축한 radius — rebuild 여부 판단용
+  private previewRadius  = -1; // 마지막으로 구축한 radius — rebuild 여부 판단용
+  private previewXZRatio = -1; // 마지막으로 구축한 xzRatio — rebuild 여부 판단용
 
   /** 현재 프리뷰에 올라가 있는 캐릭터 */
   private charPreview: Character;
@@ -143,7 +144,8 @@ export class SettingsPreview {
     const b1hex = override ? parseInt(override.replace('#', ''), 16) : BLOCK1_HEX;
     const b2hex = override ? parseInt(override.replace('#', ''), 16) : BLOCK2_HEX;
 
-    if (GraphicsSettings.blockRadiusRatio !== this.previewRadius) {
+    if (GraphicsSettings.blockRadiusRatio !== this.previewRadius ||
+        GraphicsSettings.blockXZRatio     !== this.previewXZRatio) {
       this._rebuildPreviewBlocks(b1hex, b2hex, variant);
     } else {
       recolorBlockGroup(this.block1, b1hex, variant);
@@ -199,7 +201,8 @@ export class SettingsPreview {
     this.block2.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } });
 
     this.scene.add(this.block1, this.block2);
-    this.previewRadius = GraphicsSettings.blockRadiusRatio;
+    this.previewRadius  = GraphicsSettings.blockRadiusRatio;
+    this.previewXZRatio = GraphicsSettings.blockXZRatio;
   }
 
   private _buildChar(): Character {

@@ -1,4 +1,4 @@
-import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT } from '../core/GraphicsSettings';
+import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT, BLOCK_XZ_DEFAULT } from '../core/GraphicsSettings';
 import { SettingsPreview } from './SettingsPreview';
 
 interface ColorRow { swatch: HTMLDivElement; picker: HTMLInputElement; }
@@ -15,6 +15,7 @@ export class SettingsScreen {
   private blockRow!:          ColorRow;
   private variantBtns!:       HTMLButtonElement[];
   private radiusRow!:         SliderRow;
+  private xzRow!:             SliderRow;
   private charTypeBtns!:      HTMLButtonElement[];
   private charBodyRow!:       ColorRow;
   private charHeadRow!:       ColorRow;
@@ -35,6 +36,7 @@ export class SettingsScreen {
   onStarBgChange:         (enabled: boolean)       => void = () => {};
   onCharacterTypeChange:  (type: string)            => void = () => {};
   onBlockRadiusChange:    (val: number)             => void = () => {};
+  onBlockXZChange:        (val: number)             => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -143,6 +145,19 @@ export class SettingsScreen {
     );
     this.radiusRow = radiusR.sliderRow;
     body.appendChild(radiusR.el);
+
+    const xzR = this.makeSliderRow(
+      'XZ Expand', GraphicsSettings.blockXZRatio, 0.00, 0.20, 0.01,
+      (v) => { this.onBlockXZChange(v); this.preview.refresh(); },
+      () => {
+        this.onBlockXZChange(BLOCK_XZ_DEFAULT);
+        this.xzRow.slider.value        = String(BLOCK_XZ_DEFAULT);
+        this.xzRow.valueEl.textContent = BLOCK_XZ_DEFAULT.toFixed(2);
+        this.preview.refresh();
+      },
+    );
+    this.xzRow = xzR.sliderRow;
+    body.appendChild(xzR.el);
 
     const charTypeR = this.makeCharTypeRow(
       GraphicsSettings.characterType,
@@ -564,9 +579,14 @@ export class SettingsScreen {
     this.onBlockVariantChange('default');
 
     // Block roundness reset
-    this.radiusRow.slider.value    = String(BLOCK_RADIUS_DEFAULT);
+    this.radiusRow.slider.value        = String(BLOCK_RADIUS_DEFAULT);
     this.radiusRow.valueEl.textContent = BLOCK_RADIUS_DEFAULT.toFixed(2);
     this.onBlockRadiusChange(BLOCK_RADIUS_DEFAULT);
+
+    // XZ expand reset
+    this.xzRow.slider.value        = String(BLOCK_XZ_DEFAULT);
+    this.xzRow.valueEl.textContent = BLOCK_XZ_DEFAULT.toFixed(2);
+    this.onBlockXZChange(BLOCK_XZ_DEFAULT);
 
     // Character type reset to 'default'
     this.charTypeBtns.forEach(b => b.classList.toggle('active', b.dataset.charType === 'default'));

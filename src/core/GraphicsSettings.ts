@@ -4,6 +4,7 @@ const KEY_BG_COLOR      = 'hihi_bg_color';
 const KEY_BLOCK_COLOR   = 'hihi_block_color';
 const KEY_BLOCK_VARIANT = 'hihi_block_variant';
 const KEY_BLOCK_RADIUS  = 'hihi_block_radius';
+const KEY_BLOCK_XZ      = 'hihi_block_xz';
 const KEY_CHAR_BODY     = 'hihi_char_body';
 const KEY_CHAR_HEAD     = 'hihi_char_head';
 const KEY_CHAR_TYPE     = 'hihi_char_type';
@@ -14,6 +15,7 @@ const KEY_EXPOSURE       = 'hihi_exposure';
 
 export const EXPOSURE_DEFAULT      = 0.88; // Enhanced 모드 기본 노출값
 export const BLOCK_RADIUS_DEFAULT  = 0.07; // 블록 모서리 반지름 비율 기본값
+export const BLOCK_XZ_DEFAULT      = 0.07; // XZ 팽창 비율 기본값
 
 export const COLOR_DEFAULTS = {
   charBody:   '#ffffff',
@@ -81,6 +83,17 @@ export class GraphicsSettings {
     else localStorage.setItem(KEY_BLOCK_RADIUS, val.toString());
   }
 
+  static get blockXZRatio(): number {
+    const v = localStorage.getItem(KEY_BLOCK_XZ);
+    if (v === null) return BLOCK_XZ_DEFAULT;
+    const n = parseFloat(v);
+    return isNaN(n) ? BLOCK_XZ_DEFAULT : n;
+  }
+  static set blockXZRatio(val: number) {
+    if (val === BLOCK_XZ_DEFAULT) localStorage.removeItem(KEY_BLOCK_XZ);
+    else localStorage.setItem(KEY_BLOCK_XZ, val.toString());
+  }
+
   static get characterBodyColor(): string {
     return localStorage.getItem(KEY_CHAR_BODY) || COLOR_DEFAULTS.charBody;
   }
@@ -134,6 +147,7 @@ export class GraphicsSettings {
     localStorage.removeItem(KEY_BLOCK_COLOR);
     localStorage.removeItem(KEY_BLOCK_VARIANT);
     localStorage.removeItem(KEY_BLOCK_RADIUS);
+    localStorage.removeItem(KEY_BLOCK_XZ);
     localStorage.removeItem(KEY_CHAR_BODY);
     localStorage.removeItem(KEY_CHAR_HEAD);
     localStorage.removeItem(KEY_CHAR_TYPE);

@@ -36,15 +36,21 @@ function makeBlockMat(hex: number, variant: BlockVariant): THREE.Material {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
-/** RoundedBoxGeometry를 만들되 XZ는 radius만큼 inflate해 인접 블록 이음새를 없앤다. */
+/**
+ * 블록 geometry 생성.
+ * - ratio: 모서리 반지름 비율 (Y 방향 포함)
+ * - xzRatio: XZ 팽창 비율 (인접 블록 이음새 제거용, radius와 독립 조절 가능)
+ */
 function makeBlockGeo(
   w: number, h: number, d: number,
-  ratio = GraphicsSettings.blockRadiusRatio,
+  ratio   = GraphicsSettings.blockRadiusRatio,
+  xzRatio = GraphicsSettings.blockXZRatio,
 ): THREE.BufferGeometry {
-  const r = Math.min(w, h, d) * Math.max(0, ratio);
-  if (r <= 0) return new THREE.BoxGeometry(w, h, d);
-  // XZ inflate: 각 면의 평면 부분이 격자 경계에 정확히 닿도록 확장
-  return new RoundedBoxGeometry(w + 2 * r, h, d + 2 * r, ROUNDED_SEGMENTS, r);
+  const r       = Math.min(w, h, d) * Math.max(0, ratio);
+  const inflate = Math.min(w, d)    * Math.max(0, xzRatio);
+  if (r <= 0 && inflate <= 0) return new THREE.BoxGeometry(w, h, d);
+  if (r <= 0)                 return new THREE.BoxGeometry(w + 2 * inflate, h, d + 2 * inflate);
+  return new RoundedBoxGeometry(w + 2 * inflate, h, d + 2 * inflate, ROUNDED_SEGMENTS, r);
 }
 
 /**

@@ -109,6 +109,7 @@ export class Level {
   public sections: RotatingSection[] = [];
   private group: THREE.Group = new THREE.Group();
   private walkableMeshes: THREE.Object3D[] = [];
+  private ladderMeshes: Map<string, THREE.Group[]> = new Map();
   private scene: THREE.Scene;
 
   constructor(scene: THREE.Scene) {
@@ -119,6 +120,7 @@ export class Level {
     this.blocks.clear();
     this.sections = [];
     this.walkableMeshes = [];
+    this.ladderMeshes.clear();
     this.scene.remove(this.group);
     this.group = new THREE.Group();
 
@@ -152,7 +154,16 @@ export class Level {
     for (const ladder of data.ladders ?? []) {
       const bdA = data.blocks.find(b => b.id === ladder.nodeA);
       const bdB = data.blocks.find(b => b.id === ladder.nodeB);
-      if (bdA && bdB) this.group.add(buildLadderMesh(bdA, bdB));
+      if (bdA && bdB) {
+        const ladderGroup = buildLadderMesh(bdA, bdB);
+        this.group.add(ladderGroup);
+        // nodeA, nodeB 각각에 등록 (스위치 타겟이 어느 쪽이든 숨길 수 있도록)
+        for (const nodeId of [ladder.nodeA, ladder.nodeB]) {
+          const list = this.ladderMeshes.get(nodeId) ?? [];
+          list.push(ladderGroup);
+          this.ladderMeshes.set(nodeId, list);
+        }
+      }
     }
 
     // Rotating sections
@@ -167,6 +178,7 @@ export class Level {
 
   getGroup(): THREE.Group               { return this.group; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
+  getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
 
   /** Apply a global hex color to all blocks, or restore each block's original JSON color. */
   recolorAllBlocks(hexOverride: number | null): void {
@@ -195,5 +207,6 @@ export class Level {
     this.blocks.clear();
     this.sections     = [];
     this.walkableMeshes = [];
+    this.ladderMeshes.clear();
   }
 }
