@@ -20,8 +20,6 @@ const VARIANT_BODY: Record<BlockVariant, { roughness: number; metalness: number 
   metal:   { roughness: 0.28, metalness: 0.50 },
 };
 
-// Edge radius as fraction of the shortest dimension
-const EDGE_RADIUS_RATIO = 0.10;
 // RoundedBox subdivision segments
 const ROUNDED_SEGMENTS = 4;
 
@@ -38,8 +36,19 @@ function makeBlockMat(hex: number, variant: BlockVariant): THREE.Material {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+/** RoundedBoxGeometry를 만들되 XZ는 radius만큼 inflate해 인접 블록 이음새를 없앤다. */
+function makeBlockGeo(
+  w: number, h: number, d: number,
+  ratio = GraphicsSettings.blockRadiusRatio,
+): THREE.BufferGeometry {
+  const r = Math.min(w, h, d) * Math.max(0, ratio);
+  if (r <= 0) return new THREE.BoxGeometry(w, h, d);
+  // XZ inflate: 각 면의 평면 부분이 격자 경계에 정확히 닿도록 확장
+  return new RoundedBoxGeometry(w + 2 * r, h, d + 2 * r, ROUNDED_SEGMENTS, r);
+}
+
 /**
- * Build a THREE.Group with a single RoundedBoxGeometry mesh.
+ * Build a THREE.Group with a single (Rounded)BoxGeometry mesh.
  */
 export function buildBlockMeshGroup(
   hex: number,
@@ -49,12 +58,10 @@ export function buildBlockMeshGroup(
   receiveShadow = true,
 ): THREE.Group {
   const [w, h, d] = size;
-  const radius = Math.min(w, h, d) * EDGE_RADIUS_RATIO;
 
   const group = new THREE.Group();
-
-  const geo  = new RoundedBoxGeometry(w, h, d, ROUNDED_SEGMENTS, radius);
-  const mesh = new THREE.Mesh(geo, makeBlockMat(hex, variant));
+  const geo   = makeBlockGeo(w, h, d);
+  const mesh  = new THREE.Mesh(geo, makeBlockMat(hex, variant));
   mesh.castShadow    = castShadow;
   mesh.receiveShadow = receiveShadow;
   mesh.userData.isBlock = true;
@@ -86,6 +93,7 @@ export class Block {
   private originalColor: number;
   private variant: BlockVariant;
   private currentHex: number; // 현재 적용된 색상 (revariant 시 재사용)
+  private readonly size: [number, number, number];
 
   constructor(options: BlockOptions) {
     const {
@@ -100,6 +108,7 @@ export class Block {
     this.originalColor = color;
     this.currentHex    = color;
     this.variant       = variant;
+    this.size          = size;
 
     this.mesh = buildBlockMeshGroup(color, size, variant, castShadow, receiveShadow);
     this.mesh.position.set(...position);
@@ -115,5 +124,13 @@ export class Block {
   revariant(variant: BlockVariant): void {
     this.variant = variant;
     recolorBlockGroup(this.mesh, this.currentHex, this.variant);
+  }
+
+  /** 현재 GraphicsSettings.blockRadiusRatio로 geometry를 재생성한다. */
+  rebuildGeometry(): void {
+    const mesh = this.mesh.children[0] as THREE.Mesh;
+    mesh.geometry.dispose();
+    const [w, h, d] = this.size;
+    mesh.geometry = makeBlockGeo(w, h, d);
   }
 }

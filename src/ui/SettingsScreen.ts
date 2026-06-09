@@ -1,4 +1,4 @@
-import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT } from '../core/GraphicsSettings';
+import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT } from '../core/GraphicsSettings';
 import { SettingsPreview } from './SettingsPreview';
 
 interface ColorRow { swatch: HTMLDivElement; picker: HTMLInputElement; }
@@ -14,6 +14,7 @@ export class SettingsScreen {
   private blockToggle!:       HTMLInputElement;
   private blockRow!:          ColorRow;
   private variantBtns!:       HTMLButtonElement[];
+  private radiusRow!:         SliderRow;
   private charTypeBtns!:      HTMLButtonElement[];
   private charBodyRow!:       ColorRow;
   private charHeadRow!:       ColorRow;
@@ -33,6 +34,7 @@ export class SettingsScreen {
   onExposureChange:       (val: number | null)     => void = () => {};
   onStarBgChange:         (enabled: boolean)       => void = () => {};
   onCharacterTypeChange:  (type: string)            => void = () => {};
+  onBlockRadiusChange:    (val: number)             => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -128,6 +130,19 @@ export class SettingsScreen {
     );
     this.variantBtns = variantR.btns;
     body.appendChild(variantR.el);
+
+    const radiusR = this.makeSliderRow(
+      'Block Roundness', GraphicsSettings.blockRadiusRatio, 0.00, 0.20, 0.01,
+      (v) => { this.onBlockRadiusChange(v); this.preview.refresh(); },
+      () => {
+        this.onBlockRadiusChange(BLOCK_RADIUS_DEFAULT);
+        this.radiusRow.slider.value    = String(BLOCK_RADIUS_DEFAULT);
+        this.radiusRow.valueEl.textContent = BLOCK_RADIUS_DEFAULT.toFixed(2);
+        this.preview.refresh();
+      },
+    );
+    this.radiusRow = radiusR.sliderRow;
+    body.appendChild(radiusR.el);
 
     const charTypeR = this.makeCharTypeRow(
       GraphicsSettings.characterType,
@@ -547,6 +562,11 @@ export class SettingsScreen {
     // Variant reset to 'default'
     this.variantBtns.forEach(b => b.classList.toggle('active', b.dataset.variant === 'default'));
     this.onBlockVariantChange('default');
+
+    // Block roundness reset
+    this.radiusRow.slider.value    = String(BLOCK_RADIUS_DEFAULT);
+    this.radiusRow.valueEl.textContent = BLOCK_RADIUS_DEFAULT.toFixed(2);
+    this.onBlockRadiusChange(BLOCK_RADIUS_DEFAULT);
 
     // Character type reset to 'default'
     this.charTypeBtns.forEach(b => b.classList.toggle('active', b.dataset.charType === 'default'));

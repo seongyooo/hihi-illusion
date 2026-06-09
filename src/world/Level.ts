@@ -178,6 +178,11 @@ export class Level {
     this.blocks.forEach(block => block.revariant(variant));
   }
 
+  /** Rebuild geometry for all blocks (called when block radius changes). */
+  regeometryAllBlocks(): void {
+    this.blocks.forEach(block => block.rebuildGeometry());
+  }
+
   dispose(): void {
     this.group.traverse(child => {
       if (child instanceof THREE.Mesh) {

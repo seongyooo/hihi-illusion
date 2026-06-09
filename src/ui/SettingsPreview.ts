@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GraphicsSettings } from '../core/GraphicsSettings';
 import { buildBlockMeshGroup, recolorBlockGroup } from '../world/Block';
+import type { BlockVariant } from '../world/Block';
 import { StarBackground } from '../world/StarBackground';
 import { Character } from '../character/Character';
 import type { CharacterType } from '../character/Character';
@@ -22,6 +23,7 @@ export class SettingsPreview {
 
   private block1:    THREE.Group;
   private block2:    THREE.Group;
+  private previewRadius = -1; // 마지막으로 구축한 radius — rebuild 여부 판단용
 
   /** 현재 프리뷰에 올라가 있는 캐릭터 */
   private charPreview: Character;
@@ -135,13 +137,18 @@ export class SettingsPreview {
     this.hemiLight.intensity = GraphicsSettings.lightHemi    ?? defs.hemi;
     this.ambLight.color.set(enhanced ? 0xfff5ee : 0xffffff);
 
-    // 블록 색상 + variant
+    // 블록 색상 + variant (radius 변경 시 geometry 재구축 포함)
     const override  = GraphicsSettings.blockColorOverride;
     const variant   = GraphicsSettings.blockVariant as import('../world/Block').BlockVariant;
-    const b1 = override ? parseInt(override.replace('#', ''), 16) : BLOCK1_HEX;
-    const b2 = override ? parseInt(override.replace('#', ''), 16) : BLOCK2_HEX;
-    recolorBlockGroup(this.block1, b1, variant);
-    recolorBlockGroup(this.block2, b2, variant);
+    const b1hex = override ? parseInt(override.replace('#', ''), 16) : BLOCK1_HEX;
+    const b2hex = override ? parseInt(override.replace('#', ''), 16) : BLOCK2_HEX;
+
+    if (GraphicsSettings.blockRadiusRatio !== this.previewRadius) {
+      this._rebuildPreviewBlocks(b1hex, b2hex, variant);
+    } else {
+      recolorBlockGroup(this.block1, b1hex, variant);
+      recolorBlockGroup(this.block2, b2hex, variant);
+    }
 
     // 캐릭터 — 타입 또는 품질 모드가 바뀌면 재구축
     const newType = GraphicsSettings.characterType;
@@ -169,6 +176,31 @@ export class SettingsPreview {
   }
 
   // ── Private ────────────────────────────────────────────────────────
+
+  private _rebuildPreviewBlocks(b1hex: number, b2hex: number, variant: BlockVariant): void {
+    // 기존 블록 제거 + dispose
+    this.scene.remove(this.block1);
+    this.scene.remove(this.block2);
+    for (const g of [this.block1, this.block2]) {
+      g.traverse(c => {
+        if (!(c instanceof THREE.Mesh)) return;
+        c.geometry.dispose();
+        (c.material as THREE.Material).dispose();
+      });
+    }
+
+    // 새 블록 생성
+    this.block1 = buildBlockMeshGroup(b1hex, [1, 0.5, 1], variant);
+    this.block1.position.set(0.6, 0, 0.6);
+    this.block1.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } });
+
+    this.block2 = buildBlockMeshGroup(b2hex, [1, 0.5, 1], variant);
+    this.block2.position.set(-0.6, 0, -0.6);
+    this.block2.traverse(c => { if (c instanceof THREE.Mesh) { c.castShadow = true; c.receiveShadow = true; } });
+
+    this.scene.add(this.block1, this.block2);
+    this.previewRadius = GraphicsSettings.blockRadiusRatio;
+  }
 
   private _buildChar(): Character {
     const type = GraphicsSettings.characterType as CharacterType;

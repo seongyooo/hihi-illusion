@@ -167,6 +167,11 @@ export class GameManager {
       if (!this.isTutorial) this.level?.revariantAllBlocks(variant as import('../world/Block').BlockVariant);
     };
 
+    this.settingsScreen.onBlockRadiusChange = (val) => {
+      GraphicsSettings.blockRadiusRatio = val;
+      this.level?.regeometryAllBlocks();
+    };
+
     this.settingsScreen.onCharBodyColorChange = (hexStr) => {
       GraphicsSettings.characterBodyColor = hexStr;
       this.character?.setBodyColor(hexStr);
