@@ -13,9 +13,9 @@ const KEY_LIGHT_DIR      = 'hihi_light_dir';
 const KEY_LIGHT_HEMI     = 'hihi_light_hemi';
 const KEY_EXPOSURE       = 'hihi_exposure';
 
-export const EXPOSURE_DEFAULT      = 0.88; // Enhanced 모드 기본 노출값
-export const BLOCK_RADIUS_DEFAULT  = 0.07; // 블록 모서리 반지름 비율 기본값
-export const BLOCK_XZ_DEFAULT      = 0.07; // XZ 팽창 비율 기본값
+export const EXPOSURE_DEFAULT      = 0.48; // Enhanced 모드 기본 노출값
+export const BLOCK_RADIUS_DEFAULT  = 0.04; // 블록 모서리 반지름 비율 기본값
+export const BLOCK_XZ_DEFAULT      = 0.0;  // XZ 팽창 비율 기본값
 
 export const COLOR_DEFAULTS = {
   charBody:   '#ffffff',
@@ -44,7 +44,8 @@ function setNum(key: string, val: number | null): void {
 
 export class GraphicsSettings {
   // ── Graphics quality ──────────────────────────────────────────────────
-  static get enhanced(): boolean { return localStorage.getItem(KEY_ENHANCED) === 'true'; }
+  // 미설정 시 기본값 true (Enhanced on)
+  static get enhanced(): boolean { return localStorage.getItem(KEY_ENHANCED) !== 'false'; }
   static set enhanced(val: boolean) { localStorage.setItem(KEY_ENHANCED, val ? 'true' : 'false'); }
 
   static get starBackground(): boolean { return localStorage.getItem(KEY_STAR_BG) === 'true'; }

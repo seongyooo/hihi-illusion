@@ -82,6 +82,8 @@ export class GameManager {
   private midpointCinematicTween:   gsap.core.Tween | null = null;
   private midpointCinematicTimeout: ReturnType<typeof setTimeout> | null = null;
   private goalClearTimeout:         ReturnType<typeof setTimeout> | null = null;
+  private goalClearInnerTimeout:    ReturnType<typeof setTimeout> | null = null;
+  private starHintTimeout:          ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
     this.debug      = new URLSearchParams(location.search).has('debug');
@@ -286,6 +288,7 @@ export class GameManager {
     10: 'custom_stage_10',
     11: 'custom_stage_11',
     12: 'custom_stage_12',
+    13: 'custom_stage_13',
   };
 
   private loadStage(stageNum: number): void {
@@ -660,6 +663,16 @@ export class GameManager {
       clearTimeout(this.goalClearTimeout);
       this.goalClearTimeout = null;
     }
+    // BUG-01: 튜토리얼 클리어 inner setTimeout 취소
+    if (this.goalClearInnerTimeout !== null) {
+      clearTimeout(this.goalClearInnerTimeout);
+      this.goalClearInnerTimeout = null;
+    }
+    // BUG-03: 별 부족 힌트 setTimeout 취소
+    if (this.starHintTimeout !== null) {
+      clearTimeout(this.starHintTimeout);
+      this.starHintTimeout = null;
+    }
 
     // NEW-04: cam/orbit 직접 tween이 있을 경우도 대비해 유지
     gsap.killTweensOf(this.renderer.camera.position);
@@ -915,7 +928,12 @@ export class GameManager {
   private _tryGoalReached(): void {
     if (this.starMgr && !this.starMgr.allCollected()) {
       this.tutorialHint.showHint('★ 별을 모두 모아야 해요');
-      setTimeout(() => this.tutorialHint.hideHint(), 2000);
+      // BUG-03: timeout 추적 → unloadCurrent()에서 취소
+      if (this.starHintTimeout !== null) clearTimeout(this.starHintTimeout);
+      this.starHintTimeout = setTimeout(() => {
+        this.starHintTimeout = null;
+        this.tutorialHint.hideHint();
+      }, 2000);
       return;
     }
     this.onGoalReached();
@@ -952,7 +970,11 @@ export class GameManager {
       if (this.isTutorial) {
         // 튜토리얼 클리어: 버튼 없이 잠시 후 타이틀 화면으로 이동
         this.hud.showClear();
-        setTimeout(() => { this.titleScreen.show(); }, 1400);
+        // BUG-01: inner timeout 추적 → unloadCurrent()에서 취소
+        this.goalClearInnerTimeout = setTimeout(() => {
+          this.goalClearInnerTimeout = null;
+          this.titleScreen.show();
+        }, 1400);
       } else {
         // 일반 스테이지 클리어: Next Stage / Stage Select 버튼 표시
         const nextNum = this.getNextStageNum();

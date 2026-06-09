@@ -183,6 +183,9 @@ export class SwitchManager {
     const attached = this.attachedMeshes.get(state.def.targetNodeId) ?? [];
     attached.forEach(m => { m.visible = false; });
 
+    // BUG-04: spawn scale-in 애니메이션이 진행 중일 수 있으므로 먼저 취소
+    gsap.killTweensOf(mesh.scale);
+
     // scale-out 연출 후 제거
     gsap.to(mesh.scale, {
       x: 0, y: 0, z: 0,

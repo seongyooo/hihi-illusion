@@ -447,22 +447,6 @@
     },
     {
       "nodeA": "b039",
-      "nodeB": "b025",
-      "activateAzimuth": -29.9,
-      "azimuthTolerance": 2,
-      "activateElevation": 17.1,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b039",
-      "nodeB": "b025",
-      "activateAzimuth": -39.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 17.6,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b039",
       "nodeB": "b022",
       "activateAzimuth": -39.7,
       "azimuthTolerance": 2,

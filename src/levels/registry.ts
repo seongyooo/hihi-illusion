@@ -22,31 +22,31 @@ export const LEVELS: LevelMeta[] = [
   },
   {
     id:              'custom_stage_2',
-    title:           'Custom Level',
+    title:           'Stage 2',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_2.json') as unknown as Promise<{ default: LevelData }>,
   },
   {
     id:              'custom_stage_3',
-    title:           'Custom Level',
+    title:           'Stage 3',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_3.json') as unknown as Promise<{ default: LevelData }>,
   },
   {
     id:              'custom_stage_4',
-    title:           'Custom Level',
+    title:           'Stage 4',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_4.json') as unknown as Promise<{ default: LevelData }>,
   },
   {
     id:              'custom_stage_5',
-    title:           'Custom Level',
+    title:           'Stage 5',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_5.json') as unknown as Promise<{ default: LevelData }>,
   },
   {
     id:              'custom_stage_6',
-    title:           'Custom Level',
+    title:           'Stage 6',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_6.json') as unknown as Promise<{ default: LevelData }>,
   },
@@ -76,7 +76,7 @@ export const LEVELS: LevelMeta[] = [
   },
   {
     id:              'custom_stage_11',
-    title:           'Custom Level',
+    title:           'Stage 11',
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_11.json') as unknown as Promise<{ default: LevelData }>,
   },
@@ -85,5 +85,11 @@ export const LEVELS: LevelMeta[] = [
     title:           'Pressure Gate',
     backgroundColor: '#E8F0EE',
     file:            () => import('./level_custom_12.json') as unknown as Promise<{ default: LevelData }>,
+  },
+  {
+    id:              'custom_stage_13',
+    title:           'Stage 13',
+    backgroundColor: '#E8EEF5',
+    file:            () => import('./level_custom_13.json') as unknown as Promise<{ default: LevelData }>,
   },
 ];

@@ -4,77 +4,200 @@
   "backgroundColor": "#E8F0EE",
   "blocks": [
     {
-      "id": "b001",
-      "position": [4, 0.25, 5],
+      "id": "b015",
+      "position": [
+        5.5,
+        0.25,
+        11.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     },
     {
-      "id": "b002",
-      "position": [4, 0.25, 4],
+      "id": "b016",
+      "position": [
+        5.5,
+        0.25,
+        10.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     },
     {
-      "id": "b003",
-      "position": [4, 0.25, 3],
+      "id": "b017",
+      "position": [
+        5.5,
+        0.25,
+        9.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     },
     {
-      "id": "b004",
-      "position": [4, 0.25, 2],
-      "color": "#A8DAC8",
-      "size": [1, 0.5, 1],
-      "walkable": true
-    },
-    {
-      "id": "b005",
-      "position": [4, 0.25, 1],
-      "color": "#C8E8D8",
-      "size": [1, 0.5, 1],
-      "walkable": true
-    },
-    {
-      "id": "b006",
-      "position": [4, 0.25, 0],
+      "id": "b018",
+      "position": [
+        5.5,
+        0.25,
+        8.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     },
     {
-      "id": "b007",
-      "position": [3, 0.25, 0],
+      "id": "b019",
+      "position": [
+        5.5,
+        0.25,
+        7.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     },
     {
-      "id": "b008",
-      "position": [4, 0.25, -1],
+      "id": "b020",
+      "position": [
+        5.5,
+        0.25,
+        6.5
+      ],
       "color": "#A8C5DA",
-      "size": [1, 0.5, 1],
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b021",
+      "position": [
+        5.5,
+        0.25,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b022",
+      "position": [
+        5.5,
+        0.25,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b023",
+      "position": [
+        5.5,
+        0.25,
+        3.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b024",
+      "position": [
+        5.5,
+        0.25,
+        2.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
       "walkable": true
     }
   ],
+  "ladders": [],
   "switches": [
     {
-      "switchNodeId": "b004",
-      "targetNodeId": "b005",
+      "switchNodeId": "b017",
+      "targetNodeId": "b023",
+      "mode": "toggle",
+      "type": "spawn"
+    },
+    {
+      "switchNodeId": "b017",
+      "targetNodeId": "b018",
+      "mode": "toggle",
+      "type": "spawn"
+    },
+    {
+      "switchNodeId": "b017",
+      "targetNodeId": "b019",
+      "mode": "toggle",
+      "type": "spawn"
+    },
+    {
+      "switchNodeId": "b017",
+      "targetNodeId": "b021",
+      "mode": "toggle",
+      "type": "spawn"
+    },
+    {
+      "switchNodeId": "b017",
+      "targetNodeId": "b022",
+      "mode": "toggle",
+      "type": "spawn"
+    },
+    {
+      "switchNodeId": "b017",
+      "targetNodeId": "b020",
       "mode": "toggle",
       "type": "spawn"
     }
   ],
-  "stars": [
-    { "nodeId": "b007" }
-  ],
+  "illusionConnections": [],
   "character": {
-    "startNodeId": "b001"
+    "startNodeId": "b015"
   },
   "goal": {
-    "blockId": "b008"
+    "blockId": "b024"
   }
 }

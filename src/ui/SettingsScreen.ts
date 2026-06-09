@@ -554,10 +554,10 @@ export class SettingsScreen {
   // ── Reset ──────────────────────────────────────────────────────────
 
   private resetAll(): void {
-    // Enhanced Rendering (QA-15)
-    GraphicsSettings.enhanced = false;
-    this.qualityCheckbox.checked = false;
-    this.onQualityChange(false);
+    // Enhanced Rendering — 기본값 true
+    GraphicsSettings.enhanced = true;
+    this.qualityCheckbox.checked = true;
+    this.onQualityChange(true);
 
     // Star Background
     GraphicsSettings.starBackground = false;
