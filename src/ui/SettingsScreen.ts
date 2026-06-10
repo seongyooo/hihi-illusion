@@ -1,4 +1,4 @@
-import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT, BLOCK_XZ_DEFAULT } from '../core/GraphicsSettings';
+import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT, BLOCK_XZ_DEFAULT, ROTATE_SPEED_DEFAULT, DAMPING_FACTOR_DEFAULT } from '../core/GraphicsSettings';
 import { SettingsPreview } from './SettingsPreview';
 
 interface ColorRow { swatch: HTMLDivElement; picker: HTMLInputElement; }
@@ -23,6 +23,8 @@ export class SettingsScreen {
   private dirRow!:            SliderRow;
   private hemiRow!:           SliderRow;
   private expRow!:            SliderRow;
+  private rotateRow!:         SliderRow;
+  private dampingRow!:        SliderRow;
 
   onClose:                () => void = () => {};
   onQualityChange:        (enhanced: boolean)      => void = () => {};
@@ -37,6 +39,8 @@ export class SettingsScreen {
   onCharacterTypeChange:  (type: string)            => void = () => {};
   onBlockRadiusChange:    (val: number)             => void = () => {};
   onBlockXZChange:        (val: number)             => void = () => {};
+  onRotateSpeedChange:    (val: number)             => void = () => {};
+  onDampingFactorChange:  (val: number)             => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -253,6 +257,33 @@ export class SettingsScreen {
     );
     this.hemiRow = hemiR.sliderRow;
     body.appendChild(hemiR.el);
+
+    // — CAMERA —
+    body.appendChild(this.makeSection('CAMERA'));
+
+    const rotateR = this.makeSliderRow(
+      'Rotate Speed', GraphicsSettings.rotateSpeed, 0.3, 2.0, 0.05,
+      (v) => { this.onRotateSpeedChange(v); },
+      () => {
+        this.onRotateSpeedChange(ROTATE_SPEED_DEFAULT);
+        this.rotateRow.slider.value        = String(ROTATE_SPEED_DEFAULT);
+        this.rotateRow.valueEl.textContent = ROTATE_SPEED_DEFAULT.toFixed(2);
+      },
+    );
+    this.rotateRow = rotateR.sliderRow;
+    body.appendChild(rotateR.el);
+
+    const dampingR = this.makeSliderRow(
+      'Damping', GraphicsSettings.dampingFactor, 0.01, 0.30, 0.01,
+      (v) => { this.onDampingFactorChange(v); },
+      () => {
+        this.onDampingFactorChange(DAMPING_FACTOR_DEFAULT);
+        this.dampingRow.slider.value        = String(DAMPING_FACTOR_DEFAULT);
+        this.dampingRow.valueEl.textContent = DAMPING_FACTOR_DEFAULT.toFixed(2);
+      },
+    );
+    this.dampingRow = dampingR.sliderRow;
+    body.appendChild(dampingR.el);
 
     // Reset all
     const resetBtn = document.createElement('button');
@@ -620,6 +651,15 @@ export class SettingsScreen {
     this.expRow.slider.value = String(EXPOSURE_DEFAULT);
     this.expRow.valueEl.textContent = EXPOSURE_DEFAULT.toFixed(2);
     this.onExposureChange(null);
+
+    // Camera
+    GraphicsSettings.resetCamera();
+    this.rotateRow.slider.value        = String(ROTATE_SPEED_DEFAULT);
+    this.rotateRow.valueEl.textContent = ROTATE_SPEED_DEFAULT.toFixed(2);
+    this.dampingRow.slider.value        = String(DAMPING_FACTOR_DEFAULT);
+    this.dampingRow.valueEl.textContent = DAMPING_FACTOR_DEFAULT.toFixed(2);
+    this.onRotateSpeedChange(ROTATE_SPEED_DEFAULT);
+    this.onDampingFactorChange(DAMPING_FACTOR_DEFAULT);
 
     this.preview.refresh();
   }

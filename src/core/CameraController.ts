@@ -87,5 +87,12 @@ export class CameraController {
     });
   }
 
+  /** Immediately kill the fly-in tween without resolving the Promise. */
+  cancel(): void {
+    this.currentTl?.kill();
+    this.isAnimating = false;
+    this.currentTl   = null;
+  }
+
   get animating(): boolean { return this.isAnimating; }
 }

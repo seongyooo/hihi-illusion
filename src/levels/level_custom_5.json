@@ -302,6 +302,22 @@
       "azimuthTolerance": 2,
       "activateElevation": 11.4,
       "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b007",
+      "nodeB": "b003",
+      "activateAzimuth": -90.2,
+      "azimuthTolerance": 2,
+      "activateElevation": 14.3,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b007",
+      "nodeB": "b002",
+      "activateAzimuth": -104.1,
+      "azimuthTolerance": 2,
+      "activateElevation": 6.9,
+      "elevationTolerance": 2
     }
   ],
   "character": {
@@ -312,5 +328,11 @@
   },
   "goal": {
     "blockId": "b012"
+  },
+  "initialCamera": {
+    "azimuth": -136,
+    "polar": 72,
+    "distance": 26,
+    "targetY": 0
   }
 }

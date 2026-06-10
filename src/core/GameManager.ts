@@ -27,8 +27,8 @@ import { StarManager }        from '../mechanics/StarManager';
 import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { TutorialSequencer }  from './TutorialSequencer';
-import { LEVELS }             from '../levels/registry';
-import { GraphicsSettings, COLOR_DEFAULTS } from './GraphicsSettings';
+import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
+import { GraphicsSettings, COLOR_DEFAULTS, ROTATE_SPEED_DEFAULT, DAMPING_FACTOR_DEFAULT } from './GraphicsSettings';
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
 
@@ -78,6 +78,9 @@ export class GameManager {
   // ── Stage tracking ────────────────────────────────────────────────────
   private currentStageNum = 0;  // 0 = tutorial, 1+ = actual stages
 
+  // ── Fly-in cancellation ───────────────────────────────────────────────
+  private flyInCancelFn: (() => void) | null = null;
+
   // ── Pending timers / tweens (must be cancelled on unload) ────────────
   private midpointCinematicTween:   gsap.core.Tween | null = null;
   private midpointCinematicTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -96,7 +99,8 @@ export class GameManager {
 
     this.orbit = new OrbitControls(this.renderer.camera, this.renderer.renderer.domElement);
     this.orbit.enableDamping = true;
-    this.orbit.dampingFactor = 0.08;
+    this.orbit.dampingFactor = GraphicsSettings.dampingFactor;
+    this.orbit.rotateSpeed   = GraphicsSettings.rotateSpeed;
     this.orbit.enablePan     = false;
     this.orbit.minDistance   = 6;
     this.orbit.maxDistance   = 25;
@@ -200,6 +204,16 @@ export class GameManager {
       this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
     };
 
+    this.settingsScreen.onRotateSpeedChange = (val) => {
+      GraphicsSettings.rotateSpeed = val;
+      this.orbit.rotateSpeed = val;
+    };
+
+    this.settingsScreen.onDampingFactorChange = (val) => {
+      GraphicsSettings.dampingFactor = val;
+      this.orbit.dampingFactor = val;
+    };
+
     this.settingsScreen.onCharacterTypeChange = (type) => {
       GraphicsSettings.characterType = type;
       if (!this.character || !this.controller) return;
@@ -275,22 +289,8 @@ export class GameManager {
 
   // ── Stage select helper ───────────────────────────────────────────────
 
-  private readonly builtinIds: Record<number, string> = {
-    1: 'custom_stage_1',
-    2: 'custom_stage_2',
-    3: 'custom_stage_3',
-    4: 'custom_stage_4',
-    5: 'custom_stage_5',
-    6: 'custom_stage_6',
-    7: 'custom_stage_7',
-    8: 'custom_stage_8',
-    9: 'custom_stage_9',
-    10: 'custom_stage_10',
-    11: 'custom_stage_11',
-    12: 'custom_stage_12',
-    13: 'custom_stage_13',
-    15: 'custom_stage_15',
-  };
+  private readonly builtinIds: Record<number, string> =
+    Object.fromEntries(CUSTOM_STAGE_NUMS.map(n => [n, `custom_stage_${n}`]));
 
   private loadStage(stageNum: number): void {
     const custom = CustomLevelStore.getByStage(stageNum);
@@ -639,14 +639,7 @@ export class GameManager {
     }
 
     // Intro camera fly-in
-    const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
-    const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
-    this.orbit.target.set(cx, 0, cz);
-    this.renderer.camera.position.set(cx + 22, 16, cz + 12);
-    this.orbit.update();
-    this.orbit.enabled = false;
-    this.cameraCtrl.transitionTo({ position: [cx + 12, 8, cz + 6], lookAt: [cx, 0, cz] }, 1.8)
-      .then(() => { this.orbit.enabled = true; });
+    this._startCameraFlyIn(data);
   }
 
   private async loadCustomLevel(data: LevelData): Promise<void> {
@@ -657,23 +650,75 @@ export class GameManager {
     this.tutorialMoved = false;
 
     this._initLevelObjects(data);
+    this._startCameraFlyIn(data);
+  }
 
-    // 레벨 블록들의 XZ 무게중심 계산
+  /** initialCamera 설정 또는 기본값으로 인트로 카메라 플라이-인 실행 */
+  private _startCameraFlyIn(data: LevelData): void {
     const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
     const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
 
-    this.orbit.target.set(cx, 0, cz);
-    this.renderer.camera.position.set(cx + 22, 16, cz + 12);
+    let finalPos: [number, number, number];
+    let targetY = 0;
+
+    if (data.initialCamera) {
+      const { azimuth, polar, distance, targetY: ty } = data.initialCamera;
+      targetY = ty;
+      const az = azimuth * Math.PI / 180;
+      const po = polar   * Math.PI / 180;
+      finalPos = [
+        cx + distance * Math.sin(po) * Math.sin(az),
+        targetY + distance * Math.cos(po),
+        cz + distance * Math.sin(po) * Math.cos(az),
+      ];
+    } else {
+      finalPos = [cx + 12, 8, cz + 6];
+    }
+
+    const lookAt: [number, number, number] = [cx, targetY, cz];
+    // 시작 위치는 최종 위치에서 더 멀리
+    const startPos: [number, number, number] = [
+      cx + (finalPos[0] - cx) * 1.8,
+      targetY + (finalPos[1] - targetY) * 1.8,
+      cz + (finalPos[2] - cz) * 1.8,
+    ];
+
+    this.orbit.target.set(cx, targetY, cz);
+    this.renderer.camera.position.set(...startPos);
     this.orbit.update();
+
+    // pointerdown 시 fly-in을 즉시 finalPos로 스냅하고 orbit 활성화
+    const canvas = this.renderer.renderer.domElement;
+    const commitFinal = () => {
+      this.flyInCancelFn = null;
+      this.cameraCtrl.cancel();
+      this.renderer.camera.position.set(...finalPos);
+      this.orbit.target.set(cx, targetY, cz);
+      this.renderer.camera.lookAt(this.orbit.target);
+      this.orbit.update();
+      this.orbit.enabled = true;
+    };
+    this.flyInCancelFn = () => {
+      canvas.removeEventListener('pointerdown', commitFinal);
+      commitFinal();
+    };
+    canvas.addEventListener('pointerdown', commitFinal, { once: true });
+
     this.orbit.enabled = false;
-    this.cameraCtrl.transitionTo(
-      { position: [cx + 12, 8, cz + 6], lookAt: [cx, 0, cz] },
-      1.8,
-    ).then(() => { this.orbit.enabled = true; });
+    this.cameraCtrl.transitionTo({ position: finalPos, lookAt }, 1.8)
+      .then(() => {
+        canvas.removeEventListener('pointerdown', commitFinal);
+        this.flyInCancelFn = null;
+        this.orbit.enabled = true;
+      });
   }
 
   private unloadCurrent(): void {
     if (!this.level) return;
+
+    // fly-in 취소 및 이벤트 리스너 정리
+    this.flyInCancelFn?.();
+    this.flyInCancelFn = null;
 
     // QA-01: proxy tween(p1/p2)과 setTimeout 취소
     if (this.midpointCinematicTween) {

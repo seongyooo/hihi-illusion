@@ -1,0 +1,258 @@
+{
+  "id": "custom_stage_16",
+  "name": "Custom Level",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        6.5,
+        0.25,
+        13.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        6.5,
+        0.25,
+        12.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b009",
+      "position": [
+        6.5,
+        0.75,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b010",
+      "position": [
+        6.5,
+        1.25,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b011",
+      "position": [
+        6.5,
+        1.75,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b012",
+      "position": [
+        6.5,
+        2.25,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b013",
+      "position": [
+        6.5,
+        2.75,
+        2.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b014",
+      "position": [
+        6.5,
+        3.25,
+        0.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [],
+  "switches": [
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b009",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        0.75,
+        11.5
+      ]
+    },
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b010",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        1.25,
+        10.5
+      ]
+    },
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b011",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        1.75,
+        9.5
+      ]
+    },
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b012",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        2.25,
+        8.5
+      ]
+    },
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b013",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        2.75,
+        7.5
+      ]
+    },
+    {
+      "switchNodeId": "b002",
+      "targetNodeId": "b014",
+      "mode": "hold",
+      "type": "move",
+      "moveTarget": [
+        6.5,
+        3.25,
+        6.5
+      ]
+    }
+  ],
+  "illusionConnections": [
+    {
+      "nodeA": "b002",
+      "nodeB": "b009",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b010",
+      "nodeB": "b009",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b010",
+      "nodeB": "b011",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b012",
+      "nodeB": "b011",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b012",
+      "nodeB": "b013",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    },
+    {
+      "nodeA": "b014",
+      "nodeB": "b013",
+      "activateAzimuth": 179.9,
+      "azimuthTolerance": 2,
+      "activateElevation": 28.2,
+      "elevationTolerance": 2
+    }
+  ],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b014"
+  },
+  "initialCamera": {
+    "azimuth": 40,
+    "polar": 68,
+    "distance": 26,
+    "targetY": 0
+  }
+}

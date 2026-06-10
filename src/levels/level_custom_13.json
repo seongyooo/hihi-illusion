@@ -1,6 +1,6 @@
 {
   "id": "custom_stage_13",
-  "name": "Stage 13",
+  "name": "Custom Level",
   "backgroundColor": "#E8EEF5",
   "blocks": [
     {
@@ -547,7 +547,7 @@
     {
       "nodeA": "b015",
       "nodeB": "b024",
-      "activateAzimuth": -182.8,
+      "activateAzimuth": -179.8,
       "azimuthTolerance": 2,
       "activateElevation": 18.3,
       "elevationTolerance": 2
@@ -555,7 +555,7 @@
     {
       "nodeA": "b015",
       "nodeB": "b023",
-      "activateAzimuth": -176.8,
+      "activateAzimuth": -179.8,
       "azimuthTolerance": 2,
       "activateElevation": 18.3,
       "elevationTolerance": 2
@@ -977,5 +977,11 @@
   },
   "goal": {
     "blockId": "b025"
+  },
+  "initialCamera": {
+    "azimuth": -91,
+    "polar": 52,
+    "distance": 26,
+    "targetY": 0
   }
 }

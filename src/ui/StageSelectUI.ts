@@ -1,7 +1,8 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
+import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 
-const TOTAL_STAGES     = 30;
-const BUILTIN_STAGE_NUMS = new Set([1,2,3,4,5,6,7,8,9,10,11,12,13,15]);
+const TOTAL_STAGES       = 30;
+const BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS);
 
 export class StageSelectUI {
   private el: HTMLElement;

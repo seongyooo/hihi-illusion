@@ -1,4 +1,5 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
+import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 
 export class EditorLobby {
   private el: HTMLElement;
@@ -56,41 +57,20 @@ export class EditorLobby {
     const builtinGrid = document.createElement('div');
     builtinGrid.className = 'editor-lobby__grid';
 
-    const builtinStages = [
-      { num: 1,  name: 'The Prologue' },
-      { num: 2,  name: 'Custom Level' },
-      { num: 3,  name: 'Custom Level' },
-      { num: 4,  name: 'Custom Level' },
-      { num: 5,  name: 'Custom Level' },
-      { num: 6,  name: 'Custom Level' },
-      { num: 7,  name: 'The Relay'    },
-      { num: 8,  name: 'The Elevator' },
-      { num: 9,  name: 'Mirage'         },
-      { num: 10, name: 'Convergence'    },
-      { num: 11, name: 'Custom Level'   },
-      { num: 12, name: 'Pressure Gate'  },
-      { num: 13, name: 'Stage 13'       },
-      { num: 15, name: 'Double Key'     },
-    ];
-    for (const s of builtinStages) {
+    for (const num of CUSTOM_STAGE_NUMS) {
       const card = document.createElement('div');
       card.className = 'editor-lobby__card';
 
-      const num = document.createElement('span');
-      num.className = 'editor-lobby__card-num';
-      num.textContent = `Stage ${s.num}`;
-
-      const name = document.createElement('span');
-      name.className = 'editor-lobby__card-name';
-      name.textContent = s.name;
+      const numEl = document.createElement('span');
+      numEl.className = 'editor-lobby__card-num';
+      numEl.textContent = `Stage ${num}`;
 
       const editBtn = document.createElement('button');
       editBtn.className = 'editor-btn primary';
       editBtn.textContent = 'Edit';
-      editBtn.addEventListener('click', () => this.onEditBuiltin(s.num));
+      editBtn.addEventListener('click', () => this.onEditBuiltin(num));
 
-      card.appendChild(num);
-      card.appendChild(name);
+      card.appendChild(numEl);
       card.appendChild(editBtn);
       builtinGrid.appendChild(card);
     }
@@ -102,9 +82,27 @@ export class EditorLobby {
     const section = document.createElement('div');
     section.className = 'editor-lobby__section';
 
+    const sectionHeader = document.createElement('div');
+    sectionHeader.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
     const sectionTitle = document.createElement('h3');
     sectionTitle.textContent = 'CUSTOM STAGES';
-    section.appendChild(sectionTitle);
+    sectionTitle.style.margin = '0';
+
+    const downloadAllBtn = document.createElement('button');
+    downloadAllBtn.className = 'editor-btn';
+    downloadAllBtn.textContent = '↓ All';
+    downloadAllBtn.title = '전체 커스텀 스테이지 JSON 일괄 다운로드';
+    downloadAllBtn.addEventListener('click', () => {
+      const all = CustomLevelStore.getAll().sort((a, b) => a.stageNum - b.stageNum);
+      if (all.length === 0) return;
+      const json = JSON.stringify(all.map(l => l.data), null, 2);
+      this.downloadJson(json, 'custom_stages_all.json');
+    });
+
+    sectionHeader.appendChild(sectionTitle);
+    sectionHeader.appendChild(downloadAllBtn);
+    section.appendChild(sectionHeader);
 
     this.gridEl = document.createElement('div');
     this.gridEl.className = 'editor-lobby__grid';
@@ -137,6 +135,16 @@ export class EditorLobby {
       name.className = 'editor-lobby__card-name';
       name.textContent = level.data.name;
 
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'editor-btn';
+      dlBtn.textContent = '↓';
+      dlBtn.title = 'JSON 다운로드';
+      dlBtn.addEventListener('click', () => {
+        const json = JSON.stringify(level.data, null, 2);
+        const filename = `level_custom_${level.stageNum}.json`;
+        this.downloadJson(json, filename);
+      });
+
       const editBtn = document.createElement('button');
       editBtn.className = 'editor-btn primary';
       editBtn.textContent = 'Edit';
@@ -153,6 +161,7 @@ export class EditorLobby {
 
       const btnRow = document.createElement('div');
       btnRow.className = 'editor-lobby__card-btns';
+      btnRow.appendChild(dlBtn);
       btnRow.appendChild(editBtn);
       btnRow.appendChild(delBtn);
 
@@ -161,6 +170,16 @@ export class EditorLobby {
       card.appendChild(btnRow);
       this.gridEl.appendChild(card);
     }
+  }
+
+  private downloadJson(json: string, filename: string): void {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   show(): void {

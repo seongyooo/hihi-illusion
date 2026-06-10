@@ -27,12 +27,16 @@ interface IllusionConn {
   elevationTol: number;
 }
 
+interface SwitchTarget {
+  nodeId:     string;
+  moveTarget?: [number, number, number];  // move 타입 전용
+}
+
 interface SwitchConn {
-  switchNodeId:  string;
-  targetNodeIds: string[];   // 복수 타깃 지원
+  switchNodeId: string;
+  targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
   mode: 'hold' | 'toggle';
   type: 'spawn' | 'move';
-  moveTarget?: [number, number, number];
 }
 
 type Tool = 'place' | 'erase' | 'select';
@@ -96,7 +100,7 @@ export class LevelEditor {
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starNodeIds:     string[] = [];
   private switchConns:      SwitchConn[] = [];
-  private swPendingTargets: string[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
+  private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private pickCallback: ((block: EditorBlock) => void) | null = null;
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
@@ -105,6 +109,7 @@ export class LevelEditor {
   private stageNum = 4;
   private bgColor = '#E8EEF5';
   private currentColor = DEFAULT_COLOR;
+  private initCam: { azimuth: number; polar: number; distance: number; targetY: number } | null = null;
 
   // Mouse drag detection
   private mouseDownPos = new THREE.Vector2();
@@ -125,6 +130,16 @@ export class LevelEditor {
   private teleporterFormEl!: HTMLElement;
   private starFormEl!:       HTMLElement;
   private switchFormEl!:     HTMLElement;
+  // Camera panel sliders (load 시 값 동기화용)
+  private camAzSlider!:   HTMLInputElement;
+  private camPoSlider!:   HTMLInputElement;
+  private camDistSlider!: HTMLInputElement;
+  private camTySlider!:   HTMLInputElement;
+  private camAzNum!:      HTMLInputElement;
+  private camPoNum!:      HTMLInputElement;
+  private camDistNum!:    HTMLInputElement;
+  private camTyNum!:      HTMLInputElement;
+  private camPreviewEl!:  HTMLElement;
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private selIdEl!: HTMLElement;
@@ -686,43 +701,45 @@ export class LevelEditor {
             <option value="move">move</option>
           </select>
         </div>
-        <div class="editor-row" id="sw-move-row" style="display:none; gap:4px; align-items:center;">
-          <label style="min-width:60px;">MoveTarget:</label>
-          <input class="editor-input" id="sw-mx" type="number" step="0.5" value="0" style="width:48px" placeholder="X">
-          <input class="editor-input" id="sw-my" type="number" step="0.5" value="0" style="width:48px" placeholder="Y">
-          <input class="editor-input" id="sw-mz" type="number" step="0.5" value="0" style="width:48px" placeholder="Z">
-          <button class="editor-btn" id="sw-pick-move" title="블록 클릭으로 좌표 입력">↗</button>
-        </div>
         <div style="margin-top:4px;">
           <label style="font-size:11px;color:#aaa;">Targets:</label>
           <div id="sw-target-list" style="min-height:20px;margin:2px 0 4px;"></div>
           <div class="editor-row" style="gap:4px;">
             <input class="editor-input" id="sw-target-input" style="width:72px" placeholder="e.g. b005">
             <button class="editor-btn" id="sw-pick-target" title="클릭해서 블록 선택">↗</button>
-            <button class="editor-btn" id="sw-add-target">+ Target</button>
           </div>
+          <div class="editor-row" id="sw-target-move-row" style="display:none; gap:4px; margin-top:3px;">
+            <label style="min-width:52px;font-size:11px;">MoveTo:</label>
+            <input class="editor-input" id="sw-mx" type="number" step="0.5" value="0" style="width:48px" placeholder="X">
+            <input class="editor-input" id="sw-my" type="number" step="0.5" value="0" style="width:48px" placeholder="Y">
+            <input class="editor-input" id="sw-mz" type="number" step="0.5" value="0" style="width:48px" placeholder="Z">
+            <button class="editor-btn" id="sw-pick-move" title="블록 클릭으로 좌표 입력">↗</button>
+          </div>
+          <button class="editor-btn" id="sw-add-target" style="margin-top:3px;">+ Target</button>
         </div>
       `;
 
-      // Show/hide moveTarget row when type changes
-      const swTypeSelect = this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement;
-      const swMoveRow    = this.switchFormEl.querySelector('#sw-move-row') as HTMLElement;
+      // type 변경 시 moveTarget 입력 행 표시/숨김
+      const swTypeSelect     = this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement;
+      const swTargetMoveRow  = this.switchFormEl.querySelector('#sw-target-move-row') as HTMLElement;
       swTypeSelect.addEventListener('change', () => {
-        swMoveRow.style.display = swTypeSelect.value === 'move' ? '' : 'none';
+        swTargetMoveRow.style.display = swTypeSelect.value === 'move' ? '' : 'none';
       });
 
-      // 타깃 목록 참조 (renderSwTargetList 메서드로 위임)
+      // 타깃 목록 참조
       const swTargetListEl = this.switchFormEl.querySelector('#sw-target-list') as HTMLElement;
 
-      // Pick 버튼
+      // Pick: 스위치 노드
       (this.switchFormEl.querySelector('#sw-pick-switch') as HTMLButtonElement)
         .addEventListener('click', () => this.startPick(b => {
           (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = b.id;
         }));
+      // Pick: 타깃 노드 ID 입력
       (this.switchFormEl.querySelector('#sw-pick-target') as HTMLButtonElement)
         .addEventListener('click', () => this.startPick(b => {
           (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value = b.id;
         }));
+      // Pick: moveTarget 좌표 → 해당 타깃의 XYZ 입력
       (this.switchFormEl.querySelector('#sw-pick-move') as HTMLButtonElement)
         .addEventListener('click', () => this.startPick(b => {
           const wp = blockWorldPos(b.gridX, b.floor, b.gridZ);
@@ -731,15 +748,25 @@ export class LevelEditor {
           (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = String(wp.z);
         }));
 
-      // + Target 버튼
+      // + Target: 타깃 nodeId + per-target moveTarget을 함께 추가
       (this.switchFormEl.querySelector('#sw-add-target') as HTMLButtonElement)
         .addEventListener('click', () => {
           const id = (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value.trim();
-          if (id && !this.swPendingTargets.includes(id)) {
-            this.swPendingTargets.push(id);
-            this.renderSwTargetList(swTargetListEl);
+          if (!id || this.swPendingTargets.some(t => t.nodeId === id)) return;
+          const target: SwitchTarget = { nodeId: id };
+          if (swTypeSelect.value === 'move') {
+            const mx = parseFloat((this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value) || 0;
+            const my = parseFloat((this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value) || 0;
+            const mz = parseFloat((this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value) || 0;
+            target.moveTarget = [mx, my, mz];
           }
+          this.swPendingTargets.push(target);
+          this.renderSwTargetList(swTargetListEl);
+          // 입력 초기화
           (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value = '';
+          (this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value = '0';
+          (this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value = '0';
+          (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = '0';
         });
 
       const swAddBtn = document.createElement('button');
@@ -751,14 +778,7 @@ export class LevelEditor {
         const mode = (this.switchFormEl.querySelector('#sw-mode') as HTMLSelectElement).value as 'hold' | 'toggle';
         const type = (this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement).value as 'spawn' | 'move';
         if (switchNodeId && this.swPendingTargets.length > 0) {
-          const conn: SwitchConn = { switchNodeId, targetNodeIds: [...this.swPendingTargets], mode, type };
-          if (type === 'move') {
-            const mx = parseFloat((this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value) || 0;
-            const my = parseFloat((this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value) || 0;
-            const mz = parseFloat((this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value) || 0;
-            conn.moveTarget = [mx, my, mz];
-          }
-          this.switchConns.push(conn);
+          this.switchConns.push({ switchNodeId, targets: [...this.swPendingTargets], mode, type });
           this.swPendingTargets = [];
           this.renderSwTargetList(swTargetListEl);
           this.rebuildSwitchList();
@@ -790,6 +810,98 @@ export class LevelEditor {
         this.switchFormEl.classList.toggle('open');
         if (!this.switchFormEl.classList.contains('open')) this.cancelPick();
       });
+    }));
+
+    // Camera
+    p.appendChild(this.buildSection('CAMERA', (sec) => {
+      // 슬라이더 헬퍼
+      const makeRow = (label: string, id: string, min: number, max: number, step: number, def: number) => {
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        row.style.gap = '6px';
+        const lbl = document.createElement('label');
+        lbl.style.minWidth = '80px';
+        lbl.style.fontSize = '11px';
+        lbl.textContent = label;
+        const slider = document.createElement('input');
+        slider.type = 'range'; slider.id = id;
+        slider.min = String(min); slider.max = String(max); slider.step = String(step);
+        slider.value = String(def);
+        slider.style.flex = '1';
+        const num = document.createElement('input');
+        num.type = 'number'; num.className = 'editor-input';
+        num.min = String(min); num.max = String(max); num.step = String(step);
+        num.value = String(def); num.style.width = '52px';
+        slider.addEventListener('input', () => { num.value = slider.value; updatePreview(); });
+        num.addEventListener('input', () => { slider.value = num.value; updatePreview(); });
+        row.appendChild(lbl); row.appendChild(slider); row.appendChild(num);
+        sec.appendChild(row);
+        return { slider, num };
+      };
+
+      const azRow  = makeRow('Azimuth (°)',   'cam-az',   -180, 180,  1,  45);
+      const poRow  = makeRow('Elevation (°)', 'cam-po',    10,   80,  1,  33);
+      const distRow= makeRow('Distance',      'cam-dist',   4,   30, 0.5, 14);
+      const tyRow  = makeRow('Target Y',      'cam-ty',    -5,   10, 0.5,  0);
+
+      // 필드 참조 저장 (loadFromLevelData에서 동기화)
+      this.camAzSlider = azRow.slider;   this.camAzNum = azRow.num;
+      this.camPoSlider = poRow.slider;   this.camPoNum = poRow.num;
+      this.camDistSlider = distRow.slider; this.camDistNum = distRow.num;
+      this.camTySlider = tyRow.slider;   this.camTyNum = tyRow.num;
+
+      this.camPreviewEl = document.createElement('div');
+      this.camPreviewEl.style.cssText = 'font-size:10px;color:#888;margin-top:2px;word-break:break-all;';
+      sec.appendChild(this.camPreviewEl);
+
+      const updatePreview = () => {
+        const az = parseFloat(azRow.slider.value);
+        const po = parseFloat(poRow.slider.value);
+        const d  = parseFloat(distRow.slider.value);
+        const ty = parseFloat(tyRow.slider.value);
+        const azR = az * Math.PI / 180;
+        const poR = po * Math.PI / 180;
+        const dx = +(d * Math.sin(poR) * Math.sin(azR)).toFixed(2);
+        const dy = +(ty + d * Math.cos(poR)).toFixed(2);
+        const dz = +(d * Math.sin(poR) * Math.cos(azR)).toFixed(2);
+        this.camPreviewEl.textContent = `pos offset: (${dx}, ${dy}, ${dz})`;
+        this.initCam = { azimuth: az, polar: po, distance: d, targetY: ty };
+      };
+      updatePreview();
+
+      // Capture: 에디터 현재 카메라 각도 → 슬라이더에 반영
+      const captureBtn = document.createElement('button');
+      captureBtn.className = 'editor-btn';
+      captureBtn.textContent = '📷 Capture Editor View';
+      captureBtn.style.cssText = 'width:100%;margin-top:6px;';
+      captureBtn.addEventListener('click', () => {
+        const off = this.camera.position.clone().sub(this.orbit.target);
+        const dist = off.length();
+        const az   = Math.atan2(off.x, off.z) * 180 / Math.PI;
+        const po   = Math.acos(Math.max(-1, Math.min(1, off.y / dist))) * 180 / Math.PI;
+        const ty   = this.orbit.target.y;
+        azRow.slider.value  = azRow.num.value  = String(Math.round(az));
+        poRow.slider.value  = poRow.num.value  = String(Math.min(80, Math.max(10, Math.round(po))));
+        distRow.slider.value= distRow.num.value= String(Math.max(4, +dist.toFixed(1)));
+        tyRow.slider.value  = tyRow.num.value  = String(+ty.toFixed(2));
+        updatePreview();
+      });
+      sec.appendChild(captureBtn);
+
+      // Reset: 기본값으로 초기화
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'editor-btn';
+      resetBtn.textContent = 'Reset to Default';
+      resetBtn.style.cssText = 'width:100%;margin-top:4px;';
+      resetBtn.addEventListener('click', () => {
+        azRow.slider.value  = azRow.num.value  = '45';
+        poRow.slider.value  = poRow.num.value  = '33';
+        distRow.slider.value= distRow.num.value= '14';
+        tyRow.slider.value  = tyRow.num.value  = '0';
+        this.initCam = null;
+        updatePreview();
+      });
+      sec.appendChild(resetBtn);
     }));
 
     // Export
@@ -1043,36 +1155,30 @@ export class LevelEditor {
       item.style.flexDirection = 'column';
       item.style.alignItems = 'flex-start';
       const typeColor = sw.type === 'spawn' ? '#44DDBB' : '#FFAA44';
-      const mtStr = sw.type === 'move' && sw.moveTarget
-        ? ` <small style="color:#aaa">(→${sw.moveTarget.map(v => v.toFixed(1)).join(',')})</small>`
-        : '';
-      const targetsStr = sw.targetNodeIds.join(', ');
+      const targetsStr = sw.targets.map(t => {
+        if (sw.type === 'move' && t.moveTarget) {
+          return `${t.nodeId}<small style="color:#888">(→${t.moveTarget.map(v => v.toFixed(1)).join(',')})</small>`;
+        }
+        return t.nodeId;
+      }).join(', ');
       const header = document.createElement('div');
       header.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
-      header.innerHTML = `<span style="color:${typeColor}">⬡</span> <span style="flex:1;">${sw.switchNodeId} → [${targetsStr}] <small>[${sw.mode}/${sw.type}]</small>${mtStr}</span>`;
+      header.innerHTML = `<span style="color:${typeColor}">⬡</span> <span style="flex:1;">${sw.switchNodeId} → [${targetsStr}] <small>[${sw.mode}/${sw.type}]</small></span>`;
 
       const edit = document.createElement('button');
       edit.textContent = '✎';
       edit.title = '편집';
       edit.addEventListener('click', () => {
         this.switchConns.splice(i, 1);
-        this.swPendingTargets = [...sw.targetNodeIds];
-        // 타깃 목록 UI 재빌드 — 폼의 #sw-target-list 직접 갱신
+        this.swPendingTargets = sw.targets.map(t => ({ ...t }));
         const swTargetListEl = this.switchFormEl.querySelector('#sw-target-list') as HTMLElement;
         this.renderSwTargetList(swTargetListEl);
         this.switchFormEl.classList.add('open');
         (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = sw.switchNodeId;
         (this.switchFormEl.querySelector('#sw-mode') as HTMLSelectElement).value = sw.mode;
         (this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement).value = sw.type;
-        const swMoveRow = this.switchFormEl.querySelector('#sw-move-row') as HTMLElement;
-        if (sw.type === 'move') {
-          swMoveRow.style.display = '';
-          (this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value = String(sw.moveTarget?.[0] ?? 0);
-          (this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value = String(sw.moveTarget?.[1] ?? 0);
-          (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = String(sw.moveTarget?.[2] ?? 0);
-        } else {
-          swMoveRow.style.display = 'none';
-        }
+        const swTargetMoveRow = this.switchFormEl.querySelector('#sw-target-move-row') as HTMLElement;
+        swTargetMoveRow.style.display = sw.type === 'move' ? '' : 'none';
         this.rebuildSwitchList();
       });
 
@@ -1089,13 +1195,36 @@ export class LevelEditor {
     });
   }
 
+  /** initCam → 카메라 슬라이더 동기화 (loadFromLevelData 호출 후) */
+  private rebuildCameraPanel(): void {
+    if (!this.camAzSlider) return; // 패널 미초기화 시 스킵
+    const c = this.initCam ?? { azimuth: 45, polar: 33, distance: 14, targetY: 0 };
+    this.camAzSlider.value   = this.camAzNum.value   = String(c.azimuth);
+    this.camPoSlider.value   = this.camPoNum.value   = String(c.polar);
+    this.camDistSlider.value = this.camDistNum.value = String(c.distance);
+    this.camTySlider.value   = this.camTyNum.value   = String(c.targetY);
+    this.initCam = this.initCam ? { ...c } : null;
+    // preview 텍스트 직접 갱신 (슬라이더 input 이벤트가 발화하지 않으므로)
+    if (this.camPreviewEl) {
+      const azR = c.azimuth * Math.PI / 180;
+      const poR = c.polar   * Math.PI / 180;
+      const dx = +(c.distance * Math.sin(poR) * Math.sin(azR)).toFixed(2);
+      const dy = +(c.targetY + c.distance * Math.cos(poR)).toFixed(2);
+      const dz = +(c.distance * Math.sin(poR) * Math.cos(azR)).toFixed(2);
+      this.camPreviewEl.textContent = `pos offset: (${dx}, ${dy}, ${dz})`;
+    }
+  }
+
   /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
   private renderSwTargetList(el: HTMLElement): void {
     el.innerHTML = '';
-    this.swPendingTargets.forEach((tid, ti) => {
+    this.swPendingTargets.forEach((t, ti) => {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:4px;margin:1px 0;font-size:12px;';
-      row.innerHTML = `<span style="flex:1;color:#ddd;">${tid}</span>`;
+      const mtLabel = t.moveTarget
+        ? `<small style="color:#888"> → (${t.moveTarget.map(v => v.toFixed(1)).join(',')})</small>`
+        : '';
+      row.innerHTML = `<span style="flex:1;color:#ddd;">${t.nodeId}${mtLabel}</span>`;
       const del = document.createElement('button');
       del.className = 'editor-btn';
       del.textContent = '×';
@@ -1204,8 +1333,8 @@ export class LevelEditor {
     if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
     this.starNodeIds  = this.starNodeIds.filter(id => id !== block.id);
     this.switchConns = this.switchConns
-      .map(sw => ({ ...sw, targetNodeIds: sw.targetNodeIds.filter(id => id !== block.id) }))
-      .filter(sw => sw.switchNodeId !== block.id && sw.targetNodeIds.length > 0);
+      .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
+      .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -1214,9 +1343,11 @@ export class LevelEditor {
 
   private setBlockEmissive(block: EditorBlock, hex: number): void {
     block.mesh.traverse(child => {
-      if (child instanceof THREE.Mesh && Array.isArray(child.material)) {
-        (child.material as THREE.MeshLambertMaterial[]).forEach(m => m.emissive.setHex(hex));
-      }
+      if (!(child instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      (mats as THREE.MeshLambertMaterial[]).forEach(m => {
+        if (m.emissive) m.emissive.setHex(hex);
+      });
     });
   }
 
@@ -1303,6 +1434,8 @@ export class LevelEditor {
       this.updateGhost();
     } else if (this.currentTool === 'erase') {
       this.updateEraseHover();
+    } else if (this.currentTool === 'select') {
+      this.updateSelectHover();
     }
   };
 
@@ -1396,7 +1529,9 @@ export class LevelEditor {
 
   private clearHoverHighlight(): void {
     if (this.hoveredBlock) {
-      this.setBlockEmissive(this.hoveredBlock, 0x000000);
+      // 선택된 블록이면 선택 색으로 복원, 아니면 끔
+      const restore = this.hoveredBlock === this.selectedBlock ? 0x222244 : 0x000000;
+      this.setBlockEmissive(this.hoveredBlock, restore);
       this.hoveredBlock = null;
     }
   }
@@ -1412,6 +1547,24 @@ export class LevelEditor {
         this.clearHoverHighlight();
         this.hoveredBlock = block;
         this.setBlockEmissive(block, 0x551111);
+      }
+    } else {
+      this.clearHoverHighlight();
+    }
+  }
+
+  private updateSelectHover(): void {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const hits = this.raycaster.intersectObjects(this.blocks.map(b => b.mesh), true);
+
+    if (hits.length > 0) {
+      const id = hits[0].object.userData.editorBlockId as string;
+      const block = this.blocks.find(b => b.id === id);
+      if (block && block !== this.hoveredBlock) {
+        this.clearHoverHighlight();
+        this.hoveredBlock = block;
+        // 이미 선택된 블록이면 더 밝게, 아니면 옅은 청록으로 표시
+        this.setBlockEmissive(block, block === this.selectedBlock ? 0x4444AA : 0x224444);
       }
     } else {
       this.clearHoverHighlight();
@@ -1520,12 +1673,12 @@ export class LevelEditor {
       stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
-        sw.targetNodeIds.map(tid => ({
+        sw.targets.map(t => ({
           switchNodeId: sw.switchNodeId,
-          targetNodeId: tid,
+          targetNodeId: t.nodeId,
           mode: sw.mode,
           type: sw.type,
-          ...(sw.type === 'move' && sw.moveTarget ? { moveTarget: sw.moveTarget } : {}),
+          ...(sw.type === 'move' && t.moveTarget ? { moveTarget: t.moveTarget } : {}),
         }))
       ) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
@@ -1539,6 +1692,7 @@ export class LevelEditor {
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
       goal: { blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '' },
+      ...(this.initCam ? { initialCamera: this.initCam } : {}),
     };
   }
 
@@ -1621,19 +1775,26 @@ export class LevelEditor {
     this.ladderConns     = data.ladders ?? [];
     this.teleporterConns = data.teleporters ?? [];
     this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
-    // 같은 (switchNodeId + mode + type + moveTarget) 조합을 그룹핑해 targetNodeIds 배열로 합침
+    // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
+    // 각 타깃은 자신의 moveTarget을 개별 보유
     {
       const map = new Map<string, SwitchConn>();
       for (const sw of data.switches ?? []) {
-        const key = `${sw.switchNodeId}|${sw.mode}|${sw.type}|${(sw.moveTarget ?? []).join(',')}`;
+        const key = `${sw.switchNodeId}|${sw.mode}|${sw.type}`;
         if (map.has(key)) {
-          map.get(key)!.targetNodeIds.push(sw.targetNodeId);
+          map.get(key)!.targets.push({ nodeId: sw.targetNodeId, moveTarget: sw.moveTarget });
         } else {
-          map.set(key, { switchNodeId: sw.switchNodeId, targetNodeIds: [sw.targetNodeId], mode: sw.mode, type: sw.type, moveTarget: sw.moveTarget });
+          map.set(key, { switchNodeId: sw.switchNodeId, targets: [{ nodeId: sw.targetNodeId, moveTarget: sw.moveTarget }], mode: sw.mode, type: sw.type });
         }
       }
       this.switchConns = Array.from(map.values());
     }
+
+    // initialCamera 복원
+    this.initCam = data.initialCamera
+      ? { ...data.initialCamera }
+      : null;
+    this.rebuildCameraPanel();
 
     // Rebuild panel lists
     this.rebuildIllusionList();
@@ -1679,23 +1840,8 @@ export class LevelEditor {
 
   /** 내장 스테이지(JSON 파일)를 에디터에 로드한다 */
   async loadBuiltinStage(stageNum: number): Promise<void> {
-    const fileMap: Record<number, () => Promise<{ default: unknown }>> = {
-      1:  () => import('../levels/level_custom_1.json'),
-      2:  () => import('../levels/level_custom_2.json'),
-      3:  () => import('../levels/level_custom_3.json'),
-      4:  () => import('../levels/level_custom_4.json'),
-      5:  () => import('../levels/level_custom_5.json'),
-      6:  () => import('../levels/level_custom_6.json'),
-      7:  () => import('../levels/level_custom_7.json'),
-      8:  () => import('../levels/level_custom_8.json'),
-      9:  () => import('../levels/level_custom_9.json'),
-      10: () => import('../levels/level_custom_10.json'),
-      11: () => import('../levels/level_custom_11.json'),
-      12: () => import('../levels/level_custom_12.json'),
-      13: () => import('../levels/level_custom_13.json'),
-      15: () => import('../levels/level_custom_15.json'),
-    };
-    const loader = fileMap[stageNum];
+    const modules = import.meta.glob<{ default: unknown }>('../levels/level_custom_*.json');
+    const loader  = modules[`../levels/level_custom_${stageNum}.json`];
     if (!loader) return;
     const mod  = await loader();
     const data = mod.default as unknown as LevelData;

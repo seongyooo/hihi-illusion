@@ -12,10 +12,14 @@ const KEY_LIGHT_AMB      = 'hihi_light_amb';
 const KEY_LIGHT_DIR      = 'hihi_light_dir';
 const KEY_LIGHT_HEMI     = 'hihi_light_hemi';
 const KEY_EXPOSURE       = 'hihi_exposure';
+const KEY_ROTATE_SPEED   = 'hihi_rotate_speed';
+const KEY_DAMPING_FACTOR = 'hihi_damping_factor';
 
-export const EXPOSURE_DEFAULT      = 0.48; // Enhanced 모드 기본 노출값
+export const EXPOSURE_DEFAULT       = 0.48; // Enhanced 모드 기본 노출값
 export const BLOCK_RADIUS_DEFAULT  = 0.04; // 블록 모서리 반지름 비율 기본값
 export const BLOCK_XZ_DEFAULT      = 0.0;  // XZ 팽창 비율 기본값
+export const ROTATE_SPEED_DEFAULT  = 0.80; // OrbitControls rotateSpeed 기본값
+export const DAMPING_FACTOR_DEFAULT = 0.06; // OrbitControls dampingFactor 기본값
 
 export const COLOR_DEFAULTS = {
   charBody:   '#ffffff',
@@ -127,6 +131,16 @@ export class GraphicsSettings {
   static get exposureOverride(): number | null { return getNum(KEY_EXPOSURE); }
   static set exposureOverride(val: number | null) { setNum(KEY_EXPOSURE, val); }
 
+  static get rotateSpeed(): number {
+    return getNum(KEY_ROTATE_SPEED) ?? ROTATE_SPEED_DEFAULT;
+  }
+  static set rotateSpeed(val: number) { setNum(KEY_ROTATE_SPEED, val === ROTATE_SPEED_DEFAULT ? null : val); }
+
+  static get dampingFactor(): number {
+    return getNum(KEY_DAMPING_FACTOR) ?? DAMPING_FACTOR_DEFAULT;
+  }
+  static set dampingFactor(val: number) { setNum(KEY_DAMPING_FACTOR, val === DAMPING_FACTOR_DEFAULT ? null : val); }
+
   static getEffectiveExposure(): number {
     return GraphicsSettings.exposureOverride ?? EXPOSURE_DEFAULT;
   }
@@ -159,5 +173,10 @@ export class GraphicsSettings {
     localStorage.removeItem(KEY_LIGHT_DIR);
     localStorage.removeItem(KEY_LIGHT_HEMI);
     localStorage.removeItem(KEY_EXPOSURE);
+  }
+
+  static resetCamera(): void {
+    localStorage.removeItem(KEY_ROTATE_SPEED);
+    localStorage.removeItem(KEY_DAMPING_FACTOR);
   }
 }

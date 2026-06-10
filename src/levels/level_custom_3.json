@@ -108,5 +108,11 @@
   },
   "goal": {
     "blockId": "b005"
+  },
+  "initialCamera": {
+    "azimuth": -34,
+    "polar": 76,
+    "distance": 26,
+    "targetY": 0
   }
 }

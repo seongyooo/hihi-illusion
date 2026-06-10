@@ -102,6 +102,12 @@ export interface LevelData {
   character: { startNodeId: string };
   midpoint?: { blockId: string };
   goal: { blockId: string };
+  initialCamera?: {
+    azimuth:  number;   // Y축 회전 각도 (degrees, 0 = +Z 방향)
+    polar:    number;   // 수직 각도 (degrees, 0 = 정수리, 90 = 수평)
+    distance: number;   // 타깃으로부터의 거리
+    targetY:  number;   // 오비트 타깃 Y
+  };
 }
 
 export class Level {

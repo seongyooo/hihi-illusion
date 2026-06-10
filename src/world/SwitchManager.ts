@@ -326,6 +326,11 @@ export class SwitchManager {
       (state.switchMesh.material as THREE.Material).dispose();
       this.scene.remove(state.switchLight);
 
+      // move 타입: position tween 취소 (언로드 후 graph.refresh() 호출 방지)
+      if (state.def.type === 'move' && state.targetMesh) {
+        gsap.killTweensOf(state.targetMesh.position);
+      }
+
       // spawn 타입: 씬에 없을 수도 있는 targetMesh도 정리
       if (state.targetMesh) {
         gsap.killTweensOf(state.targetMesh.scale); // QA-SP2
