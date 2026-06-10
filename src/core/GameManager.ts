@@ -650,6 +650,7 @@ export class GameManager {
     this.tutorialMoved = false;
 
     this._initLevelObjects(data);
+    this.hud.enableSkip(() => { this.stageSelect.show(); });
     this._startCameraFlyIn(data);
   }
 
