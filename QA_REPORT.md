@@ -1,7 +1,136 @@
 # QA 리포트 — Monument Valley Clone
 
 > 최종 업데이트: 2026-06-10  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + **11차 QA (QA-SP1/SP2 dispose 수정 검증 / QA-T02 name 수정 / QA-T05 illusion 분리)**
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + **12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget)**
+
+---
+
+## 12차 QA (2026-06-10) — registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor per-target moveTarget
+
+### 변경 내용
+
+| 항목 | 파일 |
+|------|------|
+| `registry.ts` — `import.meta.glob` 자동 탐색, `CUSTOM_STAGE_NUMS` 배열 export | `registry.ts` |
+| `StageSelectUI` — `BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS)` 자동 파생 | `StageSelectUI.ts` |
+| `GameManager` — `builtinIds` `CUSTOM_STAGE_NUMS` 자동 파생, `_startCameraFlyIn()` 헬퍼 추출 + `initialCamera` 지원 | `GameManager.ts` |
+| `Level.ts` — `LevelData.initialCamera` 인터페이스 추가 | `Level.ts` |
+| `LevelEditor` — 스위치 per-target `moveTarget` 리팩터, CAMERA 패널 추가, `loadBuiltinStage` glob 자동 탐색, select hover/emissive 수정 | `LevelEditor.ts` |
+| `EditorLobby` — `CUSTOM_STAGE_NUMS` 자동 파생 | `EditorLobby.ts` |
+| `level_custom_1~13, 15.json` — `initialCamera` 필드 추가 (모든 스테이지) | `levels/*.json` |
+| `level_custom_5.json` — illusion 2쌍 추가 (b007↔b003, b007↔b002) | `level_custom_5.json` |
+| `level_custom_15.json` — Stage 15 "Double Key" 리디자인: b007/b008 제거, b015/b016 추가, b009 3-target move 스위치 | `level_custom_15.json` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `CUSTOM_STAGE_NUMS` — `import.meta.glob` 키에서 숫자 파싱, 오름차순 정렬 | `registry.ts:10-15` | ✅ |
+| `BUILTIN_STAGE_NUMS` — `CUSTOM_STAGE_NUMS`에서 자동 파생 → QA-T04 해소 | `StageSelectUI.ts:4` | ✅ |
+| `builtinIds` — `CUSTOM_STAGE_NUMS`에서 `Object.fromEntries` 파생 | `GameManager.ts:276` | ✅ |
+| `loadBuiltinStage` — 하드코딩 fileMap → `import.meta.glob` 자동 탐색 | `LevelEditor.ts:1831` | ✅ |
+| `EditorLobby` — `CUSTOM_STAGE_NUMS` 순회로 카드 자동 생성 | `EditorLobby.ts:57` | ✅ |
+| `LevelData.initialCamera` 인터페이스 정의 | `Level.ts:102-108` | ✅ |
+| `_startCameraFlyIn()` — `initialCamera` 있으면 구면 좌표 → finalPos 계산, 없으면 기본값 | `GameManager.ts:636` | ✅ |
+| `updatePreview()` 좌표 공식과 `_startCameraFlyIn()` 공식 일치 (sin/cos 동일) | `LevelEditor.ts:856`, `GameManager.ts:647` | ✅ |
+| Capture 버튼 역산 공식 — `atan2(off.x, off.z)` → azimuth 올바름 | `LevelEditor.ts:879` | ✅ |
+| SwitchConn `targetNodeIds: string[]` → `targets: SwitchTarget[]` 리팩터 | `LevelEditor.ts:31-34` | ✅ |
+| 에디터 스위치 편집 시 `swPendingTargets = sw.targets.map(t => ({...t}))` 복원 | `LevelEditor.ts:1172` | ✅ |
+| `exportLevelData()` — `targets.map(t => {...moveTarget: t.moveTarget})` per-target 내보내기 | `LevelEditor.ts:1667` | ✅ |
+| `loadFromLevelData()` 그룹핑 키 — moveTarget 제외 `switchNodeId|mode|type` | `LevelEditor.ts:1773` | ✅ |
+| `setBlockEmissive()` — `Array.isArray` 분기로 단일 material도 처리 | `LevelEditor.ts:1334` | ✅ |
+| `updateSelectHover()` — select 도구일 때 hover 하이라이트 | `LevelEditor.ts:1425` | ✅ |
+| `clearHoverHighlight()` — 선택 블록이면 선택 색(0x222244)으로 복원 | `LevelEditor.ts:1520` | ✅ |
+| Stage 15 b009→b010 이동: [7.5,0.25,3.5]→[5.5,0.25,3.5] (b011 인접 XZ=1.0) | `level_custom_15.json:244-252` | ✅ |
+| Stage 15 b009→b015 이동: [7.5,0.25,6.5]→[6.5,0.25,6.5] (b006 인접 XZ=1.0) | `level_custom_15.json:254-264` | ✅ |
+| Stage 15 b009→b016 이동: [3.5,0.25,6.5]→[4.5,0.25,6.5] (b006 인접 XZ=1.0) | `level_custom_15.json:265-276` | ✅ |
+| Stage 15 전체 경로: b001→b003(spawn)→b006(mid)→b009(move×3)→b015(★)→b016(★)→b011→b010→b012→b013(★)→b014(goal) | `level_custom_15.json` | ✅ |
+| b015/b016 초기 위치 — 어떤 walkable 블록과도 XZ=1.0 이내 인접 없음 (고립) | `level_custom_15.json` | ✅ |
+| b011→b010(이동 전) XZ=√8 ≈ 2.83 비인접 / b011→b010(이동 후) XZ=1.0 인접 | `level_custom_15.json` | ✅ |
+| b011→b012 XZ=2.0 비인접 (b010 필수 경유 보장) | `level_custom_15.json` | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-T07 — Stage 15 illusionConnections에 존재하지 않는 노드 b007, b008 참조 (`level_custom_15.json:278-290`) — **P1**
+
+리디자인에서 b007, b008 블록이 삭제됐으나 `illusionConnections`의 두 항목이 갱신되지 않았다.
+
+```json
+// 현재 (버그)
+{ "nodeA": "b007", "nodeB": "b013", ... }   ← b007 블록 없음
+{ "nodeA": "b008", "nodeB": "b012", ... }   ← b008 블록 없음
+```
+
+IllusionManager는 nodeId로 블록 메시를 조회한다. b007/b008가 없으면 조회 결과가 `undefined`가 되어 런타임 오류 또는 무음 실패가 발생한다.
+
+리디자인 후 b015/b016은 이동 후 b006 인접 블록으로 직접 도달 가능하므로 환상 연결 자체가 불필요하다. 두 illusion 항목을 **삭제**하는 것이 올바른 수정이다.
+
+---
+
+#### QA-T08 — `_startCameraFlyIn()` startPos Y 계산 오류 (`GameManager.ts:660`) — **P4**
+
+```typescript
+// 현재 (버그)
+const startPos = [
+  cx + (finalPos[0] - cx) * 1.8,
+  finalPos[1] * 1.8,          ← targetY != 0일 때 부정확
+  cz + (finalPos[2] - cz) * 1.8,
+];
+
+// 올바른 수정
+const startPos = [
+  cx + (finalPos[0] - cx) * 1.8,
+  targetY + (finalPos[1] - targetY) * 1.8,
+  cz + (finalPos[2] - cz) * 1.8,
+];
+```
+
+현재 모든 레벨의 `targetY: 0`이므로 잠재 버그. `targetY != 0` 레벨 추가 시 인트로 카메라 시작 높이가 어긋난다.
+
+---
+
+#### QA-T09 — `registry.ts` 자동 파생으로 커스텀 `title` / `backgroundColor` 손실 (`registry.ts:27-30`) — **P4**
+
+자동 파생 LEVELS 항목의 `title`이 전부 `"Stage N"`으로 통일되고, `backgroundColor`가 `'#E8EEF5'`로 고정된다.
+
+| 스테이지 | 기존 title | 기존 backgroundColor |
+|---------|-----------|----------------------|
+| Stage 1 | "The Prologue" | `#F5F0E8` |
+| Stage 7 | "The Relay" | `#E8F0EE` |
+| Stage 8 | "The Elevator" | `#F0EDE8` |
+| Stage 9 | "Mirage" | `#EDE8F0` |
+| Stage 10 | "Convergence" | `#E8EBF0` |
+| Stage 12 | "Pressure Gate" | `#E8F0EE` |
+| Stage 15 | "Double Key" | `#ECF0EA` |
+
+현재 `LevelMeta.title`은 `EditorLobby` 카드 표시에 사용하지 않는 것으로 변경됨 (EditorLobby도 `CUSTOM_STAGE_NUMS`로 리팩터). `LevelMeta.backgroundColor`는 StageSelectUI 프리뷰에 사용될 경우 영향 있음. 레벨 JSON `name` / `backgroundColor` 필드는 GameManager에서 직접 사용하므로 인게임 표시는 무영향.
+
+**권장 조치:** 영향도 낮음. 단, `LevelMeta.backgroundColor`가 StageSelectUI 카드 배경색에 쓰일 경우 추후 JSON `backgroundColor` 필드를 읽어 LevelMeta에 반영하는 방식으로 해소.
+
+---
+
+#### QA-T10 — `rebuildCameraPanel()` 호출 후 preview 텍스트 미갱신 (`LevelEditor.ts:1197`) — **P4**
+
+`loadFromLevelData()` → `rebuildCameraPanel()` 호출 시 슬라이더 값은 업데이트되지만, `updatePreview()` 함수가 `buildSection` 클로저 내 지역 변수라 `rebuildCameraPanel()`에서 접근 불가. 결과적으로 레벨 로드 후 카메라 패널의 "pos offset: (...)" 텍스트가 이전 값 또는 기본값을 표시한다.
+
+**권장 조치:** `previewEl`을 클래스 멤버로 올리거나, `rebuildCameraPanel()` 내에서 직접 offset 계산 후 갱신.
+
+---
+
+### 12차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-T07 | P1 | 🔴 미수정 | Stage 15 illusionConnections에 b007/b008 존재하지 않는 노드 참조 — IllusionManager 런타임 오류 가능 | `level_custom_15.json:278-290` |
+| QA-T08 | P4 | 🔴 미수정 | `_startCameraFlyIn()` startPos Y = `finalPos[1]*1.8` — targetY≠0 시 부정확 (현재 레벨 전부 targetY=0이므로 잠재 버그) | `GameManager.ts:660` |
+| QA-T09 | P4 | ⚠️ 유지보수 | registry 자동 파생으로 커스텀 title/backgroundColor 손실 — 인게임 영향 없음, EditorLobby 카드명 손실 | `registry.ts:27-30` |
+| QA-T10 | P4 | 🔴 미수정 | 레벨 로드 후 카메라 패널 preview 텍스트 미갱신 (updatePreview 클로저 밖에서 접근 불가) | `LevelEditor.ts:1197` |
 
 ---
 
@@ -284,11 +413,15 @@ gsap.killTweensOf(mesh.scale);
 |---|---|---|---|---|
 | QA-SP1 | P2 | ✅ 수정됨 | `SwitchManager.dispose()` spawn 타입 targetMesh geometry/material 해제 추가 (`traverse` 방식) | `SwitchManager.ts:280-286` |
 | QA-SP2 | P4 | ✅ 수정됨 | `SwitchManager.dispose()` targetMesh.scale tween `killTweensOf()` 추가 | `SwitchManager.ts:278` |
-| QA-T01 | P3 | 🔴 미수정 | Stage 15 move 스위치(b010) — 환상 `b008↔b012`로 우회 가능 (설계 의도 확인 필요) | `level_custom_15.json` |
-| QA-T02 | P4 | ✅ 수정됨 | Stage 13 JSON `name` = "Stage 13" 수정 | `level_custom_13.json:3` |
-| QA-T04 | P4 | ⚠️ 유지보수 | 스테이지 등록 4곳 수동 동기화 필요 (StageSelectUI / GameManager / LevelEditor / registry) | 복수 파일 |
-| QA-T05 | P4 | ✅ 수정됨 | b015↔b024 방위각 -182.8°, b015↔b023 방위각 -176.8°로 3° 분리 | `level_custom_13.json:548,555` |
+| QA-T01 | P3 | ✅ 설계 변경으로 해소 | Stage 15 리디자인으로 b008 삭제 — 해당 환상 우회 경로 소멸 (QA-T07 참조) | `level_custom_15.json` |
+| QA-T02 | P4 | 🔴 미수정 | Stage 13 JSON `name` = "Custom Level" — HUD 레벨명 불일치 (되돌려짐) | `level_custom_13.json:3` |
+| QA-T04 | P4 | ✅ 수정됨 | `CUSTOM_STAGE_NUMS` 자동 파생으로 4곳 동기화 해소 | `registry.ts`, `StageSelectUI.ts`, `GameManager.ts`, `LevelEditor.ts` |
+| QA-T05 | P4 | 🔴 미수정 | b015↔b024 / b015↔b023 방위각 -179.8° 중복 (수정 후 되돌려짐) | `level_custom_13.json:548,555` |
 | QA-T06 | P2 | 🔴 미수정 | `dispose()` move 타입 `position` tween 미취소 — 언로드 후 `graph.refresh()` 호출 가능 | `SwitchManager.ts:269` |
+| QA-T07 | P1 | 🔴 미수정 | Stage 15 illusionConnections에 b007/b008 존재하지 않는 노드 참조 — 런타임 오류 가능 | `level_custom_15.json:278-290` |
+| QA-T08 | P4 | 🔴 미수정 | `_startCameraFlyIn()` startPos Y 계산 — targetY≠0 시 부정확 (현재 잠재 버그) | `GameManager.ts:660` |
+| QA-T09 | P4 | ⚠️ 유지보수 | registry 자동 파생으로 커스텀 title/backgroundColor 손실 — 인게임 영향 없음 | `registry.ts:27-30` |
+| QA-T10 | P4 | 🔴 미수정 | 레벨 로드 후 카메라 패널 preview 텍스트 미갱신 | `LevelEditor.ts:1197` |
 | QA-13 | P2 | ✅ 수정됨 | `Renderer.applyQuality()` 반복 호출 시 이전 환경맵 텍스처 미해제 — GPU 메모리 누수 | `Renderer.ts:87` |
 | QA-14 | P2 | ✅ 수정됨 | `_swapSceneMaterials()` Standard→Lambert 변환 시 `emissive`/`emissiveIntensity` 미복사 — 발광 효과 소실 | `GameManager.ts:923` |
 | QA-15 | P3 | ✅ 수정됨 | `SettingsScreen.resetAll()` Enhanced Rendering 체크박스·저장값 미초기화 | `SettingsScreen.ts:399` |
