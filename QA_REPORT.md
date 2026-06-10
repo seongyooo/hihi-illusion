@@ -1,7 +1,280 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-09  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + **9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션)**
+> 최종 업데이트: 2026-06-10  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + **11차 QA (QA-SP1/SP2 dispose 수정 검증 / QA-T02 name 수정 / QA-T05 illusion 분리)**
+
+---
+
+## 11차 QA (2026-06-10) — QA-SP1/SP2 dispose 수정 / QA-T02 name / QA-T05 illusion 분리 검증
+
+### 변경 내용
+
+| 항목 | 파일 |
+|------|------|
+| `SwitchManager.dispose()` — spawn targetMesh `traverse` 기반 geometry/material 해제 + scale tween 취소 | `SwitchManager.ts:276-287` |
+| `level_custom_13.json` — `name` "Custom Level" → "Stage 13" | `level_custom_13.json:3` |
+| `level_custom_13.json` — b015↔b024 azimuth -182.8°, b015↔b023 azimuth -176.8°로 3° 분리 | `level_custom_13.json:548,555` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `gsap.killTweensOf(state.targetMesh.scale)` dispose 진입 시 scale tween 취소 | `SwitchManager.ts:278` | ✅ |
+| `traverse()` — `THREE.Mesh` 자식 순회하여 geometry.dispose() + material.dispose() 호출 | `SwitchManager.ts:280-286` | ✅ |
+| `traverse` 방식이 `Object3D` 직접 접근(`.geometry`) 보다 안전 — 계층 구조 있는 블록도 처리 | `SwitchManager.ts:280` | ✅ |
+| `level_custom_13.json` name = "Stage 13" | `level_custom_13.json:3` | ✅ |
+| b015↔b024 활성 범위 [-184.8°, -180.8°] / b015↔b023 활성 범위 [-178.8°, -174.8°] — 2° 간격, 중복 없음 | `level_custom_13.json:548,555` | ✅ |
+| `attachedMeshes`는 각 매니저(StarManager 등)에서 별도 dispose — SwitchManager에서 dispose 불필요 | `SwitchManager.ts:290` | ✅ |
+| `despawnTarget()` onComplete 중 dispose 호출 시: `killTweensOf(scale)` → tween 중단(onComplete 미호출) → `removeFromParent()` 정상 처리 | `SwitchManager.ts:234,278` | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-T06 — `dispose()` move 타입 targetMesh.position tween 미취소 (`SwitchManager.ts:269`)
+
+`dispose()` 내에 `gsap.killTweensOf(state.targetMesh.scale)` (spawn용)은 추가됐으나, `move` 타입 스위치의 `position` tween 취소가 없다.
+
+`moveTarget()` tween의 클로저:
+
+```typescript
+gsap.to(mesh.position, {
+  onUpdate:   () => { graph.refresh(); },       // 레벨 언로드 후에도 호출 가능
+  onComplete: () => { state.isMoving = false; graph.refresh(); },
+});
+```
+
+레벨 언로드(`dispose()`) 이후에도 `onUpdate` / `onComplete`가 발화하면 이미 해제된 `graph`에 `refresh()` 호출이 일어난다. PathGraph가 내부적으로 Three.js 구조를 참조한다면 크래시 가능성이 있다.
+
+**수정 방향:**
+```typescript
+// dispose() 내, targetMesh 처리 앞에 추가
+if (state.def.type === 'move' && state.targetMesh) {
+  gsap.killTweensOf(state.targetMesh.position);
+}
+```
+
+---
+
+### 11차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-T06 | P2 | 🔴 미수정 | `dispose()` move 타입 `position` tween 미취소 — 언로드 후 `graph.refresh()` 호출 가능 | `SwitchManager.ts:269` |
+
+---
+
+## 10차 QA (2026-06-10) — Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정
+
+### 변경 내용
+
+| 항목 | 파일 |
+|------|------|
+| `registry.ts` — `custom_stage_13`, `custom_stage_15` 등록 | `registry.ts` |
+| `StageSelectUI` — `BUILTIN_STAGES` 숫자 → `BUILTIN_STAGE_NUMS` Set 리팩터 (13, 15 포함) | `StageSelectUI.ts` |
+| `GameManager` — `builtinIds[13]`, `builtinIds[15]` 등록 확인 | `GameManager.ts` |
+| `LevelEditor` — `fileMap[13]`, `fileMap[15]` 등록 | `LevelEditor.ts` |
+| `SwitchManager.despawnTarget()` — scale-in 진행 중 despawn 시 `gsap.killTweensOf(mesh.scale)` 추가 | `SwitchManager.ts:187` |
+| `level_custom_13.json` — Stage 13 "대규모 스폰 + 환상 레이어" 레벨 | `levels/level_custom_13.json` (기존 파일) |
+| `level_custom_15.json` — Stage 15 "Double Key" 신규 레벨 | `levels/level_custom_15.json` (신규) |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `BUILTIN_STAGE_NUMS` Set에 1~13, 15 포함 (14 제외) | `StageSelectUI.ts:4` | ✅ |
+| 스테이지 선택 UI: stage 14 → disabled/locked | `StageSelectUI.ts:44` | ✅ |
+| `builtinIds[13]` = `'custom_stage_13'` 등록 | `GameManager.ts:291` | ✅ |
+| `builtinIds[15]` = `'custom_stage_15'` 등록 | `GameManager.ts:292` | ✅ |
+| `fileMap[13]`, `fileMap[15]` 에디터 로드 경로 등록 | `LevelEditor.ts:1468-1469` | ✅ |
+| `registry.ts` `custom_stage_13` / `custom_stage_15` 등록 | `registry.ts:90-100` | ✅ |
+| `despawnTarget()` — `gsap.killTweensOf(mesh.scale)` scale-out 전 취소 | `SwitchManager.ts:187` | ✅ |
+| Stage 15 `character.startNodeId` = `b001` 존재 | `level_custom_15.json` | ✅ |
+| Stage 15 `midpoint.blockId` = `b006` 존재 | `level_custom_15.json` | ✅ |
+| Stage 15 `goal.blockId` = `b014` 존재 | `level_custom_15.json` | ✅ |
+| Stage 15 switch1 switchNodeId `b003` 존재, targetNodeId `b004` 존재 | `level_custom_15.json` | ✅ |
+| Stage 15 switch2 switchNodeId `b003` 존재, targetNodeId `b005` 존재 | `level_custom_15.json` | ✅ |
+| Stage 15 switch3 switchNodeId `b009` 존재 (move type), moveTarget `[5.5,0.25,3.5]` 설정 | `level_custom_15.json` | ✅ |
+| Stage 15 star nodeId `b007`, `b008`, `b013` 모두 블록 목록에 존재 | `level_custom_15.json` | ✅ |
+| Stage 13 `character.startNodeId` = `b001` 존재 | `level_custom_13.json` | ✅ |
+| Stage 13 `midpoint.blockId` = `b017` 존재 (스폰 타겟) | `level_custom_13.json` | ✅ |
+| Stage 13 `goal.blockId` = `b025` 존재 (일반 블록, 스폰 타겟 아님) | `level_custom_13.json` | ✅ |
+| Stage 13 별 nodeId `b015`, `b023`, `b024` 모두 blocks에 존재 | `level_custom_13.json` | ✅ |
+| Stage 13 스위치 switchNodeId `b004` — `b004`는 blocks에 일반 블록으로 존재 (자기 자신을 타겟으로 삼지 않음) | `level_custom_13.json` | ✅ |
+| `midpointMarker` 설정 순서 — SwitchManager.setup() 이전에 위치 계산 후, _linkSwitchAttachments()에서 숨김 | `GameManager.ts:381-384, 537-569` | ✅ |
+
+---
+
+### Stage 15 "Double Key" 레벨 설계 검증
+
+```
+b001(start) → b002 → b003(switch: spawn b004+b005)
+                          ↓ b004 spawns ↓ b005 spawns
+                       b004 → b005 → b006(midpoint)
+                                      ↙     ↘
+                                b007(★)    b008(★)
+                                      ↘
+                                  b009(switch: move b010)
+                                      ↓
+                                   b011 → b010(moved) → b012 → b013(★) → b014(goal)
+```
+
+**환상 연결:**
+- `b007↔b013`: azimuth 0.0°, tol ±4°, elevation 15° (정북 방향 시점)
+- `b008↔b012`: azimuth -166°, tol ±4°, elevation 14° (남동 방향 시점)
+
+| 경로 | XZ 거리 | 연결 여부 |
+|------|---------|---------|
+| b001↔b002 | 1.0 | ✅ |
+| b002↔b003 | 1.0 | ✅ (switch 발동) |
+| b003↔b004 (스폰 후) | 1.0 | ✅ |
+| b004↔b005 (스폰 후) | 1.0 | ✅ |
+| b005↔b006 | 1.0 | ✅ (midpoint) |
+| b006↔b007 | 1.0 | ✅ (★) |
+| b006↔b008 | 1.0 | ✅ (★) |
+| b006↔b009 | 1.0 | ✅ (move switch) |
+| b009↔b011 | 1.0 | ✅ (b010 이동 전후 무관) |
+| b011↔b010 (이동 전) | √8 ≈ 2.83 | ❌ |
+| b011↔b010 (이동 후 [5.5,3.5]) | 1.0 | ✅ |
+| b010↔b012 (이동 후) | 1.0 | ✅ |
+| b012↔b013 | 1.0 | ✅ (★) |
+| b013↔b014 | 1.0 | ✅ (goal) |
+| b007↔b013 (직접) | 4.0 | ❌ (환상 필요) |
+| b008↔b012 (직접) | ≈4.1 | ❌ (환상 필요) |
+
+퍼즐 흐름: 스위치(b003) → 스폰(b004+b005) → 별(b007,b008) → 스위치(b009) → 이동(b010) → 별(b013) → 골(b014) ✅
+
+---
+
+### Stage 13 레벨 설계 검증
+
+**구조:** 단일 스위치 b004가 토글로 13개 블록을 일괄 스폰. 스폰 전 이동 가능 블록: b001, b003, b004, b005, b025.
+
+```
+b001 → b003 → b004(switch: 13개 스폰) → b005 → b025(goal, 항상 가시)
+                     ↓ (스폰 후)
+       b006, b007, b008, b010, b012, b013, b014, b015
+       b017(midpoint), b018, b022, b023, b024
+       (복잡한 환상 연결 74개로 상호 연결)
+```
+
+| 항목 | 결과 |
+|------|------|
+| b004→b005 (XZ=1.0) | ✅ |
+| b005→b025 (XZ=1.0) — midpoint 미도달 시 goal 미발동 | ✅ |
+| b017(midpoint) — 스폰 전 removeFromParent, midpointMarker가 _linkSwitchAttachments에서 숨겨짐 | ✅ |
+| b017 스폰 후 midpointMarker visible=true 복원 | ✅ |
+| 사다리 연결 b010↔b012, b012↔b013, b013↔b014, b014↔b015 — 스폰 후 enableNode + refresh | ✅ |
+| 13개 스위치 상태 toggleLocked=true → 재발동 불가 | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-T01 — Stage 15 `move` 타입 스위치(b010) 우회 가능 (설계 검토 필요) (`level_custom_15.json`)
+
+`move` 스위치(b009→b010 이동)가 b013(★)→b014(goal) 도달을 위한 유일한 경로로 의도되었을 가능성이 있으나, 환상 `b008↔b012` (azimuth -166°)를 이용하면 b010 이동 없이 b008→b012→b013→b014 직행이 가능하다.
+
+```
+[우회 경로]
+b006 → b008(★) → [illusion -166°] → b012 → b013(★) → b014(goal)
+```
+
+b009 스위치를 밟지 않아도 b013 도달 및 골 클리어가 가능하다. 레벨 이름 "Double Key"가 두 개의 spawn 스위치를 지칭한다면 move 스위치는 보조 경로로 의도된 것일 수 있다. 하지만 `move` 메커닉 학습을 목적으로 설계한 경우 교육적 효과가 감소한다.
+
+**권장 조치:** 의도된 멀티-패스 설계인지 확인. move 스위치를 강제하려면 b008↔b012 환상 연결 제거 또는 azimuth 조정 필요.
+
+---
+
+#### QA-T02 — Stage 13 JSON 내부 `name` 필드가 "Custom Level" (`level_custom_13.json:3`)
+
+`level_custom_13.json`의 `name` 필드가 `"Custom Level"`로 설정되어 있어, 인게임 HUD 레벨명(`.hud.setLevelName(data.name)`)에 "Custom Level"이 표시된다. registry의 `title: 'Stage 13'`과 불일치.
+
+```json
+// level_custom_13.json
+"name": "Custom Level"  ← HUD에 표시되는 값
+```
+
+**수정 방향:**
+```json
+"name": "Stage 13"
+```
+
+---
+
+#### QA-T03 — `SwitchManager` dispose()가 여전히 QA-SP1/SP2 미수정 상태
+
+이번 커밋에서 `despawnTarget()`의 scale-in 취소(SwitchManager.ts:187)는 추가되었으나, `dispose()` 내의 두 기존 이슈는 여전히 미수정:
+
+- **QA-SP1**: spawn targetMesh의 geometry/material 미해제 (`SwitchManager.ts:231`)
+- **QA-SP2**: `dispose()` 시 `targetMesh.scale` tween 미취소 (`SwitchManager.ts:230`)
+
+Stage 13은 스폰 타겟이 13개로, 레벨 언로드 시 GPU 누수 규모가 Stage 12보다 크다(블록 하나당 BoxGeometry + MeshLambertMaterial × 6 = 78개 미해제 리소스).
+
+---
+
+#### QA-T04 — `StageSelectUI`와 `GameManager.builtinIds` 동기화 미보장 (유지보수 위험)
+
+스테이지 표시 여부(`BUILTIN_STAGE_NUMS`)와 스테이지 로드 가능 여부(`builtinIds`)가 두 파일에 별도로 관리된다.
+
+| 파일 | 역할 |
+|------|------|
+| `StageSelectUI.ts:4` | UI에서 버튼 활성화 여부 결정 |
+| `GameManager.ts:278` | 실제 레벨 파일 로드 |
+| `LevelEditor.ts:1455` | 에디터 내장 스테이지 로드 |
+| `registry.ts` | Vite 동적 import 경로 |
+
+신규 스테이지 추가 시 4곳을 모두 수동 업데이트해야 한다. 하나라도 누락되면 버튼은 활성화되지만 레벨이 로드되지 않거나(GameManager 누락), 에디터에서 열리지 않는다(LevelEditor 누락). 현재는 13, 15 모두 4곳에 정상 등록되어 있음 ✅.
+
+**권장 조치:** `registry.ts`를 단일 진실 출처(source of truth)로 삼아 `LEVELS` 배열에서 파생하도록 StageSelectUI / GameManager 리팩터 (장기).
+
+---
+
+#### QA-T05 — Stage 13 환상 연결 74개 중 동일 방향·고도 중복 항목 존재
+
+`b015↔b024` (azimuth -179.8°, elevation 18.3°)와 `b015↔b023` (azimuth -179.8°, elevation 18.3°)가 동일한 각도 조건을 공유한다 (`level_custom_13.json:547-563`). IllusionManager는 azimuth/elevation이 동시에 활성화 조건을 충족하면 두 환상 경로가 동시에 켜지도록 처리하므로 기능 버그는 아니다. 그러나 플레이어 입장에서 두 경로가 동시에 활성화되어 어떤 블록으로 이동할지 혼란을 줄 수 있다.
+
+**권장 조치:** 두 연결의 방위각을 3-5° 분리하여 각각 개별 시점에서만 활성화되도록 조정.
+
+---
+
+### despawnTarget() 내부 수정 검증
+
+`despawnTarget()`에서 scale-in tween 취소 코드 추가 — hold 모드에서 캐릭터가 스폰 애니메이션(0.4s) 완료 전에 블록을 떠날 경우 scale-in과 scale-out이 충돌하는 버그를 차단.
+
+```typescript
+// SwitchManager.ts:187 — 신규 추가
+// BUG-04: spawn scale-in 애니메이션이 진행 중일 수 있으므로 먼저 취소
+gsap.killTweensOf(mesh.scale);
+```
+
+| 항목 | 결과 |
+|------|------|
+| `despawnTarget()` 진입 시 scale-in tween 취소 | ✅ |
+| 이후 scale-out tween 정상 실행 | ✅ |
+| Stage 13처럼 toggle 모드 전용이면 `deactivate()` 미호출 → 해당 경로 비통과 (무해) | ✅ |
+
+> ⚠️ `dispose()` 내에는 여전히 `gsap.killTweensOf(state.targetMesh.scale)` 미추가 (QA-SP2).
+
+---
+
+### 10차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-T01 | P3 | 🔴 미수정 | Stage 15 move 스위치(b010) — 환상 b008↔b012로 우회 가능 (설계 의도 확인 필요) | `level_custom_15.json` |
+| QA-T02 | P4 | ✅ 수정됨 | Stage 13 JSON `name` 필드 = "Custom Level" → "Stage 13" 수정 | `level_custom_13.json:3` |
+| QA-T03 | P2 | ✅ 수정됨 | QA-SP1/SP2 수정 — `dispose()` targetMesh geometry/material 해제 + scale tween 취소 | `SwitchManager.ts:230-233` |
+| QA-T04 | P4 | ⚠️ 유지보수 | 스테이지 등록 4곳 수동 동기화 필요 (StageSelectUI, GameManager, LevelEditor, registry) | 복수 파일 |
+| QA-T05 | P4 | ✅ 수정됨 | b015↔b024 방위각 -182.8°, b015↔b023 방위각 -176.8°로 3° 분리 | `level_custom_13.json:548,555` |
 
 ---
 
@@ -9,8 +282,13 @@
 
 | ID | 우선순위 | 상태 | 내용 | 파일 |
 |---|---|---|---|---|
-| QA-SP1 | P2 | 🔴 미수정 | `SwitchManager.dispose()` spawn 타입 targetMesh geometry/material 미해제 — `Level.dispose()` 순회 범위 밖에서 누수 | `SwitchManager.ts:226` |
-| QA-SP2 | P4 | 🔴 미수정 | `SwitchManager.dispose()` / `despawnTarget()` — scale-out GSAP tween 진행 중 dispose 시 `killTweensOf()` 미호출 | `SwitchManager.ts:218,187` |
+| QA-SP1 | P2 | ✅ 수정됨 | `SwitchManager.dispose()` spawn 타입 targetMesh geometry/material 해제 추가 (`traverse` 방식) | `SwitchManager.ts:280-286` |
+| QA-SP2 | P4 | ✅ 수정됨 | `SwitchManager.dispose()` targetMesh.scale tween `killTweensOf()` 추가 | `SwitchManager.ts:278` |
+| QA-T01 | P3 | 🔴 미수정 | Stage 15 move 스위치(b010) — 환상 `b008↔b012`로 우회 가능 (설계 의도 확인 필요) | `level_custom_15.json` |
+| QA-T02 | P4 | ✅ 수정됨 | Stage 13 JSON `name` = "Stage 13" 수정 | `level_custom_13.json:3` |
+| QA-T04 | P4 | ⚠️ 유지보수 | 스테이지 등록 4곳 수동 동기화 필요 (StageSelectUI / GameManager / LevelEditor / registry) | 복수 파일 |
+| QA-T05 | P4 | ✅ 수정됨 | b015↔b024 방위각 -182.8°, b015↔b023 방위각 -176.8°로 3° 분리 | `level_custom_13.json:548,555` |
+| QA-T06 | P2 | 🔴 미수정 | `dispose()` move 타입 `position` tween 미취소 — 언로드 후 `graph.refresh()` 호출 가능 | `SwitchManager.ts:269` |
 | QA-13 | P2 | ✅ 수정됨 | `Renderer.applyQuality()` 반복 호출 시 이전 환경맵 텍스처 미해제 — GPU 메모리 누수 | `Renderer.ts:87` |
 | QA-14 | P2 | ✅ 수정됨 | `_swapSceneMaterials()` Standard→Lambert 변환 시 `emissive`/`emissiveIntensity` 미복사 — 발광 효과 소실 | `GameManager.ts:923` |
 | QA-15 | P3 | ✅ 수정됨 | `SettingsScreen.resetAll()` Enhanced Rendering 체크박스·저장값 미초기화 | `SettingsScreen.ts:399` |

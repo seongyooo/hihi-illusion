@@ -24,7 +24,7 @@ import { ParticleSystem }     from '../fx/ParticleSystem';
 import { AudioManager }       from '../fx/AudioManager';
 import { TeleportManager }    from '../mechanics/TeleportManager';
 import { StarManager }        from '../mechanics/StarManager';
-import { SwitchManager }      from '../world/SwitchManager';
+import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS }             from '../levels/registry';
@@ -289,6 +289,7 @@ export class GameManager {
     11: 'custom_stage_11',
     12: 'custom_stage_12',
     13: 'custom_stage_13',
+    15: 'custom_stage_15',
   };
 
   private loadStage(stageNum: number): void {
@@ -440,6 +441,7 @@ export class GameManager {
       (start, end) => this.graph!.findPath(start, end),
       startNode,
       {
+        shouldBlock: () => this.switchMgr?.isPlayerOnMovingBlock() ?? false,
         onDepart: (nodeId) => {
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
         },
@@ -510,6 +512,7 @@ export class GameManager {
       {
         onBlockClick: (blockId) => {
           if (this.tutorialInputLocked) return;
+          if (this.switchMgr?.isPlayerOnMovingBlock()) return;
           const node = this.graph!.getNode(blockId);
           if (node) { this.controller!.moveTo(node); this.audio.playStep(); }
         },
@@ -539,33 +542,56 @@ export class GameManager {
   private _linkSwitchAttachments(data: LevelData): void {
     if (!this.switchMgr) return;
     for (const sw of data.switches ?? []) {
-      if (sw.type !== 'spawn') continue;
-      const meshes: THREE.Object3D[] = [];
+      if (sw.type === 'spawn') {
+        const meshes: THREE.Object3D[] = [];
 
-      // 별
-      const starMesh = this.starMgr?.getStarMesh(sw.targetNodeId);
-      if (starMesh) meshes.push(starMesh);
+        // 별
+        const starMesh = this.starMgr?.getStarMesh(sw.targetNodeId);
+        if (starMesh) meshes.push(starMesh);
 
-      // 텔레포트 패드 링
-      const padRings = this.teleportMgr?.getRingsForNode(sw.targetNodeId);
-      if (padRings) meshes.push(...padRings);
+        // 텔레포트 패드 링
+        const padRings = this.teleportMgr?.getRingsForNode(sw.targetNodeId);
+        if (padRings) meshes.push(...padRings);
 
-      // 목표 마커 / 목표 조명
-      if (sw.targetNodeId === this.goalBlockId) {
-        if (this.goalMarker) meshes.push(this.goalMarker);
-        if (this.goalGlow)   meshes.push(this.goalGlow);
+        // 목표 마커 / 목표 조명
+        if (sw.targetNodeId === this.goalBlockId) {
+          if (this.goalMarker) meshes.push(this.goalMarker);
+          if (this.goalGlow)   meshes.push(this.goalGlow);
+        }
+
+        // 중간 포인트 마커
+        if (sw.targetNodeId === this.midpointBlockId) {
+          if (this.midpointMarker) meshes.push(this.midpointMarker);
+        }
+
+        // 사다리 (타겟 블록과 연결된 사다리 전체)
+        const ladderGroups = this.level!.getLaddersForBlock(sw.targetNodeId);
+        meshes.push(...ladderGroups);
+
+        if (meshes.length > 0) this.switchMgr.attachMeshes(sw.targetNodeId, meshes);
+
+      } else if (sw.type === 'move') {
+        const carries: CarryEntry[] = [];
+
+        // 별: 이동 시 float 애니 중단 → 델타 적용 → 완료 후 재시작
+        const starMesh = this.starMgr?.getStarMesh(sw.targetNodeId);
+        if (starMesh) {
+          const nodeId = sw.targetNodeId;
+          carries.push({
+            mesh: starMesh,
+            onComplete: () => {
+              const node = this.graph?.getNode(nodeId);
+              if (node) this.starMgr?.repositionStar(nodeId, node);
+            },
+          });
+        }
+
+        // 텔레포트 패드 링
+        const padRings = this.teleportMgr?.getRingsForNode(sw.targetNodeId);
+        if (padRings) padRings.forEach(m => carries.push({ mesh: m }));
+
+        if (carries.length > 0) this.switchMgr.attachCarryMeshes(sw.targetNodeId, carries);
       }
-
-      // 중간 포인트 마커
-      if (sw.targetNodeId === this.midpointBlockId) {
-        if (this.midpointMarker) meshes.push(this.midpointMarker);
-      }
-
-      // 사다리 (타겟 블록과 연결된 사다리 전체)
-      const ladderGroups = this.level!.getLaddersForBlock(sw.targetNodeId);
-      meshes.push(...ladderGroups);
-
-      if (meshes.length > 0) this.switchMgr.attachMeshes(sw.targetNodeId, meshes);
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "id": "custom_stage_13",
-  "name": "Custom Level",
+  "name": "Stage 13",
   "backgroundColor": "#E8EEF5",
   "blocks": [
     {
@@ -547,7 +547,7 @@
     {
       "nodeA": "b015",
       "nodeB": "b024",
-      "activateAzimuth": -179.8,
+      "activateAzimuth": -182.8,
       "azimuthTolerance": 2,
       "activateElevation": 18.3,
       "elevationTolerance": 2
@@ -555,7 +555,7 @@
     {
       "nodeA": "b015",
       "nodeB": "b023",
-      "activateAzimuth": -179.8,
+      "activateAzimuth": -176.8,
       "azimuthTolerance": 2,
       "activateElevation": 18.3,
       "elevationTolerance": 2

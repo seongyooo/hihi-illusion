@@ -69,6 +69,8 @@ export class EditorLobby {
       { num: 10, name: 'Convergence'    },
       { num: 11, name: 'Custom Level'   },
       { num: 12, name: 'Pressure Gate'  },
+      { num: 13, name: 'Stage 13'       },
+      { num: 15, name: 'Double Key'     },
     ];
     for (const s of builtinStages) {
       const card = document.createElement('div');

@@ -1,7 +1,7 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
 
 const TOTAL_STAGES     = 30;
-const BUILTIN_STAGES   = 13;  // stage 1-13 에만 실제 레벨 파일이 있음
+const BUILTIN_STAGE_NUMS = new Set([1,2,3,4,5,6,7,8,9,10,11,12,13,15]);
 
 export class StageSelectUI {
   private el: HTMLElement;
@@ -41,7 +41,7 @@ export class StageSelectUI {
       btn.className = 'stage-select__cell';
       btn.textContent = String(i);
 
-      const isBuiltin = i <= BUILTIN_STAGES;
+      const isBuiltin = BUILTIN_STAGE_NUMS.has(i);
       const isCustom  = !isBuiltin && !!CustomLevelStore.getByStage(i);
 
       if (isBuiltin || isCustom) {

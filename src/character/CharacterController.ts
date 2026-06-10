@@ -4,8 +4,9 @@ import type { PathNode } from '../world/PathGraph';
 import type { Character } from './Character';
 
 export interface CharacterControllerOptions {
-  onArrival?: (nodeId: string) => void;
-  onDepart?:  (nodeId: string) => void;
+  onArrival?:   (nodeId: string) => void;
+  onDepart?:    (nodeId: string) => void;
+  shouldBlock?: () => boolean;
 }
 
 export class CharacterController {
@@ -14,8 +15,9 @@ export class CharacterController {
   private currentNode: PathNode;
   private isMoving = false;
   private pendingTarget: PathNode | null = null;
-  private onArrival?: (nodeId: string) => void;
-  private onDepart?:  (nodeId: string) => void;
+  private onArrival?:   (nodeId: string) => void;
+  private onDepart?:    (nodeId: string) => void;
+  private shouldBlock?: () => boolean;
   private readonly _wp = new THREE.Vector3();
 
   // 남은 경로 (한 스텝씩 소비)
@@ -32,6 +34,7 @@ export class CharacterController {
     this.currentNode = startNode;
     this.onArrival   = options.onArrival;
     this.onDepart    = options.onDepart;
+    this.shouldBlock = options.shouldBlock;
     const { x, y, z } = startNode.position;
     character.setPosition(x, y, z);
   }
@@ -109,6 +112,12 @@ export class CharacterController {
    */
   private _advance(): void {
     if (!this.isMoving) return; // stop()에 의해 중단됨
+
+    // 이동 중인 블록 위에 있으면 경로를 즉시 취소
+    if (this.shouldBlock?.()) {
+      this.stop();
+      return;
+    }
 
     if (this._movePath.length === 0) {
       // 최종 목적지 도달

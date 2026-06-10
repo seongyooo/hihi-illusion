@@ -92,4 +92,10 @@ export const LEVELS: LevelMeta[] = [
     backgroundColor: '#E8EEF5',
     file:            () => import('./level_custom_13.json') as unknown as Promise<{ default: LevelData }>,
   },
+  {
+    id:              'custom_stage_15',
+    title:           'Double Key',
+    backgroundColor: '#ECF0EA',
+    file:            () => import('./level_custom_15.json') as unknown as Promise<{ default: LevelData }>,
+  },
 ];

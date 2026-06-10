@@ -28,10 +28,11 @@ interface IllusionConn {
 }
 
 interface SwitchConn {
-  switchNodeId: string;
-  targetNodeId: string;
+  switchNodeId:  string;
+  targetNodeIds: string[];   // 복수 타깃 지원
   mode: 'hold' | 'toggle';
   type: 'spawn' | 'move';
+  moveTarget?: [number, number, number];
 }
 
 type Tool = 'place' | 'erase' | 'select';
@@ -94,7 +95,9 @@ export class LevelEditor {
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starNodeIds:     string[] = [];
-  private switchConns:    SwitchConn[] = [];
+  private switchConns:      SwitchConn[] = [];
+  private swPendingTargets: string[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
+  private pickCallback: ((block: EditorBlock) => void) | null = null;
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
   private goalBlockId:    string | null = null;
@@ -413,8 +416,10 @@ export class LevelEditor {
       this.illusionFormEl.className = 'editor-add-form';
       this.illusionFormEl.innerHTML = `
         <div class="editor-row">
-          <label>NodeA:</label><input class="editor-input" id="ill-nodeA" style="width:80px">
-          <label>NodeB:</label><input class="editor-input" id="ill-nodeB" style="width:80px">
+          <label>NodeA:</label><input class="editor-input" id="ill-nodeA" style="width:66px">
+          <button class="editor-btn" id="ill-pick-a" title="블록 클릭으로 선택">↗</button>
+          <label>NodeB:</label><input class="editor-input" id="ill-nodeB" style="width:66px">
+          <button class="editor-btn" id="ill-pick-b" title="블록 클릭으로 선택">↗</button>
         </div>
         <div class="editor-row" style="align-items:center; gap:6px;">
           <label>Azimuth:</label><input class="editor-input" id="ill-az" type="number" value="0" style="width:60px">
@@ -446,6 +451,16 @@ export class LevelEditor {
       // 캡처 버튼
       this.illusionFormEl.querySelector('#ill-capture')!
         .addEventListener('click', fillCurrentAngle);
+
+      // Pick 버튼
+      (this.illusionFormEl.querySelector('#ill-pick-a') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.illusionFormEl.querySelector('#ill-nodeA') as HTMLInputElement).value = b.id;
+        }));
+      (this.illusionFormEl.querySelector('#ill-pick-b') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.illusionFormEl.querySelector('#ill-nodeB') as HTMLInputElement).value = b.id;
+        }));
 
       const illAddBtn = document.createElement('button');
       illAddBtn.className = 'editor-btn primary';
@@ -492,10 +507,20 @@ export class LevelEditor {
       this.ladderFormEl.className = 'editor-add-form';
       this.ladderFormEl.innerHTML = `
         <div class="editor-row">
-          <label>NodeA:</label><input class="editor-input" id="lad-nodeA" style="width:90px">
-          <label>NodeB:</label><input class="editor-input" id="lad-nodeB" style="width:90px">
+          <label>NodeA:</label><input class="editor-input" id="lad-nodeA" style="width:66px">
+          <button class="editor-btn" id="lad-pick-a" title="블록 클릭으로 선택">↗</button>
+          <label>NodeB:</label><input class="editor-input" id="lad-nodeB" style="width:66px">
+          <button class="editor-btn" id="lad-pick-b" title="블록 클릭으로 선택">↗</button>
         </div>
       `;
+      (this.ladderFormEl.querySelector('#lad-pick-a') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.ladderFormEl.querySelector('#lad-nodeA') as HTMLInputElement).value = b.id;
+        }));
+      (this.ladderFormEl.querySelector('#lad-pick-b') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.ladderFormEl.querySelector('#lad-nodeB') as HTMLInputElement).value = b.id;
+        }));
       const ladAddBtn = document.createElement('button');
       ladAddBtn.className = 'editor-btn primary';
       ladAddBtn.textContent = 'Add';
@@ -534,10 +559,20 @@ export class LevelEditor {
       this.teleporterFormEl.className = 'editor-add-form';
       this.teleporterFormEl.innerHTML = `
         <div class="editor-row">
-          <label>PadA:</label><input class="editor-input" id="tp-nodeA" style="width:90px">
-          <label>PadB:</label><input class="editor-input" id="tp-nodeB" style="width:90px">
+          <label>PadA:</label><input class="editor-input" id="tp-nodeA" style="width:66px">
+          <button class="editor-btn" id="tp-pick-a" title="블록 클릭으로 선택">↗</button>
+          <label>PadB:</label><input class="editor-input" id="tp-nodeB" style="width:66px">
+          <button class="editor-btn" id="tp-pick-b" title="블록 클릭으로 선택">↗</button>
         </div>
       `;
+      (this.teleporterFormEl.querySelector('#tp-pick-a') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.teleporterFormEl.querySelector('#tp-nodeA') as HTMLInputElement).value = b.id;
+        }));
+      (this.teleporterFormEl.querySelector('#tp-pick-b') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.teleporterFormEl.querySelector('#tp-nodeB') as HTMLInputElement).value = b.id;
+        }));
       const tpAddBtn = document.createElement('button');
       tpAddBtn.className = 'editor-btn primary';
       tpAddBtn.textContent = 'Add';
@@ -576,9 +611,14 @@ export class LevelEditor {
       this.starFormEl.className = 'editor-add-form';
       this.starFormEl.innerHTML = `
         <div class="editor-row">
-          <label>Node ID:</label><input class="editor-input" id="star-nodeId" style="width:100px" placeholder="e.g. b001">
+          <label>Node ID:</label><input class="editor-input" id="star-nodeId" style="width:80px" placeholder="e.g. b001">
+          <button class="editor-btn" id="star-pick" title="블록 클릭으로 선택">↗</button>
         </div>
       `;
+      (this.starFormEl.querySelector('#star-pick') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = b.id;
+        }));
       const starAddBtn = document.createElement('button');
       starAddBtn.className = 'editor-btn primary';
       starAddBtn.textContent = 'Add';
@@ -631,8 +671,8 @@ export class LevelEditor {
       this.switchFormEl.className = 'editor-add-form';
       this.switchFormEl.innerHTML = `
         <div class="editor-row">
-          <label>Switch:</label><input class="editor-input" id="sw-switch" style="width:80px" placeholder="e.g. b004">
-          <label>Target:</label><input class="editor-input" id="sw-target" style="width:80px" placeholder="e.g. b005">
+          <label>Switch:</label><input class="editor-input" id="sw-switch" style="width:72px" placeholder="e.g. b004">
+          <button class="editor-btn" id="sw-pick-switch" title="클릭해서 블록 선택">↗</button>
         </div>
         <div class="editor-row" style="gap:8px;">
           <label>Mode:</label>
@@ -646,27 +686,88 @@ export class LevelEditor {
             <option value="move">move</option>
           </select>
         </div>
+        <div class="editor-row" id="sw-move-row" style="display:none; gap:4px; align-items:center;">
+          <label style="min-width:60px;">MoveTarget:</label>
+          <input class="editor-input" id="sw-mx" type="number" step="0.5" value="0" style="width:48px" placeholder="X">
+          <input class="editor-input" id="sw-my" type="number" step="0.5" value="0" style="width:48px" placeholder="Y">
+          <input class="editor-input" id="sw-mz" type="number" step="0.5" value="0" style="width:48px" placeholder="Z">
+          <button class="editor-btn" id="sw-pick-move" title="블록 클릭으로 좌표 입력">↗</button>
+        </div>
+        <div style="margin-top:4px;">
+          <label style="font-size:11px;color:#aaa;">Targets:</label>
+          <div id="sw-target-list" style="min-height:20px;margin:2px 0 4px;"></div>
+          <div class="editor-row" style="gap:4px;">
+            <input class="editor-input" id="sw-target-input" style="width:72px" placeholder="e.g. b005">
+            <button class="editor-btn" id="sw-pick-target" title="클릭해서 블록 선택">↗</button>
+            <button class="editor-btn" id="sw-add-target">+ Target</button>
+          </div>
+        </div>
       `;
+
+      // Show/hide moveTarget row when type changes
+      const swTypeSelect = this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement;
+      const swMoveRow    = this.switchFormEl.querySelector('#sw-move-row') as HTMLElement;
+      swTypeSelect.addEventListener('change', () => {
+        swMoveRow.style.display = swTypeSelect.value === 'move' ? '' : 'none';
+      });
+
+      // 타깃 목록 참조 (renderSwTargetList 메서드로 위임)
+      const swTargetListEl = this.switchFormEl.querySelector('#sw-target-list') as HTMLElement;
+
+      // Pick 버튼
+      (this.switchFormEl.querySelector('#sw-pick-switch') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = b.id;
+        }));
+      (this.switchFormEl.querySelector('#sw-pick-target') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value = b.id;
+        }));
+      (this.switchFormEl.querySelector('#sw-pick-move') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          const wp = blockWorldPos(b.gridX, b.floor, b.gridZ);
+          (this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value = String(wp.x);
+          (this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value = String(wp.y);
+          (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = String(wp.z);
+        }));
+
+      // + Target 버튼
+      (this.switchFormEl.querySelector('#sw-add-target') as HTMLButtonElement)
+        .addEventListener('click', () => {
+          const id = (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value.trim();
+          if (id && !this.swPendingTargets.includes(id)) {
+            this.swPendingTargets.push(id);
+            this.renderSwTargetList(swTargetListEl);
+          }
+          (this.switchFormEl.querySelector('#sw-target-input') as HTMLInputElement).value = '';
+        });
 
       const swAddBtn = document.createElement('button');
       swAddBtn.className = 'editor-btn primary';
-      swAddBtn.textContent = 'Add';
+      swAddBtn.textContent = 'Add Switch';
       swAddBtn.style.marginTop = '6px';
       swAddBtn.addEventListener('click', () => {
         const switchNodeId = (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value.trim();
-        const targetNodeId = (this.switchFormEl.querySelector('#sw-target') as HTMLInputElement).value.trim();
         const mode = (this.switchFormEl.querySelector('#sw-mode') as HTMLSelectElement).value as 'hold' | 'toggle';
         const type = (this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement).value as 'spawn' | 'move';
-        if (switchNodeId && targetNodeId) {
-          this.switchConns.push({ switchNodeId, targetNodeId, mode, type });
+        if (switchNodeId && this.swPendingTargets.length > 0) {
+          const conn: SwitchConn = { switchNodeId, targetNodeIds: [...this.swPendingTargets], mode, type };
+          if (type === 'move') {
+            const mx = parseFloat((this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value) || 0;
+            const my = parseFloat((this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value) || 0;
+            const mz = parseFloat((this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value) || 0;
+            conn.moveTarget = [mx, my, mz];
+          }
+          this.switchConns.push(conn);
+          this.swPendingTargets = [];
+          this.renderSwTargetList(swTargetListEl);
           this.rebuildSwitchList();
           (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = '';
-          (this.switchFormEl.querySelector('#sw-target') as HTMLInputElement).value = '';
           this.switchFormEl.classList.remove('open');
         }
       });
 
-      // 선택한 블록을 Switch로, 다른 블록을 Target으로 빠르게 추가하는 헬퍼 버튼
+      // 선택한 블록을 Switch로 빠르게 채우는 헬퍼 버튼
       const swAddSelectedBtn = document.createElement('button');
       swAddSelectedBtn.className = 'editor-btn';
       swAddSelectedBtn.textContent = 'Use Selected as Switch Node';
@@ -682,7 +783,12 @@ export class LevelEditor {
       sec.appendChild(this.switchFormEl);
 
       addBtn.addEventListener('click', () => {
+        if (!this.switchFormEl.classList.contains('open')) {
+          this.swPendingTargets = [];
+          this.renderSwTargetList(swTargetListEl);
+        }
         this.switchFormEl.classList.toggle('open');
+        if (!this.switchFormEl.classList.contains('open')) this.cancelPick();
       });
     }));
 
@@ -812,12 +918,29 @@ export class LevelEditor {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
       item.innerHTML = `<span>${conn.nodeA} ↔ ${conn.nodeB} (az:${conn.azimuth} el:${conn.elevation})</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.illusionConns.splice(i, 1);
+        this.illusionFormEl.classList.add('open');
+        (this.illusionFormEl.querySelector('#ill-nodeA') as HTMLInputElement).value = conn.nodeA;
+        (this.illusionFormEl.querySelector('#ill-nodeB') as HTMLInputElement).value = conn.nodeB;
+        (this.illusionFormEl.querySelector('#ill-az') as HTMLInputElement).value = String(conn.azimuth);
+        (this.illusionFormEl.querySelector('#ill-az-tol') as HTMLInputElement).value = String(conn.azimuthTol);
+        (this.illusionFormEl.querySelector('#ill-el') as HTMLInputElement).value = String(conn.elevation);
+        (this.illusionFormEl.querySelector('#ill-el-tol') as HTMLInputElement).value = String(conn.elevationTol);
+        this.rebuildIllusionList();
+      });
+
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
         this.illusionConns.splice(i, 1);
         this.rebuildIllusionList();
       });
+      item.appendChild(edit);
       item.appendChild(del);
       this.illusionListEl.appendChild(item);
     });
@@ -829,12 +952,25 @@ export class LevelEditor {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
       item.innerHTML = `<span>${conn.nodeA} ↔ ${conn.nodeB}</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.ladderConns.splice(i, 1);
+        this.ladderFormEl.classList.add('open');
+        (this.ladderFormEl.querySelector('#lad-nodeA') as HTMLInputElement).value = conn.nodeA;
+        (this.ladderFormEl.querySelector('#lad-nodeB') as HTMLInputElement).value = conn.nodeB;
+        this.rebuildLadderList();
+      });
+
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
         this.ladderConns.splice(i, 1);
         this.rebuildLadderList();
       });
+      item.appendChild(edit);
       item.appendChild(del);
       this.ladderListEl.appendChild(item);
     });
@@ -846,12 +982,25 @@ export class LevelEditor {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
       item.innerHTML = `<span style="color:#44DDEE">⬡</span> <span>${conn.nodeA} ↔ ${conn.nodeB}</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.teleporterConns.splice(i, 1);
+        this.teleporterFormEl.classList.add('open');
+        (this.teleporterFormEl.querySelector('#tp-nodeA') as HTMLInputElement).value = conn.nodeA;
+        (this.teleporterFormEl.querySelector('#tp-nodeB') as HTMLInputElement).value = conn.nodeB;
+        this.rebuildTeleporterList();
+      });
+
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
         this.teleporterConns.splice(i, 1);
         this.rebuildTeleporterList();
       });
+      item.appendChild(edit);
       item.appendChild(del);
       this.teleporterListEl.appendChild(item);
     });
@@ -863,12 +1012,24 @@ export class LevelEditor {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
       item.innerHTML = `<span style="color:#FFD700">★</span> <span>${nodeId}</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.starNodeIds.splice(i, 1);
+        this.starFormEl.classList.add('open');
+        (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = nodeId;
+        this.rebuildStarList();
+      });
+
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
         this.starNodeIds.splice(i, 1);
         this.rebuildStarList();
       });
+      item.appendChild(edit);
       item.appendChild(del);
       this.starListEl.appendChild(item);
     });
@@ -879,16 +1040,71 @@ export class LevelEditor {
     this.switchConns.forEach((sw, i) => {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
+      item.style.flexDirection = 'column';
+      item.style.alignItems = 'flex-start';
       const typeColor = sw.type === 'spawn' ? '#44DDBB' : '#FFAA44';
-      item.innerHTML = `<span style="color:${typeColor}">⬡</span> <span>${sw.switchNodeId} → ${sw.targetNodeId} <small>[${sw.mode}/${sw.type}]</small></span>`;
+      const mtStr = sw.type === 'move' && sw.moveTarget
+        ? ` <small style="color:#aaa">(→${sw.moveTarget.map(v => v.toFixed(1)).join(',')})</small>`
+        : '';
+      const targetsStr = sw.targetNodeIds.join(', ');
+      const header = document.createElement('div');
+      header.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
+      header.innerHTML = `<span style="color:${typeColor}">⬡</span> <span style="flex:1;">${sw.switchNodeId} → [${targetsStr}] <small>[${sw.mode}/${sw.type}]</small>${mtStr}</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.switchConns.splice(i, 1);
+        this.swPendingTargets = [...sw.targetNodeIds];
+        // 타깃 목록 UI 재빌드 — 폼의 #sw-target-list 직접 갱신
+        const swTargetListEl = this.switchFormEl.querySelector('#sw-target-list') as HTMLElement;
+        this.renderSwTargetList(swTargetListEl);
+        this.switchFormEl.classList.add('open');
+        (this.switchFormEl.querySelector('#sw-switch') as HTMLInputElement).value = sw.switchNodeId;
+        (this.switchFormEl.querySelector('#sw-mode') as HTMLSelectElement).value = sw.mode;
+        (this.switchFormEl.querySelector('#sw-type') as HTMLSelectElement).value = sw.type;
+        const swMoveRow = this.switchFormEl.querySelector('#sw-move-row') as HTMLElement;
+        if (sw.type === 'move') {
+          swMoveRow.style.display = '';
+          (this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value = String(sw.moveTarget?.[0] ?? 0);
+          (this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value = String(sw.moveTarget?.[1] ?? 0);
+          (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = String(sw.moveTarget?.[2] ?? 0);
+        } else {
+          swMoveRow.style.display = 'none';
+        }
+        this.rebuildSwitchList();
+      });
+
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
         this.switchConns.splice(i, 1);
         this.rebuildSwitchList();
       });
-      item.appendChild(del);
+      header.appendChild(edit);
+      header.appendChild(del);
+      item.appendChild(header);
       this.switchListEl.appendChild(item);
+    });
+  }
+
+  /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
+  private renderSwTargetList(el: HTMLElement): void {
+    el.innerHTML = '';
+    this.swPendingTargets.forEach((tid, ti) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;margin:1px 0;font-size:12px;';
+      row.innerHTML = `<span style="flex:1;color:#ddd;">${tid}</span>`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn';
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        this.swPendingTargets.splice(ti, 1);
+        this.renderSwTargetList(el);
+      });
+      row.appendChild(del);
+      el.appendChild(row);
     });
   }
 
@@ -987,9 +1203,9 @@ export class LevelEditor {
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
     if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
     this.starNodeIds  = this.starNodeIds.filter(id => id !== block.id);
-    this.switchConns  = this.switchConns.filter(
-      sw => sw.switchNodeId !== block.id && sw.targetNodeId !== block.id,
-    );
+    this.switchConns = this.switchConns
+      .map(sw => ({ ...sw, targetNodeIds: sw.targetNodeIds.filter(id => id !== block.id) }))
+      .filter(sw => sw.switchNodeId !== block.id && sw.targetNodeIds.length > 0);
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -1014,6 +1230,18 @@ export class LevelEditor {
         });
       }
     });
+  }
+
+  private startPick(cb: (block: EditorBlock) => void): void {
+    this.pickCallback = cb;
+    this.viewportEl.style.cursor = 'crosshair';
+    this.viewportEl.style.outline = '2px solid #44DDBB';
+  }
+
+  private cancelPick(): void {
+    this.pickCallback = null;
+    this.viewportEl.style.cursor = '';
+    this.viewportEl.style.outline = '';
   }
 
   private selectBlock(block: EditorBlock): void {
@@ -1104,6 +1332,20 @@ export class LevelEditor {
 
   private handleClick(): void {
     this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    // Pick 모드: 뷰포트 블록 클릭으로 폼 필드를 채운다
+    if (this.pickCallback !== null) {
+      const hits = this.raycaster.intersectObjects(this.blocks.map(b => b.mesh), true);
+      if (hits.length > 0) {
+        const id = hits[0].object.userData.editorBlockId as string;
+        const block = this.blocks.find(b => b.id === id);
+        if (block) this.pickCallback(block);
+      }
+      this.pickCallback = null;
+      this.viewportEl.style.cursor = '';
+      this.viewportEl.style.outline = '';
+      return;
+    }
 
     if (this.currentTool === 'place') {
       const hits = this.raycaster.intersectObject(this.floorPlane);
@@ -1276,12 +1518,16 @@ export class LevelEditor {
       ladders: this.ladderConns,
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
-      switches: this.switchConns.length > 0 ? this.switchConns.map(sw => ({
-        switchNodeId: sw.switchNodeId,
-        targetNodeId: sw.targetNodeId,
-        mode: sw.mode,
-        type: sw.type,
-      })) : undefined,
+      // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
+      switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
+        sw.targetNodeIds.map(tid => ({
+          switchNodeId: sw.switchNodeId,
+          targetNodeId: tid,
+          mode: sw.mode,
+          type: sw.type,
+          ...(sw.type === 'move' && sw.moveTarget ? { moveTarget: sw.moveTarget } : {}),
+        }))
+      ) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -1375,12 +1621,19 @@ export class LevelEditor {
     this.ladderConns     = data.ladders ?? [];
     this.teleporterConns = data.teleporters ?? [];
     this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
-    this.switchConns     = (data.switches ?? []).map(sw => ({
-      switchNodeId: sw.switchNodeId,
-      targetNodeId: sw.targetNodeId,
-      mode: sw.mode,
-      type: sw.type,
-    }));
+    // 같은 (switchNodeId + mode + type + moveTarget) 조합을 그룹핑해 targetNodeIds 배열로 합침
+    {
+      const map = new Map<string, SwitchConn>();
+      for (const sw of data.switches ?? []) {
+        const key = `${sw.switchNodeId}|${sw.mode}|${sw.type}|${(sw.moveTarget ?? []).join(',')}`;
+        if (map.has(key)) {
+          map.get(key)!.targetNodeIds.push(sw.targetNodeId);
+        } else {
+          map.set(key, { switchNodeId: sw.switchNodeId, targetNodeIds: [sw.targetNodeId], mode: sw.mode, type: sw.type, moveTarget: sw.moveTarget });
+        }
+      }
+      this.switchConns = Array.from(map.values());
+    }
 
     // Rebuild panel lists
     this.rebuildIllusionList();
@@ -1439,6 +1692,8 @@ export class LevelEditor {
       10: () => import('../levels/level_custom_10.json'),
       11: () => import('../levels/level_custom_11.json'),
       12: () => import('../levels/level_custom_12.json'),
+      13: () => import('../levels/level_custom_13.json'),
+      15: () => import('../levels/level_custom_15.json'),
     };
     const loader = fileMap[stageNum];
     if (!loader) return;

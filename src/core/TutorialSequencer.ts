@@ -23,7 +23,6 @@ import type { TutorialHint } from '../ui/TutorialHint';
 
 // 순차 등장할 블록 순서 (s1 이후 방향, x=5→0)
 const REVEAL_IDS = ['s2', 's3', 'mid', 's5', 's6', 's7'] as const;
-type RevealId = (typeof REVEAL_IDS)[number];
 
 // 별 튜토리얼 블록 (s6 도착 후 등장)
 const STAR_IDS = ['star_c1', 'star_c2', 'star_b'] as const;
