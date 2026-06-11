@@ -56,6 +56,16 @@ export class CharacterController {
   }
 
   /**
+   * 남은 이동 경로 또는 대기 중인 목적지에 주어진 노드가 포함되어 있으면 즉시 멈춘다.
+   * spawn 블록 소멸 시 플레이어 차단에 사용.
+   */
+  stopIfPathContains(nodeId: string): void {
+    const inPath    = this._movePath.some(n => n.id === nodeId);
+    const inPending = this.pendingTarget?.id === nodeId;
+    if (inPath || inPending) this.stop();
+  }
+
+  /**
    * 현재 이동을 즉시 중단하고 마지막으로 밟은 노드에 정착한다.
    * 튜토리얼 장애물 연출처럼 외부에서 캐릭터를 멈춰야 할 때 사용.
    */

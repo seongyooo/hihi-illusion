@@ -5,8 +5,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Renderer }           from './Renderer';
 import { CameraController }   from './CameraController';
 import { InputManager }       from './InputManager';
-import { Level }              from '../world/Level';
-import type { LevelData }     from '../world/Level';
+import { Level, buildLadderMesh } from '../world/Level';
+import type { LevelData, BlockData } from '../world/Level';
 import { PathGraph }          from '../world/PathGraph';
 import { Character }          from '../character/Character';
 import type { CharacterType } from '../character/Character';
@@ -419,6 +419,30 @@ export class GameManager {
         this.graph,
         (id) => this.level!.blocks.get(id)?.mesh,
       );
+    }
+    this.switchMgr.setOnDespawn((nodeId) => {
+      this.controller?.stopIfPathContains(nodeId);
+    });
+    for (const cl of data.conditionalLadders ?? []) {
+      this.switchMgr.registerConditionalLadders(
+        cl.switchNodeId,
+        cl.pairs.map(p => [p.nodeA, p.nodeB] as [string, string]),
+      );
+
+      // 사다리 시각 메시: 스위치 ON 상태의 블록 위치(moveTarget)를 기준으로 생성
+      const ladderMeshes: THREE.Object3D[] = [];
+      for (const pair of cl.pairs) {
+        const bdA = this.getFinalBlockData(data, pair.nodeA);
+        const bdB = this.getFinalBlockData(data, pair.nodeB);
+        if (bdA && bdB) {
+          const mesh = buildLadderMesh(bdA, bdB);
+          this.renderer.scene.add(mesh);
+          ladderMeshes.push(mesh);
+        }
+      }
+      if (ladderMeshes.length > 0) {
+        this.switchMgr.registerConditionalLadderMeshes(cl.switchNodeId, ladderMeshes);
+      }
     }
 
     // ElevatorManager
@@ -833,6 +857,17 @@ export class GameManager {
 
     gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.setupGoalMarker(goalMesh);
+  }
+
+  /** 조건부 사다리 메시 렌더링용: 블록의 최종 위치(moveTarget 있으면 반영) 반환 */
+  private getFinalBlockData(data: LevelData, nodeId: string): BlockData | null {
+    const block = data.blocks.find(b => b.id === nodeId);
+    if (!block) return null;
+    const sw = data.switches?.find(s => s.targetNodeId === nodeId && s.type === 'move' && s.moveTarget);
+    if (sw?.moveTarget) {
+      return { ...block, position: sw.moveTarget };
+    }
+    return block;
   }
 
   private setupGoalMarker(goalMesh: THREE.Object3D): void {

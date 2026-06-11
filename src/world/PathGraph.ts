@@ -21,6 +21,8 @@ export class PathGraph {
   private teleporterEdges: Array<[string, string]> = [];
   // hold+spawn 스위치 게이트: targetNodeId → switchNodeId (해당 방향 엣지만 허용)
   private switchGatedNodes: Map<string, string> = new Map();
+  // 조건부 사다리: switchNodeId → 엣지 쌍 목록 (활성화된 것만 저장)
+  private conditionalLadderGroups: Map<string, Array<[string, string]>> = new Map();
 
   build(blocks: BlockData[], getMesh: (id: string) => THREE.Object3D | undefined): void {
     this.nodes.clear();
@@ -84,6 +86,19 @@ export class PathGraph {
     this.buildEdges();
   }
 
+  /** 스위치 활성화 시 등록되는 조건부 사다리 그룹 */
+  enableLadderGroup(groupId: string, pairs: Array<[string, string]>): void {
+    this.conditionalLadderGroups.set(groupId, pairs);
+    this.buildEdges();
+  }
+
+  /** 스위치 비활성화 시 조건부 사다리 그룹 제거 */
+  disableLadderGroup(groupId: string): void {
+    if (!this.conditionalLadderGroups.has(groupId)) return;
+    this.conditionalLadderGroups.delete(groupId);
+    this.buildEdges();
+  }
+
   /** 순간이동 패드 쌍을 설정하고 엣지를 재계산한다 */
   setTeleporters(pairs: Array<[string, string]>): void {
     this.teleporterEdges = pairs;
@@ -140,6 +155,19 @@ export class PathGraph {
       if (a && b) {
         a.neighbors.push(b);
         b.neighbors.push(a);
+      }
+    }
+
+    // 조건부 사다리 엣지 (스위치 활성화 시에만 적용)
+    for (const pairs of this.conditionalLadderGroups.values()) {
+      for (const [aId, bId] of pairs) {
+        if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+        const a = this.nodes.get(aId);
+        const b = this.nodes.get(bId);
+        if (a && b) {
+          a.neighbors.push(b);
+          b.neighbors.push(a);
+        }
       }
     }
 

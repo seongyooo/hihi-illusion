@@ -97,6 +97,7 @@ export class LevelEditor {
   private selectedBlock: EditorBlock | null = null;
   private illusionConns: IllusionConn[] = [];
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
+  private conditionalLadderConns: Array<{ switchNodeId: string; nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starNodeIds:     string[] = [];
   private switchConns:      SwitchConn[] = [];
@@ -125,6 +126,8 @@ export class LevelEditor {
   private teleporterListEl!: HTMLElement;
   private starListEl!:       HTMLElement;
   private switchListEl!:     HTMLElement;
+  private condLadderListEl!: HTMLElement;
+  private condLadderFormEl!: HTMLElement;
   private illusionFormEl!:   HTMLElement;
   private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
@@ -589,6 +592,68 @@ export class LevelEditor {
 
       addBtn.addEventListener('click', () => {
         this.ladderFormEl.classList.toggle('open');
+      });
+    }));
+
+    // Conditional Ladders (switch-gated)
+    p.appendChild(this.buildSection('COND. LADDERS', (sec) => {
+      this.condLadderListEl = document.createElement('div');
+      sec.appendChild(this.condLadderListEl);
+      this.rebuildCondLadderList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Cond. Ladder';
+      addBtn.style.width = '100%';
+      addBtn.style.marginTop = '6px';
+      sec.appendChild(addBtn);
+
+      this.condLadderFormEl = document.createElement('div');
+      this.condLadderFormEl.className = 'editor-add-form';
+      this.condLadderFormEl.innerHTML = `
+        <div class="editor-row">
+          <label>Switch:</label><input class="editor-input" id="cl-switch" style="width:60px">
+          <button class="editor-btn" id="cl-pick-sw" title="블록 클릭으로 선택">↗</button>
+        </div>
+        <div class="editor-row">
+          <label>A:</label><input class="editor-input" id="cl-nodeA" style="width:66px">
+          <button class="editor-btn" id="cl-pick-a" title="블록 클릭으로 선택">↗</button>
+          <label>B:</label><input class="editor-input" id="cl-nodeB" style="width:66px">
+          <button class="editor-btn" id="cl-pick-b" title="블록 클릭으로 선택">↗</button>
+        </div>
+      `;
+      (this.condLadderFormEl.querySelector('#cl-pick-sw') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.condLadderFormEl.querySelector('#cl-switch') as HTMLInputElement).value = b.id;
+        }));
+      (this.condLadderFormEl.querySelector('#cl-pick-a') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.condLadderFormEl.querySelector('#cl-nodeA') as HTMLInputElement).value = b.id;
+        }));
+      (this.condLadderFormEl.querySelector('#cl-pick-b') as HTMLButtonElement)
+        .addEventListener('click', () => this.startPick(b => {
+          (this.condLadderFormEl.querySelector('#cl-nodeB') as HTMLInputElement).value = b.id;
+        }));
+
+      const clAddBtn = document.createElement('button');
+      clAddBtn.className = 'editor-btn primary';
+      clAddBtn.textContent = 'Add';
+      clAddBtn.style.marginTop = '6px';
+      clAddBtn.addEventListener('click', () => {
+        const switchNodeId = (this.condLadderFormEl.querySelector('#cl-switch') as HTMLInputElement).value.trim();
+        const nodeA        = (this.condLadderFormEl.querySelector('#cl-nodeA') as HTMLInputElement).value.trim();
+        const nodeB        = (this.condLadderFormEl.querySelector('#cl-nodeB') as HTMLInputElement).value.trim();
+        if (switchNodeId && nodeA && nodeB) {
+          this.conditionalLadderConns.push({ switchNodeId, nodeA, nodeB });
+          this.rebuildCondLadderList();
+          this.condLadderFormEl.classList.remove('open');
+        }
+      });
+      this.condLadderFormEl.appendChild(clAddBtn);
+      sec.appendChild(this.condLadderFormEl);
+
+      addBtn.addEventListener('click', () => {
+        this.condLadderFormEl.classList.toggle('open');
       });
     }));
 
@@ -1120,6 +1185,37 @@ export class LevelEditor {
       item.appendChild(edit);
       item.appendChild(del);
       this.ladderListEl.appendChild(item);
+    });
+  }
+
+  private rebuildCondLadderList(): void {
+    this.condLadderListEl.innerHTML = '';
+    this.conditionalLadderConns.forEach((conn, i) => {
+      const item = document.createElement('div');
+      item.className = 'editor-conn-item';
+      item.innerHTML = `<span style="color:#FFAA44">⚡</span> <span style="font-size:10px">[${conn.switchNodeId}] ${conn.nodeA} ↔ ${conn.nodeB}</span>`;
+
+      const edit = document.createElement('button');
+      edit.textContent = '✎';
+      edit.title = '편집';
+      edit.addEventListener('click', () => {
+        this.conditionalLadderConns.splice(i, 1);
+        this.condLadderFormEl.classList.add('open');
+        (this.condLadderFormEl.querySelector('#cl-switch') as HTMLInputElement).value = conn.switchNodeId;
+        (this.condLadderFormEl.querySelector('#cl-nodeA') as HTMLInputElement).value = conn.nodeA;
+        (this.condLadderFormEl.querySelector('#cl-nodeB') as HTMLInputElement).value = conn.nodeB;
+        this.rebuildCondLadderList();
+      });
+
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        this.conditionalLadderConns.splice(i, 1);
+        this.rebuildCondLadderList();
+      });
+      item.appendChild(edit);
+      item.appendChild(del);
+      this.condLadderListEl.appendChild(item);
     });
   }
 
@@ -1704,6 +1800,17 @@ export class LevelEditor {
         walkable: b.walkable,
       })),
       ladders: this.ladderConns,
+      conditionalLadders: (() => {
+        const map = new Map<string, Array<{ nodeA: string; nodeB: string }>>();
+        for (const cl of this.conditionalLadderConns) {
+          const arr = map.get(cl.switchNodeId) ?? [];
+          arr.push({ nodeA: cl.nodeA, nodeB: cl.nodeB });
+          map.set(cl.switchNodeId, arr);
+        }
+        return map.size > 0
+          ? Array.from(map.entries()).map(([switchNodeId, pairs]) => ({ switchNodeId, pairs }))
+          : undefined;
+      })(),
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
@@ -1749,7 +1856,8 @@ export class LevelEditor {
     this.blockCounter = 0;
     this.clearAllLabels();
     this.illusionConns   = [];
-    this.ladderConns     = [];
+    this.ladderConns             = [];
+    this.conditionalLadderConns  = [];
     this.teleporterConns = [];
     this.starNodeIds     = [];
     this.switchConns     = [];
@@ -1807,7 +1915,10 @@ export class LevelEditor {
       elevation: c.activateElevation,
       elevationTol: c.elevationTolerance,
     }));
-    this.ladderConns     = data.ladders ?? [];
+    this.ladderConns            = data.ladders ?? [];
+    this.conditionalLadderConns = (data.conditionalLadders ?? []).flatMap(cl =>
+      cl.pairs.map(p => ({ switchNodeId: cl.switchNodeId, nodeA: p.nodeA, nodeB: p.nodeB }))
+    );
     this.teleporterConns = data.teleporters ?? [];
     this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
     // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
@@ -1834,6 +1945,7 @@ export class LevelEditor {
     // Rebuild panel lists
     this.rebuildIllusionList();
     this.rebuildLadderList();
+    this.rebuildCondLadderList();
     this.rebuildTeleporterList();
     this.rebuildStarList();
     this.rebuildSwitchList();

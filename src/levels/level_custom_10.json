@@ -204,6 +204,11 @@
       "nodeB": "b010"
     }
   ],
+  "stars": [
+    {
+      "nodeId": "b008"
+    }
+  ],
   "illusionConnections": [
     {
       "nodeA": "b008",
@@ -280,8 +285,8 @@
     "blockId": "b012"
   },
   "initialCamera": {
-    "azimuth": -119,
-    "polar": 61,
+    "azimuth": -123,
+    "polar": 62,
     "distance": 26,
     "targetY": 0
   }

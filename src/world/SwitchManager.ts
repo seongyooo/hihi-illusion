@@ -43,6 +43,12 @@ export class SwitchManager {
   private particles: ParticleSystem;
   private attachedMeshes: Map<string, THREE.Object3D[]> = new Map();
   private carryMeshes: Map<string, CarryEntry[]> = new Map();
+  // spawn 블록 소멸 시 콜백 (플레이어 경로 차단용)
+  private onDespawnCallback?: (nodeId: string) => void;
+  // 조건부 사다리: switchNodeId → 엣지 쌍 목록
+  private conditionalLadderGroups: Map<string, Array<[string, string]>> = new Map();
+  // 조건부 사다리 메시: switchNodeId → 씬에 추가된 메시 목록 (ON시 visible, OFF시 hidden)
+  private conditionalLadderMeshes: Map<string, THREE.Object3D[]> = new Map();
 
   constructor(scene: THREE.Scene, particles: ParticleSystem) {
     this.scene     = scene;
@@ -135,6 +141,22 @@ export class SwitchManager {
 
   attachCarryMeshes(targetNodeId: string, entries: CarryEntry[]): void {
     this.carryMeshes.set(targetNodeId, entries);
+  }
+
+  /** spawn 블록 소멸 직전에 호출될 콜백을 등록한다 (nodeId를 인수로 전달). */
+  setOnDespawn(cb: (nodeId: string) => void): void {
+    this.onDespawnCallback = cb;
+  }
+
+  /** 특정 스위치와 연동된 조건부 사다리 엣지를 등록한다. 스위치 ON시 활성화, OFF시 비활성화. */
+  registerConditionalLadders(switchNodeId: string, pairs: Array<[string, string]>): void {
+    this.conditionalLadderGroups.set(switchNodeId, pairs);
+  }
+
+  /** 조건부 사다리 시각 메시를 등록한다. 기본값 hidden, 스위치 ON시 visible. */
+  registerConditionalLadderMeshes(switchNodeId: string, meshes: THREE.Object3D[]): void {
+    this.conditionalLadderMeshes.set(switchNodeId, meshes);
+    meshes.forEach(m => { m.visible = false; });
   }
 
   onCharacterArrive(nodeId: string, graph: PathGraph): void {
@@ -237,6 +259,12 @@ export class SwitchManager {
     } else {
       this.moveTarget(state, graph, true);
     }
+
+    const ladderPairs = this.conditionalLadderGroups.get(state.def.switchNodeId);
+    if (ladderPairs) graph.enableLadderGroup(state.def.switchNodeId, ladderPairs);
+
+    const ladderMeshes = this.conditionalLadderMeshes.get(state.def.switchNodeId) ?? [];
+    ladderMeshes.forEach(m => { m.visible = true; });
   }
 
   private deactivate(state: SwitchState, graph: PathGraph): void {
@@ -282,6 +310,12 @@ export class SwitchManager {
     } else {
       this.moveTarget(state, graph, false);
     }
+
+    const ladderPairs = this.conditionalLadderGroups.get(state.def.switchNodeId);
+    if (ladderPairs) graph.disableLadderGroup(state.def.switchNodeId);
+
+    const ladderMeshes = this.conditionalLadderMeshes.get(state.def.switchNodeId) ?? [];
+    ladderMeshes.forEach(m => { m.visible = false; });
   }
 
   /** hold 버튼용 pulsing 링 애니메이션 시작 */
@@ -329,6 +363,9 @@ export class SwitchManager {
   private despawnTarget(state: SwitchState, graph: PathGraph): void {
     const mesh = state.targetMesh;
     if (!mesh) return;
+
+    // 경로에 이 블록이 포함된 플레이어 즉시 정지
+    this.onDespawnCallback?.(state.def.targetNodeId);
 
     graph.clearSwitchGate(state.def.targetNodeId);
     graph.disableNode(state.def.targetNodeId);
@@ -438,7 +475,22 @@ export class SwitchManager {
         });
       }
     }
+    for (const meshes of this.conditionalLadderMeshes.values()) {
+      for (const m of meshes) {
+        this.scene.remove(m);
+        m.traverse(child => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(mat => (mat as THREE.Material).dispose());
+          }
+        });
+      }
+    }
+
     this.states = [];
     this.attachedMeshes.clear();
+    this.conditionalLadderGroups.clear();
+    this.conditionalLadderMeshes.clear();
   }
 }

@@ -4,7 +4,7 @@ import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
 
 // ---------- 사다리 메시 생성 ----------
-function buildLadderMesh(a: BlockData, b: BlockData): THREE.Group {
+export function buildLadderMesh(a: BlockData, b: BlockData): THREE.Group {
   const ay = a.position[1] + a.size[1] / 2;
   const by = b.position[1] + b.size[1] / 2;
   const bottomY = Math.min(ay, by);
@@ -90,6 +90,10 @@ export interface LevelData {
     mode: 'hold' | 'toggle';
     type: 'spawn' | 'move';
     moveTarget?: [number, number, number];
+  }>;
+  conditionalLadders?: Array<{
+    switchNodeId: string;
+    pairs: Array<{ nodeA: string; nodeB: string }>;
   }>;
   elevators?: Array<{
     nodeId:   string;

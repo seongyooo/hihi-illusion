@@ -301,6 +301,9 @@
     },
     {
       "nodeId": "b024"
+    },
+    {
+      "nodeId": "b010"
     }
   ],
   "switches": [
@@ -980,7 +983,7 @@
   },
   "initialCamera": {
     "azimuth": -91,
-    "polar": 52,
+    "polar": 60,
     "distance": 26,
     "targetY": 0
   }
