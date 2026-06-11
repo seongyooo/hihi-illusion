@@ -95,6 +95,101 @@ Key editor features:
 
 Stages are auto-discovered from `src/levels/level_custom_*.json` at build time via `import.meta.glob`. Adding a new JSON file is enough to register a new stage — no manual registry edits needed.
 
+## Level Data Format
+
+Each stage is a JSON file with the following structure:
+
+```json
+{
+  "id": "level_custom_1",
+  "name": "Stage 1",
+  "backgroundColor": "#EDF4F8",
+  "blocks": [
+    {
+      "id": "b0",
+      "position": [0, 0, 0],
+      "size": [1, 0.3, 1],
+      "color": "#A8C8E8",
+      "walkable": true
+    }
+  ],
+  "character": { "startNodeId": "b0" },
+  "goal": { "blockId": "bN" },
+  "stars": [{ "nodeId": "star_b" }],
+  "switches": [
+    {
+      "id": "sw0",
+      "nodeId": "switch_b",
+      "mode": "hold",
+      "type": "move",
+      "targets": [{ "blockId": "b1", "moveTarget": [0, 1, 0] }]
+    }
+  ],
+  "elevators": [
+    {
+      "id": "el0",
+      "blockId": "b2",
+      "mode": "auto",
+      "range": [0, 2]
+    }
+  ],
+  "teleporters": [
+    { "id": "tp0", "fromNodeId": "b3", "toNodeId": "b4" }
+  ],
+  "initialCamera": { "yaw": 45, "pitch": 60, "distance": 12 }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `blocks` | Array of path blocks with position, size, color, walkability |
+| `character.startNodeId` | Block id where the character spawns |
+| `goal.blockId` | Block id that triggers stage clear |
+| `stars` | Optional collectible stars by block id |
+| `switches` | `hold`/`toggle` mode; `spawn`/`move` type; supports multiple targets |
+| `elevators` | `auto`/`trigger` mode; `range` is `[min, max]` Y offset |
+| `teleporters` | Instant transport from one block to another |
+| `initialCamera` | Fly-in angle (yaw/pitch in degrees, distance in world units) |
+
+## Character Types
+
+Three character model types are available via the Settings screen:
+
+| Type | Description |
+|------|-------------|
+| `default` | Abstract geometric figure |
+| `robot` | Mechanical robot silhouette |
+| `human` | Humanoid silhouette |
+
+Body and head colors are independently customizable and persist in `localStorage`.
+
+## Module Reference
+
+| Module | Key Files | Role |
+|--------|-----------|------|
+| `core` | `GameManager.ts` | Main orchestrator — state machine, game loop, level loading |
+| `core` | `Renderer.ts` | WebGL setup, scene, lighting, post-processing |
+| `core` | `CameraController.ts` | Orthographic isometric camera, orbit, fly-in |
+| `core` | `InputManager.ts` | Keyboard & mouse event routing |
+| `core` | `GraphicsSettings.ts` | Settings read/write via `localStorage` |
+| `core` | `TutorialSequencer.ts` | Tutorial step flow and hint triggers |
+| `world` | `Level.ts` | JSON parsing, block instantiation, scene assembly |
+| `world` | `Block.ts` | Individual block geometry (roundness, color variants) |
+| `world` | `PathGraph.ts` | Node graph of walkable blocks for pathfinding |
+| `world` | `RotatingSection.ts` | Grouped blocks that rotate as a unit |
+| `world` | `SwitchManager.ts` | Switch hold/toggle logic, spawn/move dispatch |
+| `world` | `ElevatorManager.ts` | Elevator movement, rail visuals, trigger detection |
+| `character` | `Character.ts` | Procedural 3D character mesh generation |
+| `character` | `CharacterController.ts` | Movement, pathfinding, walk animation |
+| `illusion` | `IllusionManager.ts` | Show/hide false paths based on camera angle |
+| `mechanics` | `TeleportManager.ts` | Teleporter logic and visual effects |
+| `mechanics` | `StarManager.ts` | Star collectible tracking and animations |
+| `editor` | `LevelEditor.ts` | In-game visual level editor |
+| `editor` | `CustomLevelStore.ts` | `localStorage` CRUD for custom stages |
+| `fx` | `ParticleSystem.ts` | Stage clear and interaction particle effects |
+| `ui` | `StageSelectUI.ts` | Stage selection screen with thumbnails |
+| `ui` | `SettingsScreen.ts` + `SettingsPreview.ts` | Real-time settings UI and preview |
+
 ---
 
 # HIHI — 착시 퍼즐 게임
@@ -193,3 +288,98 @@ src/
 ## 스테이지 레지스트리
 
 스테이지는 빌드 시 `src/levels/level_custom_*.json`을 `import.meta.glob`으로 자동 탐색합니다. JSON 파일을 추가하는 것만으로 새 스테이지가 등록되며, 레지스트리를 수동으로 편집할 필요가 없습니다.
+
+## 레벨 데이터 형식
+
+각 스테이지는 아래 구조의 JSON 파일로 정의됩니다:
+
+```json
+{
+  "id": "level_custom_1",
+  "name": "Stage 1",
+  "backgroundColor": "#EDF4F8",
+  "blocks": [
+    {
+      "id": "b0",
+      "position": [0, 0, 0],
+      "size": [1, 0.3, 1],
+      "color": "#A8C8E8",
+      "walkable": true
+    }
+  ],
+  "character": { "startNodeId": "b0" },
+  "goal": { "blockId": "bN" },
+  "stars": [{ "nodeId": "star_b" }],
+  "switches": [
+    {
+      "id": "sw0",
+      "nodeId": "switch_b",
+      "mode": "hold",
+      "type": "move",
+      "targets": [{ "blockId": "b1", "moveTarget": [0, 1, 0] }]
+    }
+  ],
+  "elevators": [
+    {
+      "id": "el0",
+      "blockId": "b2",
+      "mode": "auto",
+      "range": [0, 2]
+    }
+  ],
+  "teleporters": [
+    { "id": "tp0", "fromNodeId": "b3", "toNodeId": "b4" }
+  ],
+  "initialCamera": { "yaw": 45, "pitch": 60, "distance": 12 }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `blocks` | 위치·크기·색상·이동 가능 여부를 가진 경로 블록 배열 |
+| `character.startNodeId` | 캐릭터가 스폰되는 블록 id |
+| `goal.blockId` | 스테이지 클리어를 트리거하는 블록 id |
+| `stars` | 수집 가능한 별(블록 id 기준, 선택 사항) |
+| `switches` | `hold`/`toggle` 모드; `spawn`/`move` 타입; 다중 타깃 지원 |
+| `elevators` | `auto`/`trigger` 모드; `range`는 `[최소, 최대]` Y 오프셋 |
+| `teleporters` | 한 블록에서 다른 블록으로 순간이동 |
+| `initialCamera` | 플라이-인 각도 (yaw/pitch는 도 단위, distance는 월드 단위) |
+
+## 캐릭터 타입
+
+설정 화면에서 3종의 캐릭터 모델을 선택할 수 있습니다:
+
+| 타입 | 설명 |
+|------|------|
+| `default` | 추상적인 기하학적 형태 |
+| `robot` | 기계적인 로봇 실루엣 |
+| `human` | 인간형 실루엣 |
+
+몸통과 머리 색상을 각각 커스터마이징할 수 있으며, `localStorage`에 저장됩니다.
+
+## 모듈 레퍼런스
+
+| 모듈 | 주요 파일 | 역할 |
+|------|-----------|------|
+| `core` | `GameManager.ts` | 메인 오케스트레이터 — 상태 머신, 게임 루프, 레벨 로딩 |
+| `core` | `Renderer.ts` | WebGL 설정, 씬, 조명, 포스트 프로세싱 |
+| `core` | `CameraController.ts` | 직교 아이소메트릭 카메라, 오빗, 플라이-인 |
+| `core` | `InputManager.ts` | 키보드·마우스 이벤트 라우팅 |
+| `core` | `GraphicsSettings.ts` | `localStorage` 기반 설정 읽기/쓰기 |
+| `core` | `TutorialSequencer.ts` | 튜토리얼 단계 흐름 및 힌트 트리거 |
+| `world` | `Level.ts` | JSON 파싱, 블록 인스턴스 생성, 씬 구성 |
+| `world` | `Block.ts` | 개별 블록 지오메트리 (모서리, 색상 변형) |
+| `world` | `PathGraph.ts` | 경로 탐색을 위한 이동 가능 블록 노드 그래프 |
+| `world` | `RotatingSection.ts` | 하나의 단위로 회전하는 블록 그룹 |
+| `world` | `SwitchManager.ts` | 스위치 hold/toggle 로직, spawn/move 디스패치 |
+| `world` | `ElevatorManager.ts` | 엘리베이터 이동, 레일 시각화, 트리거 감지 |
+| `character` | `Character.ts` | 절차적 3D 캐릭터 메시 생성 |
+| `character` | `CharacterController.ts` | 이동, 경로 탐색, 걷기 애니메이션 |
+| `illusion` | `IllusionManager.ts` | 카메라 각도에 따른 가짜 경로 표시/숨김 |
+| `mechanics` | `TeleportManager.ts` | 텔레포터 로직 및 시각 효과 |
+| `mechanics` | `StarManager.ts` | 별 수집 추적 및 애니메이션 |
+| `editor` | `LevelEditor.ts` | 인게임 비주얼 레벨 에디터 |
+| `editor` | `CustomLevelStore.ts` | 커스텀 스테이지 `localStorage` CRUD |
+| `fx` | `ParticleSystem.ts` | 스테이지 클리어·상호작용 파티클 이펙트 |
+| `ui` | `StageSelectUI.ts` | 썸네일이 있는 스테이지 선택 화면 |
+| `ui` | `SettingsScreen.ts` + `SettingsPreview.ts` | 실시간 설정 UI 및 미리보기 |

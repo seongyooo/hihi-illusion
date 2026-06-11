@@ -19,6 +19,8 @@ export class PathGraph {
   private ladderEdges:    Array<[string, string]> = [];
   private illusionEdges:  Array<[string, string]> = [];
   private teleporterEdges: Array<[string, string]> = [];
+  // hold+spawn 스위치 게이트: targetNodeId → switchNodeId (해당 방향 엣지만 허용)
+  private switchGatedNodes: Map<string, string> = new Map();
 
   build(blocks: BlockData[], getMesh: (id: string) => THREE.Object3D | undefined): void {
     this.nodes.clear();
@@ -115,6 +117,11 @@ export class PathGraph {
 
         // 같은 층: XZ 인접이면 자유 이동
         if (xzDist <= XZ_THRESHOLD && yDiff < SAME_FLOOR_Y) {
+          // hold+spawn 게이트: 타겟 노드는 지정된 스위치 방향 엣지만 허용
+          const aGate = this.switchGatedNodes.get(a.id);
+          const bGate = this.switchGatedNodes.get(b.id);
+          if (aGate !== undefined && aGate !== b.id) continue;
+          if (bGate !== undefined && bGate !== a.id) continue;
           a.neighbors.push(b);
           b.neighbors.push(a);
         }
@@ -124,6 +131,10 @@ export class PathGraph {
     // 사다리 엣지: 다른 층 이동 (명시적 선언 필요)
     for (const [aId, bId] of this.ladderEdges) {
       if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+      const aGate = this.switchGatedNodes.get(aId);
+      const bGate = this.switchGatedNodes.get(bId);
+      if (aGate !== undefined && aGate !== bId) continue;
+      if (bGate !== undefined && bGate !== aId) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
       if (a && b) {
@@ -135,6 +146,10 @@ export class PathGraph {
     // 착시 엣지 (카메라 방위각 트리거)
     for (const [aId, bId] of this.illusionEdges) {
       if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+      const aGate = this.switchGatedNodes.get(aId);
+      const bGate = this.switchGatedNodes.get(bId);
+      if (aGate !== undefined && aGate !== bId) continue;
+      if (bGate !== undefined && bGate !== aId) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
       if (a && b) {
@@ -175,6 +190,19 @@ export class PathGraph {
 
   isNodeDisabled(id: string): boolean {
     return this.disabledNodes.has(id);
+  }
+
+  /**
+   * hold+spawn 전용: 타겟 노드를 스위치 노드 방향으로만 진입 가능하도록 제한.
+   * enableNode() 호출 전에 설정해야 buildEdges()가 올바르게 반영된다.
+   */
+  setSwitchGate(targetNodeId: string, switchNodeId: string): void {
+    this.switchGatedNodes.set(targetNodeId, switchNodeId);
+  }
+
+  /** 게이트 해제. disableNode() 전에 호출하면 rebuild가 한 번으로 줄어든다. */
+  clearSwitchGate(targetNodeId: string): void {
+    this.switchGatedNodes.delete(targetNodeId);
   }
 
   getNode(id: string): PathNode | undefined {

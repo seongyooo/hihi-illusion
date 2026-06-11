@@ -327,6 +327,41 @@ export class LevelEditor {
       colorRow.appendChild(colorLabel);
       colorRow.appendChild(this.colorInput);
       sec.appendChild(colorRow);
+
+      // Color presets row
+      const presetRow = document.createElement('div');
+      presetRow.className = 'editor-row';
+      const presetLabel = document.createElement('label');
+      presetLabel.textContent = 'Preset:';
+      presetRow.appendChild(presetLabel);
+
+      const presets: { color: string; title: string }[] = [
+        { color: '#A8C5DA', title: 'Block (168,197,218)' },
+        { color: '#A6E2D6', title: 'Spawn target (166,226,214)' },
+        { color: '#F7DA93', title: 'Move target (247,218,147)' },
+      ];
+
+      const swatchWrap = document.createElement('div');
+      swatchWrap.style.cssText = 'display:flex;gap:4px;align-items:center;';
+      for (const preset of presets) {
+        const swatch = document.createElement('button');
+        swatch.title = preset.title;
+        swatch.style.cssText = [
+          `width:22px`, `height:22px`, `border-radius:4px`,
+          `border:2px solid #555`, `cursor:pointer`,
+          `background:${preset.color}`, `padding:0`, `flex-shrink:0`,
+        ].join(';');
+        swatch.addEventListener('click', () => {
+          this.currentColor = preset.color;
+          this.colorInput.value = preset.color;
+          if (this.selectedBlock) {
+            this.applyBlockColor(this.selectedBlock, preset.color);
+          }
+        });
+        swatchWrap.appendChild(swatch);
+      }
+      presetRow.appendChild(swatchWrap);
+      sec.appendChild(presetRow);
     }));
 
     // Selected block

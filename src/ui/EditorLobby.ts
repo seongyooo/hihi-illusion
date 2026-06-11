@@ -100,8 +100,21 @@ export class EditorLobby {
       this.downloadJson(json, 'custom_stages_all.json');
     });
 
+    const deleteAllBtn = document.createElement('button');
+    deleteAllBtn.className = 'editor-btn danger';
+    deleteAllBtn.textContent = '🗑 All';
+    deleteAllBtn.title = '전체 커스텀 스테이지 삭제';
+    deleteAllBtn.addEventListener('click', () => {
+      const all = CustomLevelStore.getAll();
+      if (all.length === 0) return;
+      if (!confirm(`커스텀 스테이지 ${all.length}개를 모두 삭제할까요?`)) return;
+      all.forEach(l => CustomLevelStore.delete(l.stageNum));
+      this.rebuildGrid();
+    });
+
     sectionHeader.appendChild(sectionTitle);
     sectionHeader.appendChild(downloadAllBtn);
+    sectionHeader.appendChild(deleteAllBtn);
     section.appendChild(sectionHeader);
 
     this.gridEl = document.createElement('div');
