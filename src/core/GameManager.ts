@@ -105,6 +105,7 @@ export class GameManager {
     this.orbit.minDistance   = 6;
     this.orbit.maxDistance   = 25;
     this.orbit.minPolarAngle = Math.PI / 6;  // elevation 최대 60° 제한
+    this.orbit.maxPolarAngle = Math.PI / 2 - 0.0873;  // elevation 최소 5° 제한 (수평 착시 방지)
     this.orbit.target.set(-1, 0, -1);
 
     this.cameraCtrl   = new CameraController(this.renderer.camera, this.orbit.target);
@@ -347,18 +348,11 @@ export class GameManager {
 
     if (this.debug) this.blockLabels.build(this.graph.getAllNodes());
 
-    // IllusionManager
+    // IllusionManager — 블록 위치로부터 모든 가능한 착시 연결을 자동 계산
     this.illusionMgr = new IllusionManager(
       this.renderer.camera,
       this.orbit.target,
-      (data.illusionConnections ?? []).map(c => ({
-        nodeAId:            c.nodeA,
-        nodeBId:            c.nodeB,
-        activateAzimuth:    c.activateAzimuth,
-        azimuthTolerance:   c.azimuthTolerance,
-        activateElevation:  c.activateElevation,
-        elevationTolerance: c.elevationTolerance,
-      })),
+      this._buildAutoIllusionConns(data),
       {
         onActivate:   () => { this.audio.playIllusionActivate(); },
         onDeactivate: () => {},
@@ -846,8 +840,134 @@ export class GameManager {
     this.orbit.minAzimuthAngle = -Infinity;
     this.orbit.maxAzimuthAngle =  Infinity;
     this.orbit.minPolarAngle   = Math.PI / 6;  // elevation 최대 60° 제한 유지
-    this.orbit.maxPolarAngle   = Math.PI;
+    this.orbit.maxPolarAngle   = Math.PI / 2 - 0.0873;  // elevation 최소 5° 제한 (수평 착시 방지)
     this.orbit.target.set(-1, 0, -1);
+  }
+
+  /**
+   * 모든 walkable 블록 쌍의 면(face) 중심점을 기준으로 착시 연결 설정을 자동 생성한다.
+   *
+   * 블록 A와 B가 대각선 방향으로 떨어져 있을 때, X축 방향 face 쌍과 Z축 방향 face 쌍
+   * 각각에 대해 카메라 정렬 각도를 계산한다. 각 face 쌍마다 A→B 시점과 B→A 시점
+   * 두 가지 방향을 등록하며, 카메라 elevation 범위(0°~60°) 안에 드는 것만 포함한다.
+   *
+   * switch-move 블록의 경우 원래 위치와 이동 후 위치(moveTarget) 두 가지 모두에 대해
+   * 각도를 계산하여 등록한다.
+   */
+  private _buildAutoIllusionConns(data: LevelData) {
+    const blocks = data.blocks;
+    const walkable = blocks.filter(b => b.walkable);
+    const conns: Array<{
+      nodeAId: string; nodeBId: string;
+      activateAzimuth: number; azimuthTolerance: number;
+      activateElevation: number; elevationTolerance: number;
+    }> = [];
+
+    const AZ_TOL = 1;   // 방위각 허용 오차 (°)
+    const EL_TOL = 1;   // 고도각 허용 오차 (°)
+    const EL_MIN = -5;  // 카메라 elevation 하한 (여유 포함)
+    const EL_MAX = 65;  // 카메라 elevation 상한 (여유 포함)
+
+    const flipAz = (az: number) => az >= 0 ? az - 180 : az + 180;
+
+    const tryRegister = (nodeAId: string, nodeBId: string,
+                         fdx: number, fdy: number, fdz: number) => {
+      const hd = Math.hypot(fdx, fdz);
+      if (hd < 0.01) return;
+      const az = Math.atan2(fdx, fdz) * (180 / Math.PI);
+      const el = Math.atan2(fdy, hd) * (180 / Math.PI);
+      if (el >= EL_MIN && el <= EL_MAX) {
+        conns.push({ nodeAId, nodeBId, activateAzimuth: az, azimuthTolerance: AZ_TOL, activateElevation: el, elevationTolerance: EL_TOL });
+      }
+      // B→A 반대 시점 (elevation 부호 반전, azimuth 반전)
+      const elBA = -el;
+      if (elBA >= EL_MIN && elBA <= EL_MAX) {
+        conns.push({ nodeAId, nodeBId, activateAzimuth: flipAz(az), azimuthTolerance: AZ_TOL, activateElevation: elBA, elevationTolerance: EL_TOL });
+      }
+    };
+
+    for (let i = 0; i < walkable.length; i++) {
+      for (let j = i + 1; j < walkable.length; j++) {
+        const a = walkable[i];
+        const b = walkable[j];
+
+        const A_topY = a.position[1] + a.size[1] / 2;
+        const B_topY = b.position[1] + b.size[1] / 2;
+        const dx = b.position[0] - a.position[0];
+        const dz = b.position[2] - a.position[2];
+
+        // 이미 인접한 블록은 착시 불필요
+        const xzDist = Math.hypot(dx, dz);
+        const yDiff  = Math.abs(B_topY - A_topY);
+        if (xzDist <= 1.1 && yDiff < 0.15) continue;
+
+        // X축 방향 face 쌍: A의 ±x 면 → B의 ∓x 면
+        if (Math.abs(dx) > 0.01) {
+          const signX = dx > 0 ? 1 : -1;
+          const FA = { x: a.position[0] + signX * a.size[0] / 2, y: A_topY, z: a.position[2] };
+          const FB = { x: b.position[0] - signX * b.size[0] / 2, y: B_topY, z: b.position[2] };
+          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z);
+        }
+
+        // Z축 방향 face 쌍: A의 ±z 면 → B의 ∓z 면
+        if (Math.abs(dz) > 0.01) {
+          const signZ = dz > 0 ? 1 : -1;
+          const FA = { x: a.position[0], y: A_topY, z: a.position[2] + signZ * a.size[2] / 2 };
+          const FB = { x: b.position[0], y: B_topY, z: b.position[2] - signZ * b.size[2] / 2 };
+          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z);
+        }
+      }
+    }
+
+    // switch-move 블록의 moveTarget 위치에서도 착시 각도 계산
+    // movable 블록들을 moveTarget 위치로 대체한 블록 목록으로 한 번 더 계산한다.
+    const moveTargets = new Map<string, [number, number, number]>();
+    for (const sw of data.switches ?? []) {
+      if (sw.type === 'move' && sw.moveTarget) {
+        moveTargets.set(sw.targetNodeId, sw.moveTarget);
+      }
+    }
+    if (moveTargets.size > 0) {
+      const movedWalkable = walkable.map(b => {
+        const mt = moveTargets.get(b.id);
+        return mt ? { ...b, position: mt } : b;
+      });
+      // 원래 위치와 동일한 블록 쌍은 이미 등록됐으므로
+      // moveTarget이 적용된 블록이 최소 하나 포함된 쌍만 계산
+      for (let i = 0; i < movedWalkable.length; i++) {
+        for (let j = i + 1; j < movedWalkable.length; j++) {
+          const a = movedWalkable[i];
+          const b = movedWalkable[j];
+          const aWasMoved = moveTargets.has(a.id);
+          const bWasMoved = moveTargets.has(b.id);
+          if (!aWasMoved && !bWasMoved) continue; // 둘 다 원래 위치면 이미 등록됨
+
+          const A_topY = a.position[1] + a.size[1] / 2;
+          const B_topY = b.position[1] + b.size[1] / 2;
+          const dx = b.position[0] - a.position[0];
+          const dz = b.position[2] - a.position[2];
+
+          const xzDist = Math.hypot(dx, dz);
+          const yDiff  = Math.abs(B_topY - A_topY);
+          if (xzDist <= 1.1 && yDiff < 0.15) continue;
+
+          if (Math.abs(dx) > 0.01) {
+            const signX = dx > 0 ? 1 : -1;
+            const FA = { x: a.position[0] + signX * a.size[0] / 2, y: A_topY, z: a.position[2] };
+            const FB = { x: b.position[0] - signX * b.size[0] / 2, y: B_topY, z: b.position[2] };
+            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z);
+          }
+          if (Math.abs(dz) > 0.01) {
+            const signZ = dz > 0 ? 1 : -1;
+            const FA = { x: a.position[0], y: A_topY, z: a.position[2] + signZ * a.size[2] / 2 };
+            const FB = { x: b.position[0], y: B_topY, z: b.position[2] - signZ * b.size[2] / 2 };
+            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z);
+          }
+        }
+      }
+    }
+
+    return conns;
   }
 
   /** 튜토리얼: 경로 블록이 모두 올라온 뒤 goal glow/marker를 활성화 */

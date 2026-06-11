@@ -18,6 +18,7 @@ export class PathGraph {
   private disabledNodes: Set<string> = new Set();
   private ladderEdges:    Array<[string, string]> = [];
   private illusionEdges:  Array<[string, string]> = [];
+  private illusionEdgeCounts: Map<string, number> = new Map();
   private teleporterEdges: Array<[string, string]> = [];
   // hold+spawn 스위치 게이트: targetNodeId → switchNodeId (해당 방향 엣지만 허용)
   private switchGatedNodes: Map<string, string> = new Map();
@@ -70,11 +71,17 @@ export class PathGraph {
   }
 
   setIllusionEdge(aId: string, bId: string, active: boolean): void {
-    const idx = this.illusionEdges.findIndex(([a, b]) => a === aId && b === bId);
-    if (active && idx === -1) {
+    const key  = `${aId}|${bId}`;
+    const prev = this.illusionEdgeCounts.get(key) ?? 0;
+    const next = active ? prev + 1 : Math.max(0, prev - 1);
+    this.illusionEdgeCounts.set(key, next);
+
+    const inList = this.illusionEdges.some(([a, b]) => a === aId && b === bId);
+    if (next > 0 && !inList) {
       this.illusionEdges.push([aId, bId]);
       this.buildEdges();
-    } else if (!active && idx !== -1) {
+    } else if (next === 0 && inList) {
+      const idx = this.illusionEdges.findIndex(([a, b]) => a === aId && b === bId);
       this.illusionEdges.splice(idx, 1);
       this.buildEdges();
     }
