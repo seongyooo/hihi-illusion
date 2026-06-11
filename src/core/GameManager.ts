@@ -28,7 +28,7 @@ import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
-import { GraphicsSettings, COLOR_DEFAULTS, ROTATE_SPEED_DEFAULT, DAMPING_FACTOR_DEFAULT } from './GraphicsSettings';
+import { GraphicsSettings, COLOR_DEFAULTS } from './GraphicsSettings';
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
 
