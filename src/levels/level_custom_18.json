@@ -1,0 +1,39 @@
+{
+  "id": "custom_stage_18",
+  "name": "Stage 18",
+  "backgroundColor": "#EBF0F5",
+  "blocks": [
+    { "id": "b001", "position": [5.5, 0.25, 9.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b002", "position": [5.5, 0.25, 8.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b003", "position": [5.5, 0.25, 7.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b004", "position": [5.5, 0.25, 6.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b005", "position": [5.5, 0.25, 5.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b006", "position": [5.5, 0.25, 4.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b010", "position": [4.5, 0.25, 7.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b011", "position": [3.5, 0.25, 7.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b012", "position": [3.5, 0.25, 6.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b013", "position": [4.5, 0.25, 6.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b014", "position": [6.5, 0.25, 7.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b015", "position": [7.5, 0.25, 7.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b016", "position": [7.5, 0.25, 6.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "b017", "position": [6.5, 0.25, 6.5], "color": "#A8C5DA", "size": [1, 0.5, 1], "walkable": true }
+  ],
+  "ladders": [],
+  "stars": [
+    { "nodeId": "b011" },
+    { "nodeId": "b015" }
+  ],
+  "switches": [
+    { "switchNodeId": "b003", "targetNodeId": "b010", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b011", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b012", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b013", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b014", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b015", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b016", "mode": "toggle", "type": "spawn" },
+    { "switchNodeId": "b003", "targetNodeId": "b017", "mode": "toggle", "type": "spawn" }
+  ],
+  "character": { "startNodeId": "b001" },
+  "goal": { "blockId": "b006" },
+  "initialCamera": { "azimuth": 45, "polar": 60, "distance": 22, "targetY": 0 }
+}
