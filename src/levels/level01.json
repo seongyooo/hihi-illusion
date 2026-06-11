@@ -14,11 +14,12 @@
     { "id": "s7",      "position": [0, 0, 0], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true },
     { "id": "star_c1", "position": [1, 0, 1], "color": "#A0C4DC", "size": [1, 0.5, 1], "walkable": true },
     { "id": "star_c2", "position": [1, 0, 2], "color": "#A0C4DC", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "star_b",  "position": [1, 0, 3], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true }
+    { "id": "star_b",  "position": [1, 0, 3], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true },
+    { "id": "s8",      "position": [0, 0.5, -2], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true }
   ],
 
   "stars": [{ "nodeId": "star_b" }],
 
   "character": { "startNodeId": "s0" },
-  "goal": { "blockId": "s7" }
+  "goal": { "blockId": "s8" }
 }

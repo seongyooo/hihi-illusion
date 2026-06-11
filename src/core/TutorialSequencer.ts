@@ -12,7 +12,10 @@
  * [Phase 3]  s6 도착 → 별 튜토리얼:
  *              ① star_b 솟아오름 (별과 함께)
  *              ② star_c1, star_c2 연결 블록 순차 등장
- *              ③ "별을 수집한 뒤 황금 링으로 이동하세요"
+ *              ③ "별을 수집한 뒤 계속 이동하세요"
+ * [Phase 4]  s7 도착 → 착시 튜토리얼:
+ *              ① s8 블록 솟아오름 (목표 블록)
+ *              ② "길이 끊어져 있습니다" / "시점을 돌려 길이 이어진 것처럼 보이게 해보세요"
  */
 
 import * as THREE from 'three';
@@ -57,6 +60,9 @@ export class TutorialSequencer {
   // 3D 화살표 (s1 위)
   private arrowMesh: THREE.Mesh | null = null;
 
+  // 3D 화살표 (s7 위, phase 1 완료 후 목표 방향 표시)
+  private s7ArrowMesh: THREE.Mesh | null = null;
+
   // 사다리 시각화
   private ladderGroup: THREE.Group | null = null;
 
@@ -100,6 +106,14 @@ export class TutorialSequencer {
       this.onStarBlockHidden(id);
     }
 
+    // 착시 목표 블록(s8) 숨기기 + PathGraph 비활성화
+    const s8Node = this.graph.getNode('s8');
+    if (s8Node) {
+      s8Node.mesh.position.y = UNDERGROUND;
+      s8Node.mesh.visible    = false;
+      this.graph.disableNode('s8');
+    }
+
     this.hint.showInstruction('블록을 탭하세요', '화살표 방향 블록을 탭해 이동합니다');
     this._createArrow(s1Mesh);
   }
@@ -109,6 +123,7 @@ export class TutorialSequencer {
     if (nodeId === 's1' && this.phase === 0) { this.phase = 1; this._revealPath(); }
     if (nodeId === 's3' && this.phase === 1) { this.phase = 2; this._obstacleSequence(); }
     if (nodeId === 's6' && this.phase === 2) { this.phase = 3; this._starTutorial(); }
+    if (nodeId === 's7' && this.phase === 3) { this.phase = 4; this._illusionTutorial(); }
   }
 
   // ── Phase 1: 경로 블록 순차 등장 ────────────────────────────────────────
@@ -138,9 +153,8 @@ export class TutorialSequencer {
   }
 
   private _finalizeReveal(): void {
-    // 목표 링·글로우 활성화
-    this.onPathRevealed();
     // 카메라 조작 안내 (~5초)
+    // 목표 링·글로우는 Phase 4에서 s8이 솟아오른 뒤 활성화
     this._after(400, () => {
       this.hint.showInstruction(
         '카메라를 드래그해 시점을 회전하세요',
@@ -148,7 +162,10 @@ export class TutorialSequencer {
       );
       this._after(5000, () => {
         this.hint.hideInstruction();
-        this._after(300, () => this.hint.showHint('황금 링을 향해 이동하세요'));
+        this._after(300, () => {
+          this.hint.showHint('경로를 따라 이동하세요');
+          this._createS7Arrow();
+        });
       });
     });
   }
@@ -220,11 +237,6 @@ export class TutorialSequencer {
     this.hint.hideHint();
 
     this._after(350, () => {
-      this.hint.showInstruction(
-        '황금 링에 가기 전, 별을 먼저 모아야 해요',
-        '★ 블록에 이동하면 별을 수집할 수 있어요',
-      );
-
       // ① star_b 먼저 솟아오름 (별과 함께)
       const starBNode = this.graph.getNode('star_b');
       if (starBNode) {
@@ -265,8 +277,47 @@ export class TutorialSequencer {
 
       // ③ 모두 올라온 후 힌트 교체 + 입력 잠금 해제
       this._after(1500, () => {
-        this.hint.showHint('별을 수집한 뒤 황금 링으로 이동하세요');
+        this.hint.showHint('별을 수집한 뒤 계속 이동하세요');
         this.onInputLock(false);
+      });
+    });
+  }
+
+  // ── Phase 4: 착시 튜토리얼 ───────────────────────────────────────────────
+
+  private _illusionTutorial(): void {
+    this._removeS7Arrow();
+    this.onInputLock(true);
+    this.hint.hideHint();
+
+    this._after(400, () => {
+      // s8 블록 솟아오름 (목표 블록, center Y=0.5) → 완료 시 목표 링·글로우 활성화
+      const s8Node = this.graph.getNode('s8');
+      if (s8Node) {
+        s8Node.mesh.visible = true;
+        gsap.to(s8Node.mesh.position, {
+          y: 0.5,
+          duration: 0.8,
+          ease: 'back.out(1.7)',
+          onComplete: () => {
+            this.graph.refresh();
+            this.graph.enableNode('s8');
+            this.onAddInteractTarget(s8Node.mesh);
+            // 이제 s8이 올라왔으므로 목표 링·글로우 활성화
+            this.onPathRevealed();
+          },
+        });
+      }
+
+      this._after(700, () => {
+        this.hint.showInstruction(
+          '길이 끊어져 있습니다',
+          '시점을 돌려 길이 이어진 것처럼 보이게 해보세요',
+        );
+        this._after(6000, () => {
+          this.hint.hideInstruction();
+          this.onInputLock(false);
+        });
       });
     });
   }
@@ -311,6 +362,16 @@ export class TutorialSequencer {
     return group;
   }
 
+  // ── 착시 활성화 알림 ──────────────────────────────────────────────────────
+
+  /** GameManager의 IllusionManager.onActivate에서 호출 */
+  notifyIllusionActivated(nodeA: string, nodeB: string): void {
+    if (this.phase !== 4) return;
+    const isS7S8 = (nodeA === 's7' && nodeB === 's8') || (nodeA === 's8' && nodeB === 's7');
+    if (!isS7S8) return;
+    this.hint.showHint('길이 이어졌습니다. 이제 건너면 됩니다');
+  }
+
   // ── 3D 화살표 ─────────────────────────────────────────────────────────────
 
   private _createArrow(targetMesh: THREE.Object3D): void {
@@ -350,6 +411,45 @@ export class TutorialSequencer {
     });
   }
 
+  private _createS7Arrow(): void {
+    const node = this.graph.getNode('s7');
+    if (!node) return;
+    const wp = new THREE.Vector3();
+    node.mesh.getWorldPosition(wp);
+
+    const geo = new THREE.ConeGeometry(0.20, 0.50, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xFFD700, emissive: 0xFFD700, emissiveIntensity: 0.35 });
+    this.s7ArrowMesh = new THREE.Mesh(geo, mat);
+    this.s7ArrowMesh.rotation.z = Math.PI;
+    this.s7ArrowMesh.position.set(wp.x, wp.y + 1.5, wp.z);
+    this.scene.add(this.s7ArrowMesh);
+
+    gsap.to(this.s7ArrowMesh.position, {
+      y: wp.y + 1.0,
+      duration: 0.65,
+      yoyo: true,
+      repeat: -1,
+      ease: 'sine.inOut',
+    });
+  }
+
+  private _removeS7Arrow(): void {
+    if (!this.s7ArrowMesh) return;
+    const a = this.s7ArrowMesh;
+    this.s7ArrowMesh = null;
+    gsap.killTweensOf(a.position);
+    gsap.to(a.scale, {
+      x: 0, y: 0, z: 0,
+      duration: 0.25,
+      ease: 'power2.in',
+      onComplete: () => {
+        this.scene.remove(a);
+        a.geometry.dispose();
+        (a.material as THREE.Material).dispose();
+      },
+    });
+  }
+
   // ── 유틸 ──────────────────────────────────────────────────────────────────
 
   private _after(ms: number, fn: () => void): void {
@@ -366,6 +466,7 @@ export class TutorialSequencer {
     this.timeouts = [];
 
     this._removeArrow();
+    this._removeS7Arrow();
 
     // 진행 중인 블록 트윈 모두 정지
     for (const id of REVEAL_IDS) {
@@ -378,6 +479,9 @@ export class TutorialSequencer {
     }
     const midNode = this.graph.getNode('mid');
     if (midNode) gsap.killTweensOf(midNode.mesh.position);
+
+    const s8Node = this.graph.getNode('s8');
+    if (s8Node) gsap.killTweensOf(s8Node.mesh.position);
 
     if (this.ladderGroup) {
       this.scene.remove(this.ladderGroup);

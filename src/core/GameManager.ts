@@ -354,7 +354,10 @@ export class GameManager {
       this.orbit.target,
       this._buildAutoIllusionConns(data),
       {
-        onActivate:   () => { this.audio.playIllusionActivate(); },
+        onActivate:   (nodeA, nodeB) => {
+          this.audio.playIllusionActivate();
+          this.tutorialSequencer?.notifyIllusionActivated(nodeA, nodeB);
+        },
         onDeactivate: () => {},
       }
     );
@@ -974,6 +977,11 @@ export class GameManager {
   private _revealTutorialGoal(): void {
     const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh;
     if (!goalMesh || !this.goalGlow) return;
+
+    // 메시가 올라온 뒤 호출되므로 glow 위치를 현재 메시 위치로 갱신
+    const wp = new THREE.Vector3();
+    goalMesh.getWorldPosition(wp);
+    this.goalGlow.position.set(wp.x, wp.y + 1.5, wp.z);
 
     gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.setupGoalMarker(goalMesh);
