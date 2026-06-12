@@ -399,6 +399,29 @@ canvas {
   position: relative;
   overflow: hidden;
 }
+
+/* Panel toggle button */
+.editor-panel-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(18, 18, 30, 0.82);
+  border: 1px solid #3a3a6a;
+  color: #c8c4e0;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s;
+  touch-action: manipulation;
+}
+.editor-panel-toggle:hover { background: rgba(42, 42, 80, 0.9); }
 .editor-angle-overlay {
   position: absolute;
   bottom: 16px;
@@ -442,6 +465,83 @@ canvas {
   display: flex;
   flex-direction: column;
   border-left: 1px solid #2a2a4a;
+  transition: max-width 0.25s ease, transform 0.25s ease;
+  max-width: 280px;
+}
+
+/* Desktop collapse: slide out to the right */
+.editor-panel--hidden {
+  max-width: 0;
+  overflow: hidden;
+  border-left: none;
+}
+
+/* ── Mobile: bottom drawer ──────────────────────── */
+@media (max-width: 767px) {
+  .editor-overlay.visible { flex-direction: column; }
+
+  .editor-viewport { order: 1; flex: 1; }
+
+  .editor-panel {
+    order: 2;
+    width: 100%;
+    max-width: 100%;
+    height: 58vh;
+    max-height: 58vh;
+    border-left: none;
+    border-top: 2px solid #3a3a6a;
+    transition: max-height 0.3s ease, transform 0.3s ease;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .editor-panel--hidden {
+    max-height: 0;
+    max-width: 100%;
+    overflow: hidden;
+    border-top: none;
+  }
+
+  /* toggle button: bottom-right corner on mobile */
+  .editor-panel-toggle {
+    top: auto;
+    bottom: 14px;
+    right: 14px;
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  /* larger touch targets for editor buttons on mobile */
+  .editor-btn {
+    padding: 9px 14px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+
+  .editor-conn-item button {
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 16px;
+  }
+
+  .editor-section {
+    padding: 14px 16px;
+  }
+
+  .editor-row {
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .editor-input {
+    font-size: 14px;
+    padding: 6px 8px;
+    min-height: 36px;
+  }
+
+  .editor-add-form .editor-input { width: 80px; }
 }
 .editor-section {
   padding: 12px 14px;

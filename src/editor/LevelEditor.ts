@@ -63,6 +63,8 @@ export class LevelEditor {
   private el: HTMLElement;
   private viewportEl: HTMLElement;
   private panelEl: HTMLElement;
+  private panelToggleBtn!: HTMLButtonElement;
+  private panelVisible = true;
 
   // Three.js
   private renderer: THREE.WebGLRenderer;
@@ -179,6 +181,14 @@ export class LevelEditor {
     this.labelsContainer.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;';
     this.viewportEl.appendChild(this.labelsContainer);
 
+    // Panel toggle button (always visible in viewport)
+    this.panelToggleBtn = document.createElement('button');
+    this.panelToggleBtn.className = 'editor-panel-toggle';
+    this.panelToggleBtn.innerHTML = '&#9776;';
+    this.panelToggleBtn.title = '패널 열기/닫기';
+    this.panelToggleBtn.addEventListener('click', () => this.togglePanel());
+    this.viewportEl.appendChild(this.panelToggleBtn);
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xF5F0E8);
 
@@ -254,6 +264,16 @@ export class LevelEditor {
 
     // Initial size
     this.onResize();
+  }
+
+  // ── Panel toggle ──────────────────────────────────────────────────────────
+
+  private togglePanel(): void {
+    this.panelVisible = !this.panelVisible;
+    this.panelEl.classList.toggle('editor-panel--hidden', !this.panelVisible);
+    this.panelToggleBtn.innerHTML = this.panelVisible ? '&#10005;' : '&#9776;';
+    // 패널 숨김 시 뷰포트 리사이즈 트리거
+    setTimeout(() => this.onResize(), 300);
   }
 
   // ── Panel construction ────────────────────────────────────────────────────
@@ -1999,6 +2019,17 @@ export class LevelEditor {
 
   show(): void {
     this.el.classList.add('visible');
+    // 모바일에서는 패널 기본 닫힘으로 시작
+    const isMobile = window.innerWidth < 768;
+    if (isMobile && this.panelVisible) {
+      this.panelVisible = false;
+      this.panelEl.classList.add('editor-panel--hidden');
+      this.panelToggleBtn.innerHTML = '&#9776;';
+    } else if (!isMobile && !this.panelVisible) {
+      this.panelVisible = true;
+      this.panelEl.classList.remove('editor-panel--hidden');
+      this.panelToggleBtn.innerHTML = '&#10005;';
+    }
     this.onResize();
     if (this.rafId === null) this.loop();
   }
