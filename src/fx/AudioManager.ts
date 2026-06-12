@@ -104,7 +104,7 @@ export class AudioManager {
   ensureBgm(): void {
     if (this.bgmStarted) return;
     this.bgmStarted = true;
-    this.bgmAudio = new Audio('/backgroud_music.wav');
+    this.bgmAudio = new Audio('/backgroud_music.mp3');
     this.bgmAudio.loop = true;
     this.bgmAudio.volume = 0.5;
     this.bgmAudio.play().catch(() => {});
