@@ -3,6 +3,8 @@
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
+  private bgmAudio: HTMLAudioElement | null = null;
+  private bgmStarted = false;
 
   private getCtx(): AudioContext {
     if (!this.ctx) this.ctx = new AudioContext();
@@ -33,8 +35,8 @@ export class AudioManager {
     osc.stop(t + attack + decay);
   }
 
-  // Soft tap — character starts moving
-  playStep(): void {
+  // Soft UI button click
+  playClick(): void {
     const ctx = this.getCtx();
     const t   = ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -42,9 +44,27 @@ export class AudioManager {
     osc.connect(g);
     g.connect(ctx.destination);
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(520, t);
-    osc.frequency.exponentialRampToValueAtTime(260, t + 0.1);
-    g.gain.setValueAtTime(0.1, t);
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.exponentialRampToValueAtTime(660, t + 0.06);
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    osc.start(t);
+    osc.stop(t + 0.09);
+  }
+
+  // Soft tap with slight pitch variation — fires on each individual step
+  playStep(): void {
+    const ctx = this.getCtx();
+    const t   = ctx.currentTime;
+    const variation = 0.88 + Math.random() * 0.26; // 0.88~1.14x pitch range
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(500 * variation, t);
+    osc.frequency.exponentialRampToValueAtTime(250 * variation, t + 0.1);
+    g.gain.setValueAtTime(0.08, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
     osc.start(t);
     osc.stop(t + 0.13);
@@ -79,4 +99,23 @@ export class AudioManager {
     this.tone(440, 'sine',     0.08, 0.01, 0.12, 0.05);
     this.tone(660, 'triangle', 0.16, 0.02, 0.32, 0.12);
   }
+
+  /** 첫 인터랙션 시 BGM 시작 (브라우저 자동재생 정책 대응) */
+  ensureBgm(): void {
+    if (this.bgmStarted) return;
+    this.bgmStarted = true;
+    this.bgmAudio = new Audio('/backgroud_music.wav');
+    this.bgmAudio.loop = true;
+    this.bgmAudio.volume = 0.5;
+    this.bgmAudio.play().catch(() => {});
+  }
+
+  stopBgm(): void {
+    if (!this.bgmAudio) return;
+    this.bgmAudio.pause();
+    this.bgmAudio.currentTime = 0;
+    this.bgmAudio = null;
+    this.bgmStarted = false;
+  }
+
 }

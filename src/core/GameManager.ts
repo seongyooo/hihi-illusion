@@ -31,6 +31,7 @@ import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS } from './GraphicsSettings';
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
+import { ProgressStore }      from './ProgressStore';
 
 export class GameManager {
   // ── Engine singletons (shared across levels) ──────────────────────────
@@ -93,6 +94,7 @@ export class GameManager {
     this.renderer   = new Renderer(container);
     this.hud        = new HUD(container);
     this.audio      = new AudioManager();
+
     this.particles         = new ParticleSystem(this.renderer.scene);
     this.starBackground    = new StarBackground(this.renderer.scene);
     this.starBackground.setVisible(GraphicsSettings.starBackground);
@@ -115,6 +117,7 @@ export class GameManager {
     this.tutorialHint = new TutorialHint(container);
 
     this.titleScreen.onPlay = () => {
+      this.audio.playClick();
       this.titleScreen.hide();
       this.stageSelect.show();
     };
@@ -124,6 +127,7 @@ export class GameManager {
 
     // DEV 버튼 → 로비
     this.titleScreen.onDev = () => {
+      this.audio.playClick();
       this.titleScreen.hide();
       this.editorLobby.show();
     };
@@ -132,11 +136,13 @@ export class GameManager {
     this.settingsScreen = new SettingsScreen(container);
 
     this.titleScreen.onSettings = () => {
+      this.audio.playClick();
       this.titleScreen.hide();
       this.settingsScreen.show();
     };
 
     this.settingsScreen.onClose = () => {
+      this.audio.playClick();
       this.settingsScreen.hide();
       this.titleScreen.show();
     };
@@ -277,15 +283,27 @@ export class GameManager {
       this.editorLobby.show();
     };
 
-    this.stageSelect.onSelect = (stageNum) => { this.loadStage(stageNum); };
-    this.stageSelect.onBack   = () => { this.stageSelect.hide(); this.titleScreen.show(); };
+    this.stageSelect.onSelect   = (stageNum) => { this.audio.playClick(); this.loadStage(stageNum); };
+    this.stageSelect.onBack     = () => { this.audio.playClick(); this.stageSelect.hide(); this.titleScreen.show(); };
+    this.stageSelect.onTutorial = () => {
+      this.audio.playClick();
+      this.stageSelect.hide();
+      this.currentStageNum = 0;
+      this.loadLevel('level_01');
+    };
     this.animate = this.animate.bind(this);
   }
 
   start(): void {
     requestAnimationFrame(this.animate);
-    this.currentStageNum = 0;
-    this.loadLevel('level_01');
+    if (ProgressStore.isTutorialDone()) {
+      // 튜토리얼 완료된 유저: 배경용 튜토리얼 레벨 로드 후 바로 타이틀 표시
+      this.currentStageNum = 0;
+      this.loadLevelForTitle('level_01');
+    } else {
+      this.currentStageNum = 0;
+      this.loadLevel('level_01');
+    }
   }
 
   // ── Stage select helper ───────────────────────────────────────────────
@@ -299,6 +317,13 @@ export class GameManager {
     if (this.builtinIds[stageNum]) { this.currentStageNum = stageNum; this.loadLevel(this.builtinIds[stageNum]); return; }
     // QA-04: silent fail 방지 — stageNum 업데이트 없이 조기 종료
     console.warn(`[GameManager] loadStage: no level for stageNum=${stageNum}`);
+  }
+
+  // ── Effects ───────────────────────────────────────────────────────────
+
+  private _triggerIllusionEffect(): void {
+    // 모바일 햅틱
+    try { navigator.vibrate?.(40); } catch { /* 지원 안 하는 환경 무시 */ }
   }
 
   private getNextStageNum(): number | null {
@@ -356,6 +381,7 @@ export class GameManager {
       {
         onActivate:   (nodeA, nodeB) => {
           this.audio.playIllusionActivate();
+          this._triggerIllusionEffect();
           this.tutorialSequencer?.notifyIllusionActivated(nodeA, nodeB);
         },
         onDeactivate: () => {},
@@ -464,6 +490,7 @@ export class GameManager {
       {
         shouldBlock: () => this.switchMgr?.isPlayerOnMovingBlock() ?? false,
         onDepart: (nodeId) => {
+          this.audio.playStep();
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
         },
         onArrival: (nodeId) => {
@@ -535,7 +562,10 @@ export class GameManager {
           if (this.tutorialInputLocked) return;
           if (this.switchMgr?.isPlayerOnMovingBlock()) return;
           const node = this.graph!.getNode(blockId);
-          if (node) { this.controller!.moveTo(node); this.audio.playStep(); }
+          if (node) {
+            this.audio.ensureBgm();
+            this.controller!.moveTo(node);
+          }
         },
         onSectionDrag: (sectionId, deltaRad) => {
           const section = this.level!.sections.find(s => s.id === sectionId);
@@ -614,6 +644,55 @@ export class GameManager {
         if (carries.length > 0) this.switchMgr.attachCarryMeshes(sw.targetNodeId, carries);
       }
     }
+  }
+
+  /** 튜토리얼 완료 유저용: 레벨을 배경으로만 로드하고 타이틀 화면을 즉시 표시 */
+  private async loadLevelForTitle(id: string): Promise<void> {
+    this.unloadCurrent();
+
+    const meta = LEVELS.find(l => l.id === id);
+    if (!meta) throw new Error(`Level not found: ${id}`);
+    const mod  = await meta.file();
+    const data = mod.default as unknown as LevelData;
+
+    this.isTutorial    = false; // 튜토리얼 시퀀서 비활성화
+    this.goalReached   = false;
+    this.tutorialMoved = false;
+
+    this._initLevelObjects(data);
+
+    // 타이틀 화면을 플라이인 완료 시 표시
+    this._startCameraFlyInThenTitle(data);
+  }
+
+  private _startCameraFlyInThenTitle(data: LevelData): void {
+    const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
+    const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+
+    let finalPos: [number, number, number];
+    let targetY = 0;
+
+    if (data.initialCamera) {
+      const { azimuth, polar, distance, targetY: ty } = data.initialCamera;
+      targetY = ty;
+      const az = azimuth * Math.PI / 180;
+      const po = polar   * Math.PI / 180;
+      finalPos = [
+        cx + distance * Math.sin(po) * Math.sin(az),
+        targetY + distance * Math.cos(po),
+        cz + distance * Math.sin(po) * Math.cos(az),
+      ];
+    } else {
+      finalPos = [cx + 12, 8, cz + 6];
+    }
+
+    // 애니메이션 없이 즉시 최종 위치로 이동 후 타이틀 표시
+    this.orbit.target.set(cx, targetY, cz);
+    this.renderer.camera.position.set(...finalPos);
+    this.renderer.camera.lookAt(cx, targetY, cz);
+    this.orbit.update();
+    this.orbit.enabled = true;
+    this.titleScreen.show();
   }
 
   private async loadLevel(id: string): Promise<void> {
@@ -1203,7 +1282,9 @@ export class GameManager {
     this.goalClearTimeout = setTimeout(() => {
       this.goalClearTimeout = null;
       if (this.isTutorial) {
-        // 튜토리얼 클리어: 버튼 없이 잠시 후 타이틀 화면으로 이동
+        // 튜토리얼 클리어: 완료 기록 후 타이틀 화면으로 이동
+        ProgressStore.setTutorialDone();
+        ProgressStore.unlockStage(1);
         this.hud.showClear();
         // BUG-01: inner timeout 추적 → unloadCurrent()에서 취소
         this.goalClearInnerTimeout = setTimeout(() => {
@@ -1211,12 +1292,13 @@ export class GameManager {
           this.titleScreen.show();
         }, 1400);
       } else {
-        // 일반 스테이지 클리어: Next Stage / Stage Select 버튼 표시
+        // 일반 스테이지 클리어: 다음 스테이지 언락 + Next Stage / Stage Select 버튼 표시
+        ProgressStore.unlockStage(this.currentStageNum + 1);
         const nextNum = this.getNextStageNum();
-        const onNext  = nextNum !== null
-          ? () => { this.loadStage(nextNum); }
+        const onNext  = nextNum !== null && ProgressStore.isUnlocked(nextNum)
+          ? () => { this.audio.playClick(); this.loadStage(nextNum); }
           : undefined;
-        const onSelect = () => { this.stageSelect.show(); };
+        const onSelect = () => { this.audio.playClick(); this.stageSelect.show(); };
         this.hud.showClear(onNext, onSelect);
       }
     }, 800);

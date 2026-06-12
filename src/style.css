@@ -98,6 +98,7 @@ canvas {
   color: #aaaaaa;
 }
 
+
 .hud-overlay {
   position: absolute;
   inset: 0;
@@ -347,6 +348,40 @@ canvas {
 .stage-select__cell.locked {
   opacity: 0.22;
   cursor: not-allowed;
+}
+
+/* 콘텐츠는 있지만 진행도 잠김 — 자물쇠 표시 */
+.stage-select__cell.locked--progress {
+  opacity: 0.45;
+  position: relative;
+}
+
+.stage-select__cell.locked--progress::after {
+  content: '🔒';
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.stage-select__tutorial-btn {
+  margin-top: 8px;
+  font-family: 'Georgia', serif;
+  font-size: clamp(11px, 2.5vw, 12px);
+  letter-spacing: 0.18em;
+  color: rgba(245, 240, 232, 0.4);
+  background: transparent;
+  border: 1px solid rgba(245, 240, 232, 0.15);
+  padding: 8px 24px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.stage-select__tutorial-btn:hover {
+  color: rgba(245, 240, 232, 0.75);
+  border-color: rgba(245, 240, 232, 0.35);
 }
 
 /* ── Level Editor ──────────────────────────────── */
