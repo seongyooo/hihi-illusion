@@ -112,6 +112,17 @@ export class LevelEditor {
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private zones: ZoneEntry[] = [];
   private zoneCounter = 0;
+  private zoneOverlays: Map<string, THREE.Mesh> = new Map();
+  private static readonly ZONE_COLORS = [
+    0xFF6B6B, // 빨강
+    0x6BAEFF, // 파랑
+    0x6BFF8A, // 초록
+    0xFFCC6B, // 노랑
+    0xCC6BFF, // 보라
+    0x6BFFF0, // 청록
+    0xFF9E6B, // 주황
+    0xFF6BCC, // 핑크
+  ];
   private pickCallback: ((block: EditorBlock) => void) | null = null;
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
@@ -213,10 +224,18 @@ export class LevelEditor {
 
     this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbit.enableDamping = true;
-    this.orbit.enablePan = false;
+    this.orbit.enablePan = true;
+    this.orbit.mouseButtons = {
+      LEFT:   THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT:  THREE.MOUSE.PAN,
+    };
     this.orbit.minZoom = 0.15;
     this.orbit.maxZoom = 8;
     this.orbit.target.set(7, 0, 7);
+
+    // 우클릭 컨텍스트 메뉴 방지
+    this.renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
     // 게임과 동일한 조명
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
@@ -1424,6 +1443,40 @@ export class LevelEditor {
     });
   }
 
+  private updateZoneOverlays(): void {
+    // 기존 오버레이 전부 제거
+    for (const mesh of this.zoneOverlays.values()) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    this.zoneOverlays.clear();
+
+    // 구역별로 색깔 오버레이 재생성
+    this.zones.forEach((zone, zi) => {
+      const color = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
+      for (const nodeId of zone.nodeIds) {
+        const block = this.blocks.find(b => b.id === nodeId);
+        if (!block) continue;
+        const geo = new THREE.PlaneGeometry(0.88, 0.88);
+        const mat = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.40,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const overlay = new THREE.Mesh(geo, mat);
+        overlay.rotation.x = -Math.PI / 2;
+        const wp = blockWorldPos(block.gridX, block.floor, block.gridZ);
+        overlay.position.set(wp.x, wp.y + 0.26, wp.z);  // 블록 윗면 바로 위
+        overlay.renderOrder = 1;
+        this.scene.add(overlay);
+        this.zoneOverlays.set(nodeId, overlay);
+      }
+    });
+  }
+
   private rebuildZoneList(): void {
     this.zoneListEl.innerHTML = '';
     if (this.zones.length === 0) {
@@ -1529,6 +1582,9 @@ export class LevelEditor {
 
       this.zoneListEl.appendChild(wrap);
     });
+
+    // 오버레이 업데이트 (항상 리스트 재빌드 후 동기화)
+    this.updateZoneOverlays();
   }
 
   /** initCam → 카메라 슬라이더 동기화 (loadFromLevelData 호출 후) */
@@ -1671,6 +1727,11 @@ export class LevelEditor {
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
+    // 구역에서도 제거
+    for (const zone of this.zones) {
+      zone.nodeIds = zone.nodeIds.filter(id => id !== block.id);
+    }
+    this.rebuildZoneList();  // 오버레이도 동기화
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -2071,6 +2132,13 @@ export class LevelEditor {
     this.switchConns     = [];
     this.zones           = [];
     this.zoneCounter     = 0;
+    // 오버레이 초기화
+    for (const mesh of this.zoneOverlays.values()) {
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
+    this.zoneOverlays.clear();
     this.selectedBlock   = null;
     this.hoveredBlock    = null;
     this.midpointBlockId = null;
