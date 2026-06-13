@@ -6,7 +6,7 @@ import { Renderer }           from './Renderer';
 import { CameraController }   from './CameraController';
 import { InputManager }       from './InputManager';
 import { Level, buildLadderMesh } from '../world/Level';
-import type { LevelData, BlockData } from '../world/Level';
+import type { LevelData, BlockData, ZoneDef } from '../world/Level';
 import { PathGraph }          from '../world/PathGraph';
 import { Character }          from '../character/Character';
 import type { CharacterType } from '../character/Character';
@@ -88,6 +88,11 @@ export class GameManager {
   private goalClearTimeout:         ReturnType<typeof setTimeout> | null = null;
   private goalClearInnerTimeout:    ReturnType<typeof setTimeout> | null = null;
   private starHintTimeout:          ReturnType<typeof setTimeout> | null = null;
+
+  // ── Zone camera system ────────────────────────────────────────────────
+  private zoneNodeMap:      Map<string, ZoneDef> = new Map();
+  private currentZoneId:    string | null = null;
+  private zoneCameraTween:  gsap.core.Tween | null = null;
 
   constructor(container: HTMLElement) {
     this.debug      = new URLSearchParams(location.search).has('debug');
@@ -483,6 +488,18 @@ export class GameManager {
     const startNode = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
+    // Zone setup — nodeId → ZoneDef 매핑 구성
+    this.zoneNodeMap.clear();
+    this.currentZoneId = null;
+    for (const zone of data.zones ?? []) {
+      for (const nodeId of zone.nodeIds) {
+        this.zoneNodeMap.set(nodeId, zone);
+      }
+    }
+    // 시작 노드가 속한 구역을 초기 구역으로 설정 (전환 없이)
+    const startZone = this.zoneNodeMap.get(data.character.startNodeId);
+    if (startZone) this.currentZoneId = startZone.id;
+
     this.controller = new CharacterController(
       this.character,
       (start, end) => this.graph!.findPath(start, end),
@@ -494,6 +511,13 @@ export class GameManager {
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
         },
         onArrival: (nodeId) => {
+          // 구역 전환 체크 — 새 구역 진입 시 카메라 타깃 이동
+          const arrivedZone = this.zoneNodeMap.get(nodeId);
+          if (arrivedZone && arrivedZone.id !== this.currentZoneId) {
+            this.currentZoneId = arrivedZone.id;
+            this._onZoneEnter(arrivedZone);
+          }
+
           // 튜토리얼 시퀀스 트리거
           this.tutorialSequencer?.onArrival(nodeId);
 
@@ -851,6 +875,11 @@ export class GameManager {
     gsap.killTweensOf(this.orbit.target);
     this.orbit.enabled = true;
 
+    // Zone 상태 초기화
+    if (this.zoneCameraTween) { this.zoneCameraTween.kill(); this.zoneCameraTween = null; }
+    this.zoneNodeMap.clear();
+    this.currentZoneId = null;
+
     if (this.goalGlow) {
       gsap.killTweensOf(this.goalGlow);
       this.renderer.scene.remove(this.goalGlow);
@@ -1115,6 +1144,19 @@ export class GameManager {
       yoyo: true,
       repeat: -1,
       ease: 'sine.inOut',
+    });
+  }
+
+  /** 구역 진입 시 orbit.target을 해당 구역의 cameraTarget으로 부드럽게 이동 */
+  private _onZoneEnter(zone: ZoneDef): void {
+    const [tx, ty, tz] = zone.cameraTarget;
+    if (this.zoneCameraTween) this.zoneCameraTween.kill();
+    this.zoneCameraTween = gsap.to(this.orbit.target, {
+      x: tx, y: ty, z: tz,
+      duration: 0.8,
+      ease: 'power2.inOut',
+      onUpdate: () => { this.orbit.update(); },
+      onComplete: () => { this.zoneCameraTween = null; },
     });
   }
 

@@ -68,6 +68,12 @@ export interface RotatingSectionData {
   blocks: SectionBlockInput[];
 }
 
+export interface ZoneDef {
+  id: string;
+  nodeIds: string[];
+  cameraTarget: [number, number, number];  // orbit.target x, y, z
+}
+
 export interface LevelData {
   id: string;
   name: string;
@@ -103,6 +109,7 @@ export interface LevelData {
     mode:     'auto' | 'trigger';
   }>;
   stars?: Array<{ nodeId: string }>;
+  zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string };
   goal: { blockId: string };

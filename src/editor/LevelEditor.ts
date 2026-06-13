@@ -32,6 +32,12 @@ interface SwitchTarget {
   moveTarget?: [number, number, number];  // move 타입 전용
 }
 
+interface ZoneEntry {
+  id:           string;
+  nodeIds:      string[];
+  cameraTarget: [number, number, number];
+}
+
 interface SwitchConn {
   switchNodeId: string;
   targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
@@ -104,6 +110,8 @@ export class LevelEditor {
   private starNodeIds:     string[] = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
+  private zones: ZoneEntry[] = [];
+  private zoneCounter = 0;
   private pickCallback: ((block: EditorBlock) => void) | null = null;
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
@@ -130,6 +138,8 @@ export class LevelEditor {
   private switchListEl!:     HTMLElement;
   private condLadderListEl!: HTMLElement;
   private condLadderFormEl!: HTMLElement;
+  private zoneListEl!:       HTMLElement;
+  private zoneFormEl!:       HTMLElement;
   private illusionFormEl!:   HTMLElement;
   private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
@@ -932,6 +942,74 @@ export class LevelEditor {
       });
     }));
 
+    // Zones
+    p.appendChild(this.buildSection('ZONES', (sec) => {
+      this.zoneListEl = document.createElement('div');
+      sec.appendChild(this.zoneListEl);
+      this.rebuildZoneList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Zone';
+      addBtn.style.cssText = 'width:100%;margin-top:6px;';
+      sec.appendChild(addBtn);
+
+      this.zoneFormEl = document.createElement('div');
+      this.zoneFormEl.className = 'editor-add-form';
+
+      const idRow = document.createElement('div');
+      idRow.className = 'editor-row';
+      idRow.innerHTML = `<label style="min-width:46px">ID:</label><input class="editor-input" id="zone-id" style="flex:1" placeholder="zone_1">`;
+      this.zoneFormEl.appendChild(idRow);
+
+      const txRow = document.createElement('div');
+      txRow.className = 'editor-row';
+      txRow.style.gap = '4px';
+      txRow.innerHTML = `
+        <label style="min-width:46px;font-size:11px">Target:</label>
+        <label style="font-size:10px">X</label><input class="editor-input" id="zone-tx" type="number" step="0.5" value="0" style="width:44px">
+        <label style="font-size:10px">Y</label><input class="editor-input" id="zone-ty" type="number" step="0.5" value="0" style="width:44px">
+        <label style="font-size:10px">Z</label><input class="editor-input" id="zone-tz" type="number" step="0.5" value="0" style="width:44px">
+      `;
+      this.zoneFormEl.appendChild(txRow);
+
+      const captureBtn = document.createElement('button');
+      captureBtn.className = 'editor-btn';
+      captureBtn.textContent = '📷 Capture Current Target';
+      captureBtn.style.cssText = 'width:100%;margin-top:4px;font-size:11px;';
+      captureBtn.addEventListener('click', () => {
+        const t = this.orbit.target;
+        (this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value = t.x.toFixed(2);
+        (this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value = t.y.toFixed(2);
+        (this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value = t.z.toFixed(2);
+      });
+      this.zoneFormEl.appendChild(captureBtn);
+
+      const zoneAddBtn = document.createElement('button');
+      zoneAddBtn.className = 'editor-btn primary';
+      zoneAddBtn.textContent = 'Add Zone';
+      zoneAddBtn.style.cssText = 'margin-top:6px;';
+      zoneAddBtn.addEventListener('click', () => {
+        const idInput = this.zoneFormEl.querySelector('#zone-id') as HTMLInputElement;
+        const rawId   = idInput.value.trim();
+        const zoneId  = rawId || `zone_${++this.zoneCounter}`;
+        const tx = parseFloat((this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value) || 0;
+        const ty = parseFloat((this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value) || 0;
+        const tz = parseFloat((this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value) || 0;
+        this.zones.push({ id: zoneId, nodeIds: [], cameraTarget: [tx, ty, tz] });
+        idInput.value = '';
+        this.rebuildZoneList();
+        this.zoneFormEl.classList.remove('open');
+      });
+      this.zoneFormEl.appendChild(zoneAddBtn);
+      sec.appendChild(this.zoneFormEl);
+
+      addBtn.addEventListener('click', () => {
+        this.zoneFormEl.classList.toggle('open');
+        if (!this.zoneFormEl.classList.contains('open')) this.cancelPick();
+      });
+    }));
+
     // Camera
     p.appendChild(this.buildSection('CAMERA', (sec) => {
       // 슬라이더 헬퍼
@@ -1343,6 +1421,113 @@ export class LevelEditor {
       header.appendChild(del);
       item.appendChild(header);
       this.switchListEl.appendChild(item);
+    });
+  }
+
+  private rebuildZoneList(): void {
+    this.zoneListEl.innerHTML = '';
+    if (this.zones.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '구역 없음';
+      this.zoneListEl.appendChild(empty);
+      return;
+    }
+    this.zones.forEach((zone, zi) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'border:1px solid #ddd;border-radius:4px;padding:6px;margin-bottom:6px;';
+
+      // 헤더: ID + 삭제 버튼
+      const header = document.createElement('div');
+      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
+      const title = document.createElement('strong');
+      title.style.fontSize = '12px';
+      title.textContent = `📍 ${zone.id}`;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'editor-btn';
+      delBtn.textContent = '✕';
+      delBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
+      delBtn.addEventListener('click', () => {
+        this.zones.splice(zi, 1);
+        this.rebuildZoneList();
+      });
+      header.appendChild(title);
+      header.appendChild(delBtn);
+      wrap.appendChild(header);
+
+      // Camera target
+      const targetRow = document.createElement('div');
+      targetRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:11px;';
+      targetRow.innerHTML = `
+        <label style="min-width:44px;color:#666">Target:</label>
+        <label>X</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[0]}" style="width:44px" data-zi="${zi}" data-axis="0">
+        <label>Y</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[1]}" style="width:44px" data-zi="${zi}" data-axis="1">
+        <label>Z</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[2]}" style="width:44px" data-zi="${zi}" data-axis="2">
+      `;
+      targetRow.querySelectorAll('input[data-axis]').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const inp  = e.target as HTMLInputElement;
+          const axis = parseInt(inp.dataset.axis!);
+          const idx  = parseInt(inp.dataset.zi!);
+          this.zones[idx].cameraTarget[axis] = parseFloat(inp.value) || 0;
+        });
+      });
+      const capBtn = document.createElement('button');
+      capBtn.className = 'editor-btn';
+      capBtn.textContent = '📷';
+      capBtn.title = '현재 orbit target 캡처';
+      capBtn.style.cssText = 'font-size:11px;padding:1px 5px;';
+      capBtn.addEventListener('click', () => {
+        const t = this.orbit.target;
+        zone.cameraTarget = [
+          parseFloat(t.x.toFixed(2)),
+          parseFloat(t.y.toFixed(2)),
+          parseFloat(t.z.toFixed(2)),
+        ];
+        this.rebuildZoneList();
+      });
+      targetRow.appendChild(capBtn);
+      wrap.appendChild(targetRow);
+
+      // Node list
+      const nodeWrap = document.createElement('div');
+      nodeWrap.style.cssText = 'margin-bottom:4px;';
+      const nodeTitle = document.createElement('div');
+      nodeTitle.style.cssText = 'font-size:11px;color:#555;margin-bottom:2px;';
+      nodeTitle.textContent = `블록 (${zone.nodeIds.length}개):`;
+      nodeWrap.appendChild(nodeTitle);
+      const nodeList = document.createElement('div');
+      nodeList.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;';
+      zone.nodeIds.forEach((nid, ni) => {
+        const tag = document.createElement('span');
+        tag.style.cssText = 'background:#e8f0fe;border-radius:3px;padding:1px 5px;font-size:10px;display:flex;align-items:center;gap:3px;cursor:default;';
+        tag.innerHTML = `${nid}<span style="cursor:pointer;color:#999;" data-ni="${ni}">×</span>`;
+        tag.querySelector('span')!.addEventListener('click', () => {
+          zone.nodeIds.splice(ni, 1);
+          this.rebuildZoneList();
+        });
+        nodeList.appendChild(tag);
+      });
+      nodeWrap.appendChild(nodeList);
+      wrap.appendChild(nodeWrap);
+
+      // Add node button
+      const pickRow = document.createElement('div');
+      pickRow.style.cssText = 'display:flex;gap:4px;';
+      const pickBtn = document.createElement('button');
+      pickBtn.className = 'editor-btn';
+      pickBtn.textContent = '+ 블록 추가';
+      pickBtn.style.cssText = 'flex:1;font-size:11px;';
+      pickBtn.addEventListener('click', () => {
+        this.startPick(b => {
+          if (!zone.nodeIds.includes(b.id)) zone.nodeIds.push(b.id);
+          this.rebuildZoneList();
+        });
+      });
+      pickRow.appendChild(pickBtn);
+      wrap.appendChild(pickRow);
+
+      this.zoneListEl.appendChild(wrap);
     });
   }
 
@@ -1851,6 +2036,9 @@ export class LevelEditor {
         activateElevation: c.elevation,
         elevationTolerance: c.elevationTol,
       })),
+      zones: this.zones.length > 0
+        ? this.zones.map(z => ({ id: z.id, nodeIds: z.nodeIds, cameraTarget: z.cameraTarget }))
+        : undefined,
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
       goal: { blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '' },
@@ -1881,6 +2069,8 @@ export class LevelEditor {
     this.teleporterConns = [];
     this.starNodeIds     = [];
     this.switchConns     = [];
+    this.zones           = [];
+    this.zoneCounter     = 0;
     this.selectedBlock   = null;
     this.hoveredBlock    = null;
     this.midpointBlockId = null;
@@ -1956,11 +2146,23 @@ export class LevelEditor {
       this.switchConns = Array.from(map.values());
     }
 
+    // Zones 복원
+    this.zones = (data.zones ?? []).map(z => ({
+      id: z.id,
+      nodeIds: [...z.nodeIds],
+      cameraTarget: [...z.cameraTarget] as [number, number, number],
+    }));
+    const maxZoneNum = this.zones
+      .map(z => { const m = z.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((a, b) => Math.max(a, b), 0);
+    this.zoneCounter = maxZoneNum;
+
     // initialCamera 복원
     this.initCam = data.initialCamera
       ? { ...data.initialCamera }
       : null;
     this.rebuildCameraPanel();
+    this.rebuildZoneList();
 
     // Rebuild panel lists
     this.rebuildIllusionList();
