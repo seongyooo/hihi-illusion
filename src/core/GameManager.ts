@@ -90,7 +90,7 @@ export class GameManager {
   private starHintTimeout:          ReturnType<typeof setTimeout> | null = null;
 
   // ── Zone camera system ────────────────────────────────────────────────
-  private zoneNodeMap:      Map<string, ZoneDef> = new Map();
+  private zoneDefs:         ZoneDef[] = [];
   private currentZoneId:    string | null = null;
   private zoneCameraTween:  gsap.core.Tween | null = null;
 
@@ -488,17 +488,14 @@ export class GameManager {
     const startNode = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
-    // Zone setup — nodeId → ZoneDef 매핑 구성
-    this.zoneNodeMap.clear();
+    // Zone setup — 구역 목록 저장, 시작 위치 기반 초기 구역 결정
+    this.zoneDefs      = data.zones ?? [];
     this.currentZoneId = null;
-    for (const zone of data.zones ?? []) {
-      for (const nodeId of zone.nodeIds) {
-        this.zoneNodeMap.set(nodeId, zone);
-      }
+    const startNode2   = this.graph.getNode(data.character.startNodeId);
+    if (startNode2) {
+      const startZone = this._findZoneAt(startNode2.position.x, startNode2.position.z);
+      if (startZone) this.currentZoneId = startZone.id;
     }
-    // 시작 노드가 속한 구역을 초기 구역으로 설정 (전환 없이)
-    const startZone = this.zoneNodeMap.get(data.character.startNodeId);
-    if (startZone) this.currentZoneId = startZone.id;
 
     this.controller = new CharacterController(
       this.character,
@@ -512,10 +509,13 @@ export class GameManager {
         },
         onArrival: (nodeId) => {
           // 구역 전환 체크 — 새 구역 진입 시 카메라 타깃 이동
-          const arrivedZone = this.zoneNodeMap.get(nodeId);
-          if (arrivedZone && arrivedZone.id !== this.currentZoneId) {
-            this.currentZoneId = arrivedZone.id;
-            this._onZoneEnter(arrivedZone);
+          const arrivedNode = this.graph?.getNode(nodeId);
+          if (arrivedNode) {
+            const arrivedZone = this._findZoneAt(arrivedNode.position.x, arrivedNode.position.z);
+            if (arrivedZone && arrivedZone.id !== this.currentZoneId) {
+              this.currentZoneId = arrivedZone.id;
+              this._onZoneEnter(arrivedZone);
+            }
           }
 
           // 튜토리얼 시퀀스 트리거
@@ -877,7 +877,7 @@ export class GameManager {
 
     // Zone 상태 초기화
     if (this.zoneCameraTween) { this.zoneCameraTween.kill(); this.zoneCameraTween = null; }
-    this.zoneNodeMap.clear();
+    this.zoneDefs      = [];
     this.currentZoneId = null;
 
     if (this.goalGlow) {
@@ -1145,6 +1145,17 @@ export class GameManager {
       repeat: -1,
       ease: 'sine.inOut',
     });
+  }
+
+  /** 월드 좌표 (x, z)가 속한 구역 반환. 없으면 null */
+  private _findZoneAt(worldX: number, worldZ: number): ZoneDef | null {
+    for (const zone of this.zoneDefs) {
+      if (worldX >= zone.gridX && worldX < zone.gridX + zone.width &&
+          worldZ >= zone.gridZ && worldZ < zone.gridZ + zone.depth) {
+        return zone;
+      }
+    }
+    return null;
   }
 
   /** 구역 진입 시 orbit.target을 해당 구역의 cameraTarget으로 부드럽게 이동 */

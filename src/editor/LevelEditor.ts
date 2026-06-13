@@ -34,7 +34,10 @@ interface SwitchTarget {
 
 interface ZoneEntry {
   id:           string;
-  nodeIds:      string[];
+  gridX:        number;
+  gridZ:        number;
+  width:        number;
+  depth:        number;
   cameraTarget: [number, number, number];
 }
 
@@ -977,46 +980,83 @@ export class LevelEditor {
       this.zoneFormEl = document.createElement('div');
       this.zoneFormEl.className = 'editor-add-form';
 
+      // ID
       const idRow = document.createElement('div');
       idRow.className = 'editor-row';
-      idRow.innerHTML = `<label style="min-width:46px">ID:</label><input class="editor-input" id="zone-id" style="flex:1" placeholder="zone_1">`;
+      idRow.innerHTML = `<label style="min-width:36px;font-size:11px">ID:</label><input class="editor-input" id="zone-id" style="flex:1" placeholder="자동">`;
       this.zoneFormEl.appendChild(idRow);
 
+      // 위치 (gridX, gridZ)
+      const posRow = document.createElement('div');
+      posRow.className = 'editor-row';
+      posRow.style.gap = '4px';
+      posRow.innerHTML = `
+        <label style="min-width:36px;font-size:11px">위치:</label>
+        <label style="font-size:10px">X</label><input class="editor-input" id="zone-gx" type="number" step="1" value="0" style="width:44px">
+        <label style="font-size:10px">Z</label><input class="editor-input" id="zone-gz" type="number" step="1" value="0" style="width:44px">
+      `;
+      const pickOriginBtn = document.createElement('button');
+      pickOriginBtn.className = 'editor-btn';
+      pickOriginBtn.textContent = '↗';
+      pickOriginBtn.title = '현재 카메라 위치를 구역 좌상단으로';
+      pickOriginBtn.addEventListener('click', () => {
+        const t = this.orbit.target;
+        (this.zoneFormEl.querySelector('#zone-gx') as HTMLInputElement).value = String(Math.round(t.x - 5));
+        (this.zoneFormEl.querySelector('#zone-gz') as HTMLInputElement).value = String(Math.round(t.z - 5));
+      });
+      posRow.appendChild(pickOriginBtn);
+      this.zoneFormEl.appendChild(posRow);
+
+      // 크기 (width × depth), 기본 10×10
+      const sizeRow = document.createElement('div');
+      sizeRow.className = 'editor-row';
+      sizeRow.style.gap = '4px';
+      sizeRow.innerHTML = `
+        <label style="min-width:36px;font-size:11px">크기:</label>
+        <label style="font-size:10px">W</label><input class="editor-input" id="zone-w" type="number" step="1" min="1" value="10" style="width:44px">
+        <label style="font-size:10px">D</label><input class="editor-input" id="zone-d" type="number" step="1" min="1" value="10" style="width:44px">
+        <span style="font-size:10px;color:#888">블록</span>
+      `;
+      this.zoneFormEl.appendChild(sizeRow);
+
+      // 카메라 타깃
       const txRow = document.createElement('div');
       txRow.className = 'editor-row';
       txRow.style.gap = '4px';
       txRow.innerHTML = `
-        <label style="min-width:46px;font-size:11px">Target:</label>
+        <label style="min-width:36px;font-size:11px">Cam:</label>
         <label style="font-size:10px">X</label><input class="editor-input" id="zone-tx" type="number" step="0.5" value="0" style="width:44px">
         <label style="font-size:10px">Y</label><input class="editor-input" id="zone-ty" type="number" step="0.5" value="0" style="width:44px">
         <label style="font-size:10px">Z</label><input class="editor-input" id="zone-tz" type="number" step="0.5" value="0" style="width:44px">
       `;
-      this.zoneFormEl.appendChild(txRow);
-
       const captureBtn = document.createElement('button');
       captureBtn.className = 'editor-btn';
-      captureBtn.textContent = '📷 Capture Current Target';
-      captureBtn.style.cssText = 'width:100%;margin-top:4px;font-size:11px;';
+      captureBtn.textContent = '📷';
+      captureBtn.title = '현재 orbit target 캡처';
       captureBtn.addEventListener('click', () => {
         const t = this.orbit.target;
-        (this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value = t.x.toFixed(2);
-        (this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value = t.y.toFixed(2);
-        (this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value = t.z.toFixed(2);
+        (this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value = t.x.toFixed(1);
+        (this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value = t.y.toFixed(1);
+        (this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value = t.z.toFixed(1);
       });
-      this.zoneFormEl.appendChild(captureBtn);
+      txRow.appendChild(captureBtn);
+      this.zoneFormEl.appendChild(txRow);
 
       const zoneAddBtn = document.createElement('button');
       zoneAddBtn.className = 'editor-btn primary';
       zoneAddBtn.textContent = 'Add Zone';
-      zoneAddBtn.style.cssText = 'margin-top:6px;';
+      zoneAddBtn.style.cssText = 'margin-top:6px;width:100%;';
       zoneAddBtn.addEventListener('click', () => {
         const idInput = this.zoneFormEl.querySelector('#zone-id') as HTMLInputElement;
-        const rawId   = idInput.value.trim();
-        const zoneId  = rawId || `zone_${++this.zoneCounter}`;
+        const zoneId  = idInput.value.trim() || `zone_${++this.zoneCounter}`;
+        const gx = parseInt((this.zoneFormEl.querySelector('#zone-gx') as HTMLInputElement).value) || 0;
+        const gz = parseInt((this.zoneFormEl.querySelector('#zone-gz') as HTMLInputElement).value) || 0;
+        const w  = Math.max(1, parseInt((this.zoneFormEl.querySelector('#zone-w') as HTMLInputElement).value) || 10);
+        const d  = Math.max(1, parseInt((this.zoneFormEl.querySelector('#zone-d') as HTMLInputElement).value) || 10);
         const tx = parseFloat((this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value) || 0;
         const ty = parseFloat((this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value) || 0;
         const tz = parseFloat((this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value) || 0;
-        this.zones.push({ id: zoneId, nodeIds: [], cameraTarget: [tx, ty, tz] });
+        this.zones.push({ id: zoneId, gridX: gx, gridZ: gz, width: w, depth: d, cameraTarget: [tx, ty, tz] });
         idInput.value = '';
         this.rebuildZoneList();
         this.zoneFormEl.classList.remove('open');
@@ -1024,10 +1064,7 @@ export class LevelEditor {
       this.zoneFormEl.appendChild(zoneAddBtn);
       sec.appendChild(this.zoneFormEl);
 
-      addBtn.addEventListener('click', () => {
-        this.zoneFormEl.classList.toggle('open');
-        if (!this.zoneFormEl.classList.contains('open')) this.cancelPick();
-      });
+      addBtn.addEventListener('click', () => this.zoneFormEl.classList.toggle('open'));
     }));
 
     // Camera
@@ -1453,33 +1490,29 @@ export class LevelEditor {
     }
     this.zoneOverlays.clear();
 
-    // 구역별로 바닥 색깔 타일 재생성
+    // 구역별로 그리드 바닥을 덮는 직사각형 평면 1장씩 생성
     this.zones.forEach((zone, zi) => {
       const color = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
-      for (const nodeId of zone.nodeIds) {
-        const block = this.blocks.find(b => b.id === nodeId);
-        if (!block) continue;
-        // 1×1 타일을 블록이 위치한 floor 바닥면에 깔기
-        const geo = new THREE.PlaneGeometry(1.0, 1.0);
-        const mat = new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.60,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
-        const overlay = new THREE.Mesh(geo, mat);
-        overlay.rotation.x = -Math.PI / 2;
-        // 블록 바닥면 y = floorY(block.floor) + 아주 살짝 위
-        overlay.position.set(
-          block.gridX + 0.5,
-          floorY(block.floor) + 0.01,
-          block.gridZ + 0.5,
-        );
-        overlay.renderOrder = 1;
-        this.scene.add(overlay);
-        this.zoneOverlays.set(nodeId, overlay);
-      }
+      const geo = new THREE.PlaneGeometry(zone.width, zone.depth);
+      const mat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const overlay = new THREE.Mesh(geo, mat);
+      overlay.rotation.x = -Math.PI / 2;
+      // 구역 중심 = (gridX + width/2, 0.005, gridZ + depth/2)
+      overlay.position.set(
+        zone.gridX + zone.width / 2,
+        0.005,
+        zone.gridZ + zone.depth / 2,
+      );
+      overlay.renderOrder = 1;
+      this.scene.add(overlay);
+      // key를 zone.id로 저장 (1구역 = 1오버레이)
+      this.zoneOverlays.set(zone.id, overlay);
     });
   }
 
@@ -1490,20 +1523,19 @@ export class LevelEditor {
       empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
       empty.textContent = '구역 없음';
       this.zoneListEl.appendChild(empty);
+      this.updateZoneOverlays();
       return;
     }
     this.zones.forEach((zone, zi) => {
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'border:1px solid #ddd;border-radius:4px;padding:6px;margin-bottom:6px;';
-
-      // 헤더: 색상 뱃지 + ID + 삭제 버튼
-      const zoneColor = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
+      const zoneColor    = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
       const zoneColorCss = '#' + zoneColor.toString(16).padStart(6, '0');
-      // 존 카드 왼쪽 테두리를 구역 색으로
-      wrap.style.borderLeft = `4px solid ${zoneColorCss}`;
 
+      const wrap = document.createElement('div');
+      wrap.style.cssText = `border:1px solid #ddd;border-left:4px solid ${zoneColorCss};border-radius:4px;padding:6px;margin-bottom:6px;`;
+
+      // 헤더: 색상 뱃지 + ID + 삭제
       const header = document.createElement('div');
-      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
+      header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;';
       const title = document.createElement('strong');
       title.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;';
       const badge = document.createElement('span');
@@ -1514,24 +1546,42 @@ export class LevelEditor {
       delBtn.className = 'editor-btn';
       delBtn.textContent = '✕';
       delBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
-      delBtn.addEventListener('click', () => {
-        this.zones.splice(zi, 1);
-        this.rebuildZoneList();
-      });
+      delBtn.addEventListener('click', () => { this.zones.splice(zi, 1); this.rebuildZoneList(); });
       header.appendChild(title);
       header.appendChild(delBtn);
       wrap.appendChild(header);
 
-      // Camera target
-      const targetRow = document.createElement('div');
-      targetRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:11px;';
-      targetRow.innerHTML = `
-        <label style="min-width:44px;color:#666">Target:</label>
+      // 위치/크기 편집
+      const boundsRow = document.createElement('div');
+      boundsRow.style.cssText = 'display:flex;gap:4px;align-items:center;font-size:11px;margin-bottom:4px;flex-wrap:wrap;';
+      boundsRow.innerHTML = `
+        <label style="color:#666;min-width:28px">위치:</label>
+        <label>X</label><input class="editor-input" type="number" step="1" value="${zone.gridX}" style="width:40px" data-zi="${zi}" data-field="gridX">
+        <label>Z</label><input class="editor-input" type="number" step="1" value="${zone.gridZ}" style="width:40px" data-zi="${zi}" data-field="gridZ">
+        <label style="margin-left:4px">W</label><input class="editor-input" type="number" step="1" min="1" value="${zone.width}" style="width:40px" data-zi="${zi}" data-field="width">
+        <label>D</label><input class="editor-input" type="number" step="1" min="1" value="${zone.depth}" style="width:40px" data-zi="${zi}" data-field="depth">
+      `;
+      boundsRow.querySelectorAll('input[data-field]').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const inp   = e.target as HTMLInputElement;
+          const idx   = parseInt(inp.dataset.zi!);
+          const field = inp.dataset.field as keyof ZoneEntry;
+          (this.zones[idx] as never as Record<string, number>)[field] = parseInt(inp.value) || 0;
+          this.updateZoneOverlays();
+        });
+      });
+      wrap.appendChild(boundsRow);
+
+      // 카메라 타깃 편집
+      const camRow = document.createElement('div');
+      camRow.style.cssText = 'display:flex;gap:4px;align-items:center;font-size:11px;margin-bottom:2px;';
+      camRow.innerHTML = `
+        <label style="color:#666;min-width:28px">Cam:</label>
         <label>X</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[0]}" style="width:44px" data-zi="${zi}" data-axis="0">
         <label>Y</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[1]}" style="width:44px" data-zi="${zi}" data-axis="1">
         <label>Z</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[2]}" style="width:44px" data-zi="${zi}" data-axis="2">
       `;
-      targetRow.querySelectorAll('input[data-axis]').forEach(el => {
+      camRow.querySelectorAll('input[data-axis]').forEach(el => {
         el.addEventListener('input', (e) => {
           const inp  = e.target as HTMLInputElement;
           const axis = parseInt(inp.dataset.axis!);
@@ -1543,61 +1593,17 @@ export class LevelEditor {
       capBtn.className = 'editor-btn';
       capBtn.textContent = '📷';
       capBtn.title = '현재 orbit target 캡처';
-      capBtn.style.cssText = 'font-size:11px;padding:1px 5px;';
       capBtn.addEventListener('click', () => {
         const t = this.orbit.target;
-        zone.cameraTarget = [
-          parseFloat(t.x.toFixed(2)),
-          parseFloat(t.y.toFixed(2)),
-          parseFloat(t.z.toFixed(2)),
-        ];
+        zone.cameraTarget = [+t.x.toFixed(1), +t.y.toFixed(1), +t.z.toFixed(1)];
         this.rebuildZoneList();
       });
-      targetRow.appendChild(capBtn);
-      wrap.appendChild(targetRow);
-
-      // Node list
-      const nodeWrap = document.createElement('div');
-      nodeWrap.style.cssText = 'margin-bottom:4px;';
-      const nodeTitle = document.createElement('div');
-      nodeTitle.style.cssText = 'font-size:11px;color:#555;margin-bottom:2px;';
-      nodeTitle.textContent = `블록 (${zone.nodeIds.length}개):`;
-      nodeWrap.appendChild(nodeTitle);
-      const nodeList = document.createElement('div');
-      nodeList.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;';
-      zone.nodeIds.forEach((nid, ni) => {
-        const tag = document.createElement('span');
-        tag.style.cssText = 'background:#e8f0fe;border-radius:3px;padding:1px 5px;font-size:10px;display:flex;align-items:center;gap:3px;cursor:default;';
-        tag.innerHTML = `${nid}<span style="cursor:pointer;color:#999;" data-ni="${ni}">×</span>`;
-        tag.querySelector('span')!.addEventListener('click', () => {
-          zone.nodeIds.splice(ni, 1);
-          this.rebuildZoneList();
-        });
-        nodeList.appendChild(tag);
-      });
-      nodeWrap.appendChild(nodeList);
-      wrap.appendChild(nodeWrap);
-
-      // Add node button
-      const pickRow = document.createElement('div');
-      pickRow.style.cssText = 'display:flex;gap:4px;';
-      const pickBtn = document.createElement('button');
-      pickBtn.className = 'editor-btn';
-      pickBtn.textContent = '+ 블록 추가';
-      pickBtn.style.cssText = 'flex:1;font-size:11px;';
-      pickBtn.addEventListener('click', () => {
-        this.startPick(b => {
-          if (!zone.nodeIds.includes(b.id)) zone.nodeIds.push(b.id);
-          this.rebuildZoneList();
-        });
-      });
-      pickRow.appendChild(pickBtn);
-      wrap.appendChild(pickRow);
+      camRow.appendChild(capBtn);
+      wrap.appendChild(camRow);
 
       this.zoneListEl.appendChild(wrap);
     });
 
-    // 오버레이 업데이트 (항상 리스트 재빌드 후 동기화)
     this.updateZoneOverlays();
   }
 
@@ -1741,11 +1747,7 @@ export class LevelEditor {
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
-    // 구역에서도 제거
-    for (const zone of this.zones) {
-      zone.nodeIds = zone.nodeIds.filter(id => id !== block.id);
-    }
-    this.rebuildZoneList();  // 오버레이도 동기화
+    // 구역은 격자 범위 기반이므로 별도 제거 불필요
     if (this.selectedBlock === block) this.selectedBlock = null;
     this.updateMarkers();
     this.updateSelectedPanel();
@@ -2112,7 +2114,7 @@ export class LevelEditor {
         elevationTolerance: c.elevationTol,
       })),
       zones: this.zones.length > 0
-        ? this.zones.map(z => ({ id: z.id, nodeIds: z.nodeIds, cameraTarget: z.cameraTarget }))
+        ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth, cameraTarget: z.cameraTarget }))
         : undefined,
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
@@ -2230,8 +2232,11 @@ export class LevelEditor {
 
     // Zones 복원
     this.zones = (data.zones ?? []).map(z => ({
-      id: z.id,
-      nodeIds: [...z.nodeIds],
+      id:           z.id,
+      gridX:        z.gridX,
+      gridZ:        z.gridZ,
+      width:        z.width,
+      depth:        z.depth,
       cameraTarget: [...z.cameraTarget] as [number, number, number],
     }));
     const maxZoneNum = this.zones
