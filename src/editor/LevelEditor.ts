@@ -172,6 +172,8 @@ export class LevelEditor {
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private spikeInput!: HTMLInputElement;
+  private spikeModeBtn!: HTMLButtonElement;
+  private spikeMode = false;
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
@@ -419,6 +421,21 @@ export class LevelEditor {
       }
       presetRow.appendChild(swatchWrap);
       sec.appendChild(presetRow);
+
+      // Spike mode toggle
+      const spikeModeRow = document.createElement('div');
+      spikeModeRow.className = 'editor-row';
+      this.spikeModeBtn = document.createElement('button');
+      this.spikeModeBtn.className = 'editor-btn';
+      this.spikeModeBtn.textContent = '🗡 Spike Mode: OFF';
+      this.spikeModeBtn.style.cssText = 'width:100%;text-align:left;';
+      this.spikeModeBtn.addEventListener('click', () => {
+        this.spikeMode = !this.spikeMode;
+        this.spikeModeBtn.textContent = `🗡 Spike Mode: ${this.spikeMode ? 'ON' : 'OFF'}`;
+        this.spikeModeBtn.classList.toggle('active', this.spikeMode);
+      });
+      spikeModeRow.appendChild(this.spikeModeBtn);
+      sec.appendChild(spikeModeRow);
     }));
 
     // Selected block
@@ -1706,9 +1723,10 @@ export class LevelEditor {
       gridZ,
       color: this.currentColor,
       walkable: true,
-      isSpike: false,
+      isSpike: this.spikeMode,
       mesh: blockInst.mesh,
     };
+    if (this.spikeMode) this._setSpikeIndicator(block, true);
     this.blocks.push(block);
     this.addLabel(id);
 
