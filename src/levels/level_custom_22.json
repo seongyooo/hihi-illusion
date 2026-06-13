@@ -1,0 +1,158 @@
+{
+  "id": "custom_stage_22",
+  "name": "Stage 22",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        4.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        5.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b003",
+      "position": [
+        6.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [
+        9.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b005",
+      "position": [
+        10.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b007",
+      "position": [
+        7.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true,
+      "isSpike": true
+    },
+    {
+      "id": "b008",
+      "position": [
+        8.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true,
+      "isSpike": true
+    },
+    {
+      "id": "b013",
+      "position": [
+        12.5,
+        1.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b014",
+      "position": [
+        13.5,
+        1.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [],
+  "illusionConnections": [],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b014"
+  },
+  "initialCamera": {
+    "azimuth": 45,
+    "polar": 33,
+    "distance": 14,
+    "targetY": 0
+  }
+}
