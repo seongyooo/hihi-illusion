@@ -690,8 +690,16 @@ export class GameManager {
   }
 
   private _startCameraFlyInThenTitle(data: LevelData): void {
-    const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
-    const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+    let cx: number;
+    let cz: number;
+    if (data.zones && data.zones.length > 0) {
+      const z0 = data.zones[0];
+      cx = z0.gridX + z0.width  / 2;
+      cz = z0.gridZ + z0.depth  / 2;
+    } else {
+      cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
+      cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+    }
 
     let finalPos: [number, number, number];
     let targetY = 0;
@@ -780,8 +788,17 @@ export class GameManager {
 
   /** initialCamera 설정 또는 기본값으로 인트로 카메라 플라이-인 실행 */
   private _startCameraFlyIn(data: LevelData): void {
-    const cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
-    const cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+    // zone이 있으면 첫 번째 zone의 중심을 기준으로, 없으면 블록 평균
+    let cx: number;
+    let cz: number;
+    if (data.zones && data.zones.length > 0) {
+      const z0 = data.zones[0];
+      cx = z0.gridX + z0.width  / 2;
+      cz = z0.gridZ + z0.depth  / 2;
+    } else {
+      cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
+      cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+    }
 
     let finalPos: [number, number, number];
     let targetY = 0;
