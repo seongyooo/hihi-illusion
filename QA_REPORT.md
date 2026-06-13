@@ -1930,4 +1930,105 @@ stars?: Array<{ nodeId: string }>;
 
 - 활성화: `|azimuth - activateAzimuth| < tolerance`
 - 비활성화: `|azimuth - activateAzimuth| > tolerance × 2`
+
+---
+
+## 미구현 기능 백로그 (2026-06-14)
+
+향후 구현을 위한 기획 메모. 우선순위 순으로 정렬.
+
+---
+
+### 🔴 BACKLOG-01 — 180도 중력 반전 블록
+
+**개요**
+특정 블록 위에 올라가면 캐릭터가 천장에 붙어 걷는 것처럼 보이는 블록.  
+에셔 계단 착시 컨셉과 가장 잘 어울리는 요소.
+
+**구현 방향**
+- `BlockData`에 `gravityFlip?: true` 플래그 추가
+- `onArrival`에서 감지 → 전환 연출 후 `isFlipped` 상태 토글
+- 카메라: `camera.up`을 `(0, -1, 0)`으로 GSAP 트윈 (약 0.6s)
+- 캐릭터 위치: 블록 `topY` 기준 → `bottomY - characterHeight` 기준으로 전환
+- OrbitControls: `up` 변경 시 조작이 뒤집히므로, 뒤집힌 상태에서 `rotateSpeed`에 `-1` 곱하기 필요
+
+**주요 리스크**
+- OrbitControls가 `camera.up` 변경에 민감 → 전환 중 일시적으로 수동 제어 필요
+- 90도 회전(옆 벽 걷기)보다는 쉽지만, PathGraph Y 기준 위치 계산 수정 필요
+- 반전 구역과 일반 구역 경계 블록 처리 로직 필요
+
+**에디터 지원**
+- `gravityFlip` 체크박스 (SELECTED BLOCK 패널)
+- 에디터 뷰에서 뒤집힌 블록 시각 표시 (파란색 화살표 등)
+
+---
+
+### 🟠 BACKLOG-02 — 적(Enemy) 시스템
+
+**개요**
+경로 위를 왕복하는 적 캐릭터. 착시를 활용해 적을 다른 경로로 보낼 수 있음.  
+착시 퍼즐 컨셉과 시너지가 가장 강한 요소.
+
+**구현 방향**
+- `EnemyManager` 클래스 신규 작성
+  - `enemies: Enemy[]` 배열 관리
+  - 각 Enemy는 `nodeA ↔ nodeB` 사이를 왕복 (PathGraph 기반)
+  - `update(dt)` 메서드로 매 프레임 이동 처리
+- `LevelData`에 `enemies?: Array<{ nodeA: string; nodeB: string; speed?: number }>` 추가
+- 플레이어와 같은 노드에 도달하면 → `_respawn()` 호출 (가시 블록과 동일 처리)
+- 착시 연동: `IllusionManager` 활성화 시 적의 PathGraph 연결도 변경 → 적이 착시 경로로 이동
+
+**주요 리스크**
+- 적 이동에 PathGraph를 재사용하면 graph.refresh() 타이밍 충돌 가능
+- 착시로 적을 보내는 로직은 IllusionManager와 EnemyManager 간 이벤트 연동 필요
+- 적 메시 디자인 (Character 재사용 vs 별도 모델)
+
+**에디터 지원**
+- ENEMIES 섹션 추가 (nodeA, nodeB, speed 입력)
+- 에디터 뷰에서 왕복 경로를 화살표로 시각화
+
+---
+
+### 🟡 BACKLOG-03 — 움직이는 블록 (Patrol Block)
+
+**개요**
+Y축 또는 X/Z축 방향으로 자동 왕복하는 블록.  
+플레이어가 타이밍에 맞춰 올라타는 플랫포머 요소.
+
+**구현 방향**
+- 기존 `ElevatorManager`를 참고해 `PatrolBlock` 구현
+- `LevelData.patrols?: Array<{ nodeId, axis: 'x'|'y'|'z', distance, duration }>` 추가
+- GSAP 트윈으로 왕복 애니메이션 (yoyo: true)
+- 블록 이동 시 위에 올라탄 캐릭터도 함께 이동 (SwitchManager의 `isPlayerOnMovingBlock` 패턴 참고)
+
+**주요 리스크**
+- 캐릭터가 블록과 함께 이동할 때 PathGraph 노드 위치 동기화 필요
+- 다른 블록/착시와 조합 시 충돌 케이스 증가
+
+---
+
+### 🟢 BACKLOG-04 — 상자 밀기 (Push Box)
+
+**개요**
+블록 위에 상자가 있고, 플레이어가 밀어서 이동시킬 수 있는 퍼즐 요소.  
+스위치 위에 상자를 밀어놓는 등 퍼즐 조합 가능.
+
+**구현 방향**
+- `BoxEntity` 클래스: 현재 노드 위치, 메시 관리
+- 플레이어가 상자가 있는 노드로 이동 시도 → 상자가 반대편 노드로 밀려남
+- `CharacterController.moveTo()` 에서 목적 노드에 상자가 있으면 push 시도
+- 상자가 밀릴 수 없는 위치(엣지, 다른 상자)면 이동 차단
+
+**주요 리스크**
+- PathGraph와 상자 위치의 실시간 동기화 복잡도 높음
+- 착시 + 상자 조합 시 예외 케이스 다수 예상
+
+---
+
+### ℹ️ 구현 시 공통 고려사항
+
+- 모든 신규 메커닉은 **에디터(LevelEditor)에도 함께 추가** 필요
+- `LevelData` 인터페이스 변경 시 기존 JSON 하위 호환성 유지 (optional 필드로 추가)
+- 신규 매니저 클래스는 `GameManager.unloadCurrent()`에서 반드시 dispose 처리
+- 모바일 성능 고려: 적/패트롤 블록 개수 제한 또는 프레임 스킵 적용 검토
 - 경계에서 경로가 깜빡이는 현상 방지
