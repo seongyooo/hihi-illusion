@@ -94,6 +94,9 @@ export class GameManager {
   private currentZoneId:    string | null = null;
   private zoneCameraTween:  gsap.core.Tween | null = null;
 
+  // ── Respawn ───────────────────────────────────────────────────────────
+  private startNodeId = '';
+
   constructor(container: HTMLElement) {
     this.debug      = new URLSearchParams(location.search).has('debug');
     this.renderer   = new Renderer(container);
@@ -485,7 +488,8 @@ export class GameManager {
       this.character.setBodyColor(COLOR_DEFAULTS.charBody);
       this.character.setHeadColor(COLOR_DEFAULTS.charHead);
     }
-    const startNode = this.graph.getNode(data.character.startNodeId);
+    this.startNodeId  = data.character.startNodeId;
+    const startNode   = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
     // Zone setup — 구역 목록 저장, 시작 위치 기반 초기 구역 결정
@@ -508,6 +512,12 @@ export class GameManager {
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
         },
         onArrival: (nodeId) => {
+          // 가시 블록 — 즉시 리스폰
+          if (this.level!.getSpikeNodeIds().has(nodeId)) {
+            this._respawn();
+            return;
+          }
+
           // 구역 전환 체크 — 새 구역 진입 시 카메라 타깃 이동
           const arrivedNode = this.graph?.getNode(nodeId);
           if (arrivedNode) {
@@ -1162,6 +1172,17 @@ export class GameManager {
       repeat: -1,
       ease: 'sine.inOut',
     });
+  }
+
+  /** 가시 블록 착지 시 시작 지점으로 리스폰 */
+  private _respawn(): void {
+    const startNode = this.graph?.getNode(this.startNodeId);
+    if (!startNode || !this.controller || !this.character) return;
+    this.particles.burst(this.character.mesh.position.clone(), 0xFF3322, 18, 1.5, 0.8);
+    this.audio.playTeleport();
+    this.controller.stop();
+    this.controller.teleportTo(startNode);
+    this.cameraCtrl.pulse(0.35);
   }
 
   /** 월드 좌표 (x, z)가 속한 구역 반환. 없으면 null */

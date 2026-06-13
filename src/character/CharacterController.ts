@@ -40,11 +40,8 @@ export class CharacterController {
   }
 
   moveTo(target: PathNode): void {
-    if (this.isMoving) {
-      this.pendingTarget = target;
-      return;
-    }
     if (target === this.currentNode) return;
+    if (this.isMoving) this.stop(); // 이동 중 새 목적지 → 현재 경로 취소 후 즉시 리다이렉트
     this._startMove(target);
   }
 

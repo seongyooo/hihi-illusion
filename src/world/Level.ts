@@ -3,6 +3,32 @@ import { Block } from './Block';
 import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
 
+// ---------- 가시 메시 생성 ----------
+export function buildSpikesMesh(bd: BlockData): THREE.Group {
+  const group = new THREE.Group();
+  const mat   = new THREE.MeshLambertMaterial({ color: 0xCC2020 });
+  const [bx, by, bz] = bd.position;
+  const [bw, bh, bdp] = bd.size;
+  const topY  = by + bh / 2;
+  const spikeH = 0.22;
+  const spikeR = 0.065;
+  const cols  = Math.max(1, Math.round(bw));
+  const rows  = Math.max(1, Math.round(bdp));
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const geo  = new THREE.ConeGeometry(spikeR, spikeH, 5);
+      const mesh = new THREE.Mesh(geo, mat.clone());
+      mesh.position.set(
+        bx - bw / 2 + (c + 0.5) * (bw / cols),
+        topY + spikeH / 2,
+        bz - bdp / 2 + (r + 0.5) * (bdp / rows),
+      );
+      group.add(mesh);
+    }
+  }
+  return group;
+}
+
 // ---------- 사다리 메시 생성 ----------
 export function buildLadderMesh(a: BlockData, b: BlockData): THREE.Group {
   const ay = a.position[1] + a.size[1] / 2;
@@ -60,6 +86,7 @@ export interface BlockData {
   size: [number, number, number];
   walkable: boolean;
   variant?: string;
+  isSpike?: boolean;
 }
 
 export interface RotatingSectionData {
@@ -129,6 +156,7 @@ export class Level {
   private group: THREE.Group = new THREE.Group();
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
+  private spikeNodeIds: Set<string> = new Set();
   private scene: THREE.Scene;
 
   constructor(scene: THREE.Scene) {
@@ -140,6 +168,7 @@ export class Level {
     this.sections = [];
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
+    this.spikeNodeIds.clear();
     this.scene.remove(this.group);
     this.group = new THREE.Group();
 
@@ -167,6 +196,10 @@ export class Level {
       this.blocks.set(bd.id, block);
       this.group.add(block.mesh);
       if (bd.walkable) this.walkableMeshes.push(block.mesh);
+      if (bd.isSpike) {
+        this.spikeNodeIds.add(bd.id);
+        this.group.add(buildSpikesMesh(bd));
+      }
     }
 
     // 사다리 메시
@@ -198,6 +231,7 @@ export class Level {
   getGroup(): THREE.Group               { return this.group; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
+  getSpikeNodeIds(): Set<string>                     { return this.spikeNodeIds; }
 
   /** Apply a global hex color to all blocks, or restore each block's original JSON color. */
   recolorAllBlocks(hexOverride: number | null): void {
@@ -224,8 +258,9 @@ export class Level {
     });
     this.scene.remove(this.group);
     this.blocks.clear();
-    this.sections     = [];
+    this.sections       = [];
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
+    this.spikeNodeIds.clear();
   }
 }

@@ -15,6 +15,7 @@ interface EditorBlock {
   gridZ: number;
   color: string;
   walkable: boolean;
+  isSpike: boolean;
   mesh: THREE.Group;  // Block.mesh (THREE.Group with per-face materials)
 }
 
@@ -170,6 +171,7 @@ export class LevelEditor {
   private camPreviewEl!:  HTMLElement;
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
+  private spikeInput!: HTMLInputElement;
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
@@ -454,6 +456,23 @@ export class LevelEditor {
       walkRow.appendChild(walkLabel);
       walkRow.appendChild(this.walkableInput);
       sec.appendChild(walkRow);
+
+      const spikeRow = document.createElement('div');
+      spikeRow.className = 'editor-row';
+      const spikeLabel = document.createElement('label');
+      spikeLabel.textContent = 'Spike:';
+      this.spikeInput = document.createElement('input');
+      this.spikeInput.type = 'checkbox';
+      this.spikeInput.checked = false;
+      this.spikeInput.addEventListener('change', () => {
+        if (this.selectedBlock) {
+          this.selectedBlock.isSpike = this.spikeInput.checked;
+          this._setSpikeIndicator(this.selectedBlock, this.spikeInput.checked);
+        }
+      });
+      spikeRow.appendChild(spikeLabel);
+      spikeRow.appendChild(this.spikeInput);
+      sec.appendChild(spikeRow);
 
       const startBtn = document.createElement('button');
       startBtn.className = 'editor-btn';
@@ -1454,6 +1473,24 @@ export class LevelEditor {
     });
   }
 
+  /** 에디터 블록 메시에 가시 표시 콘을 추가하거나 제거한다 */
+  private _setSpikeIndicator(block: EditorBlock, on: boolean): void {
+    const existing = block.mesh.children.find(c => c.userData.isSpikeIndicator);
+    if (existing) {
+      block.mesh.remove(existing);
+      existing.traverse(c => {
+        if (c instanceof THREE.Mesh) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
+      });
+    }
+    if (!on) return;
+    const mat = new THREE.MeshBasicMaterial({ color: 0xFF2200 });
+    const geo = new THREE.ConeGeometry(0.18, 0.28, 4);
+    const cone = new THREE.Mesh(geo, mat);
+    cone.position.y = 0.25 + 0.14; // 블록 상단(+0.25) + 콘 반높이
+    cone.userData.isSpikeIndicator = true;
+    block.mesh.add(cone);
+  }
+
   private updateZoneOverlays(): void {
     // 기존 오버레이 전부 제거
     for (const mesh of this.zoneOverlays.values()) {
@@ -1607,6 +1644,7 @@ export class LevelEditor {
       this.selFloorEl.textContent = String(b.floor);
       this.colorInput.value = b.color;
       this.walkableInput.checked = b.walkable;
+      this.spikeInput.checked    = b.isSpike;
     } else {
       this.selIdEl.textContent = '—';
       this.selFloorEl.textContent = '—';
@@ -1668,6 +1706,7 @@ export class LevelEditor {
       gridZ,
       color: this.currentColor,
       walkable: true,
+      isSpike: false,
       mesh: blockInst.mesh,
     };
     this.blocks.push(block);
@@ -2031,6 +2070,7 @@ export class LevelEditor {
         color: b.color,
         size: [1, 0.5, 1] as [number, number, number],
         walkable: b.walkable,
+        ...(b.isSpike ? { isSpike: true } : {}),
       })),
       ladders: this.ladderConns,
       conditionalLadders: (() => {
@@ -2141,8 +2181,10 @@ export class LevelEditor {
         gridZ,
         color: bd.color,
         walkable: bd.walkable,
+        isSpike: !!bd.isSpike,
         mesh: blockInst.mesh,
       };
+      if (bd.isSpike) this._setSpikeIndicator(block, true);
       this.blocks.push(block);
 
       // Track counter for new IDs
