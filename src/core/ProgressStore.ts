@@ -1,5 +1,6 @@
 const KEY_TUTORIAL = 'hihi_tutorial_done';
 const KEY_UNLOCKED = 'hihi_unlocked_stages';
+const KEY_DEV_MODE = 'hihi_dev_mode';
 
 export class ProgressStore {
   static isTutorialDone(): boolean {
@@ -38,5 +39,13 @@ export class ProgressStore {
     for (let i = 1; i <= totalStages; i++) all.push(i);
     localStorage.setItem(KEY_TUTORIAL, '1');
     localStorage.setItem(KEY_UNLOCKED, JSON.stringify(all));
+  }
+
+  static isDeveloperMode(): boolean {
+    return !!localStorage.getItem(KEY_DEV_MODE);
+  }
+
+  static setDeveloperMode(): void {
+    localStorage.setItem(KEY_DEV_MODE, '1');
   }
 }

@@ -698,6 +698,7 @@ export class SettingsScreen {
     this.tapCount = 0;
 
     ProgressStore.unlockAll(TOTAL_STAGES);
+    ProgressStore.setDeveloperMode();
 
     labelEl.textContent = '🔓 ALL UNLOCKED';
     labelEl.style.color = '#FFD700';

@@ -272,6 +272,13 @@ export class GameManager {
       this.editor.show();
     };
 
+    // 로비: 내장 스테이지 수정 (개발자 모드)
+    this.editorLobby.onEditBuiltin = async (stageNum) => {
+      this.editorLobby.hide();
+      await this.editor.loadBuiltinStage(stageNum);
+      this.editor.show();
+    };
+
     // 로비: 커스텀 스테이지 플레이
     this.editorLobby.onPlay = (stageNum) => {
       const saved = CustomLevelStore.getByStage(stageNum);
