@@ -32,4 +32,11 @@ export class ProgressStore {
   static isUnlocked(stageNum: number): boolean {
     return ProgressStore.getUnlockedStages().has(stageNum);
   }
+
+  static unlockAll(totalStages: number): void {
+    const all: number[] = [];
+    for (let i = 1; i <= totalStages; i++) all.push(i);
+    localStorage.setItem(KEY_TUTORIAL, '1');
+    localStorage.setItem(KEY_UNLOCKED, JSON.stringify(all));
+  }
 }
