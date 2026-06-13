@@ -33,12 +33,11 @@ interface SwitchTarget {
 }
 
 interface ZoneEntry {
-  id:           string;
-  gridX:        number;
-  gridZ:        number;
-  width:        number;
-  depth:        number;
-  cameraTarget: [number, number, number];
+  id:    string;
+  gridX: number;
+  gridZ: number;
+  width: number;
+  depth: number;
 }
 
 interface SwitchConn {
@@ -1019,29 +1018,6 @@ export class LevelEditor {
       `;
       this.zoneFormEl.appendChild(sizeRow);
 
-      // 카메라 타깃
-      const txRow = document.createElement('div');
-      txRow.className = 'editor-row';
-      txRow.style.gap = '4px';
-      txRow.innerHTML = `
-        <label style="min-width:36px;font-size:11px">Cam:</label>
-        <label style="font-size:10px">X</label><input class="editor-input" id="zone-tx" type="number" step="0.5" value="0" style="width:44px">
-        <label style="font-size:10px">Y</label><input class="editor-input" id="zone-ty" type="number" step="0.5" value="0" style="width:44px">
-        <label style="font-size:10px">Z</label><input class="editor-input" id="zone-tz" type="number" step="0.5" value="0" style="width:44px">
-      `;
-      const captureBtn = document.createElement('button');
-      captureBtn.className = 'editor-btn';
-      captureBtn.textContent = '📷';
-      captureBtn.title = '현재 orbit target 캡처';
-      captureBtn.addEventListener('click', () => {
-        const t = this.orbit.target;
-        (this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value = t.x.toFixed(1);
-        (this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value = t.y.toFixed(1);
-        (this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value = t.z.toFixed(1);
-      });
-      txRow.appendChild(captureBtn);
-      this.zoneFormEl.appendChild(txRow);
-
       const zoneAddBtn = document.createElement('button');
       zoneAddBtn.className = 'editor-btn primary';
       zoneAddBtn.textContent = 'Add Zone';
@@ -1053,10 +1029,7 @@ export class LevelEditor {
         const gz = parseInt((this.zoneFormEl.querySelector('#zone-gz') as HTMLInputElement).value) || 0;
         const w  = Math.max(1, parseInt((this.zoneFormEl.querySelector('#zone-w') as HTMLInputElement).value) || 10);
         const d  = Math.max(1, parseInt((this.zoneFormEl.querySelector('#zone-d') as HTMLInputElement).value) || 10);
-        const tx = parseFloat((this.zoneFormEl.querySelector('#zone-tx') as HTMLInputElement).value) || 0;
-        const ty = parseFloat((this.zoneFormEl.querySelector('#zone-ty') as HTMLInputElement).value) || 0;
-        const tz = parseFloat((this.zoneFormEl.querySelector('#zone-tz') as HTMLInputElement).value) || 0;
-        this.zones.push({ id: zoneId, gridX: gx, gridZ: gz, width: w, depth: d, cameraTarget: [tx, ty, tz] });
+        this.zones.push({ id: zoneId, gridX: gx, gridZ: gz, width: w, depth: d });
         idInput.value = '';
         this.rebuildZoneList();
         this.zoneFormEl.classList.remove('open');
@@ -1572,34 +1545,12 @@ export class LevelEditor {
       });
       wrap.appendChild(boundsRow);
 
-      // 카메라 타깃 편집
-      const camRow = document.createElement('div');
-      camRow.style.cssText = 'display:flex;gap:4px;align-items:center;font-size:11px;margin-bottom:2px;';
-      camRow.innerHTML = `
-        <label style="color:#666;min-width:28px">Cam:</label>
-        <label>X</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[0]}" style="width:44px" data-zi="${zi}" data-axis="0">
-        <label>Y</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[1]}" style="width:44px" data-zi="${zi}" data-axis="1">
-        <label>Z</label><input class="editor-input" type="number" step="0.5" value="${zone.cameraTarget[2]}" style="width:44px" data-zi="${zi}" data-axis="2">
-      `;
-      camRow.querySelectorAll('input[data-axis]').forEach(el => {
-        el.addEventListener('input', (e) => {
-          const inp  = e.target as HTMLInputElement;
-          const axis = parseInt(inp.dataset.axis!);
-          const idx  = parseInt(inp.dataset.zi!);
-          this.zones[idx].cameraTarget[axis] = parseFloat(inp.value) || 0;
-        });
-      });
-      const capBtn = document.createElement('button');
-      capBtn.className = 'editor-btn';
-      capBtn.textContent = '📷';
-      capBtn.title = '현재 orbit target 캡처';
-      capBtn.addEventListener('click', () => {
-        const t = this.orbit.target;
-        zone.cameraTarget = [+t.x.toFixed(1), +t.y.toFixed(1), +t.z.toFixed(1)];
-        this.rebuildZoneList();
-      });
-      camRow.appendChild(capBtn);
-      wrap.appendChild(camRow);
+      const autoLabel = document.createElement('div');
+      autoLabel.style.cssText = 'font-size:10px;color:#888;margin-bottom:2px;';
+      const cx = (zone.gridX + zone.width  / 2).toFixed(1);
+      const cz = (zone.gridZ + zone.depth  / 2).toFixed(1);
+      autoLabel.textContent = `Cam target: (${cx}, 0, ${cz}) — 자동`;
+      wrap.appendChild(autoLabel);
 
       this.zoneListEl.appendChild(wrap);
     });
@@ -2114,7 +2065,7 @@ export class LevelEditor {
         elevationTolerance: c.elevationTol,
       })),
       zones: this.zones.length > 0
-        ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth, cameraTarget: z.cameraTarget }))
+        ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth }))
         : undefined,
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
@@ -2232,12 +2183,11 @@ export class LevelEditor {
 
     // Zones 복원
     this.zones = (data.zones ?? []).map(z => ({
-      id:           z.id,
-      gridX:        z.gridX,
-      gridZ:        z.gridZ,
-      width:        z.width,
-      depth:        z.depth,
-      cameraTarget: [...z.cameraTarget] as [number, number, number],
+      id:    z.id,
+      gridX: z.gridX,
+      gridZ: z.gridZ,
+      width: z.width,
+      depth: z.depth,
     }));
     const maxZoneNum = this.zones
       .map(z => { const m = z.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })

@@ -70,11 +70,10 @@ export interface RotatingSectionData {
 
 export interface ZoneDef {
   id: string;
-  gridX: number;                           // 구역 좌상단 X (그리드 좌표)
-  gridZ: number;                           // 구역 좌상단 Z (그리드 좌표)
-  width: number;                           // X 방향 칸 수
-  depth: number;                           // Z 방향 칸 수
-  cameraTarget: [number, number, number];  // orbit.target x, y, z
+  gridX: number;   // 구역 좌상단 X (그리드 좌표)
+  gridZ: number;   // 구역 좌상단 Z (그리드 좌표)
+  width: number;   // X 방향 칸 수
+  depth: number;   // Z 방향 칸 수
 }
 
 export interface LevelData {

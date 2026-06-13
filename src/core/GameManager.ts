@@ -1158,9 +1158,11 @@ export class GameManager {
     return null;
   }
 
-  /** 구역 진입 시 orbit.target을 해당 구역의 cameraTarget으로 부드럽게 이동 */
+  /** 구역 진입 시 orbit.target을 해당 구역의 중심으로 부드럽게 이동 */
   private _onZoneEnter(zone: ZoneDef): void {
-    const [tx, ty, tz] = zone.cameraTarget;
+    const tx = zone.gridX + zone.width / 2;
+    const ty = 0;
+    const tz = zone.gridZ + zone.depth / 2;
     if (this.zoneCameraTween) this.zoneCameraTween.kill();
     this.zoneCameraTween = gsap.to(this.orbit.target, {
       x: tx, y: ty, z: tz,
