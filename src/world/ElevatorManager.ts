@@ -23,6 +23,7 @@ interface ElevatorState {
 export class ElevatorManager {
   private states: ElevatorState[] = [];
   private scene: THREE.Scene;
+  private lastAutoRefresh = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -53,13 +54,19 @@ export class ElevatorManager {
     }
   }
 
-  /** 매 프레임 graph.refresh() — auto 모드 전용 (animate loop에서 호출) */
+  /** auto 모드 이동 중 graph.refresh() — 50ms 스로틀로 과도한 호출 방지 */
   update(graph: PathGraph): void {
     let needRefresh = false;
     for (const state of this.states) {
       if (state.def.mode === 'auto' && state.moving) needRefresh = true;
     }
-    if (needRefresh) graph.refresh();
+    if (needRefresh) {
+      const now = performance.now();
+      if (now - this.lastAutoRefresh >= 50) {
+        graph.refresh();
+        this.lastAutoRefresh = now;
+      }
+    }
   }
 
   /** CharacterController의 onArrival에서 호출 — trigger 모드 */
@@ -90,12 +97,17 @@ export class ElevatorManager {
     const { mesh, def } = state;
     const destY = state.atTop ? def.bottomY : def.topY;
     state.moving = true;
+    let lastRefresh = 0;
 
     state.tween = gsap.to(mesh.position, {
       y: destY,
       duration: def.duration,
       ease: 'power2.inOut',
-      onUpdate: () => { graph.refresh(); },
+      onUpdate: () => {
+        // 50ms 스로틀: 매 프레임 호출되는 비용을 절감
+        const now = performance.now();
+        if (now - lastRefresh >= 50) { graph.refresh(); lastRefresh = now; }
+      },
       onComplete: () => {
         state.atTop  = !state.atTop;
         state.moving = false;

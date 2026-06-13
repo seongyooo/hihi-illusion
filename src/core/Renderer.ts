@@ -36,7 +36,8 @@ export class Renderer {
     this.camera.lookAt(0, 0, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    // 모바일 발열 방지: 고DPR 기기에서 픽셀 비율 2 이하로 제한
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = true;
     container.appendChild(this.renderer.domElement);

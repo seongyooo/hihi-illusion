@@ -1,4 +1,12 @@
 const KEY_ENHANCED      = 'hihi_graphics_enhanced';
+
+/** 모바일 기기 감지 (터치스크린 + 좁은 화면 또는 모바일 UA) */
+export function isMobileDevice(): boolean {
+  return (
+    /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.screen.width <= 1024)
+  );
+}
 const KEY_STAR_BG       = 'hihi_star_bg';
 const KEY_BG_COLOR      = 'hihi_bg_color';
 const KEY_BLOCK_COLOR   = 'hihi_block_color';

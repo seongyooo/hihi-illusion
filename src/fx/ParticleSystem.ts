@@ -1,8 +1,21 @@
 import * as THREE from 'three';
 
+interface Burst {
+  points:   THREE.Points;
+  geo:      THREE.BufferGeometry;
+  mat:      THREE.PointsMaterial;
+  vels:     [number, number, number][];
+  arr:      Float32Array;
+  start:    number;
+  duration: number;
+  count:    number;
+}
+
 export class ParticleSystem {
-  private scene:  THREE.Scene;
+  private scene:   THREE.Scene;
   private active = true;
+  private bursts: Burst[] = [];
+  private rafId:  number | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -43,39 +56,64 @@ export class ParticleSystem {
       ];
     });
 
-    const start = performance.now();
-    const arr   = geo.attributes.position.array as Float32Array;
+    this.bursts.push({ points, geo, mat, vels, arr: pos, start: performance.now(), duration, count });
 
-    const tick = () => {
-      if (!this.active) {
-        this.scene.remove(points);
-        geo.dispose();
-        mat.dispose();
-        return;
-      }
-      const t = (performance.now() - start) / 1000 / duration;
+    // 이미 실행 중인 루프가 없을 때만 시작 (모든 버스트를 하나의 RAF로 처리)
+    if (this.rafId === null) {
+      this.rafId = requestAnimationFrame(this.tick);
+    }
+  }
+
+  private tick = (): void => {
+    if (!this.active) {
+      this.clearAll();
+      this.rafId = null;
+      return;
+    }
+
+    const now = performance.now();
+    this.bursts = this.bursts.filter(b => {
+      const t = (now - b.start) / 1000 / b.duration;
       if (t >= 1) {
-        this.scene.remove(points);
-        geo.dispose();
-        mat.dispose();
-        return;
+        this.scene.remove(b.points);
+        b.geo.dispose();
+        b.mat.dispose();
+        return false;
       }
-      const dt = t * duration;
-      for (let i = 0; i < count; i++) {
-        arr[i * 3]     = vels[i][0] * dt;
-        arr[i * 3 + 1] = vels[i][1] * dt - 2.5 * dt * dt;
-        arr[i * 3 + 2] = vels[i][2] * dt;
+      const dt = t * b.duration;
+      for (let i = 0; i < b.count; i++) {
+        b.arr[i * 3]     = b.vels[i][0] * dt;
+        b.arr[i * 3 + 1] = b.vels[i][1] * dt - 2.5 * dt * dt;
+        b.arr[i * 3 + 2] = b.vels[i][2] * dt;
       }
-      geo.attributes.position.needsUpdate = true;
-      mat.opacity = 1 - t;
-      requestAnimationFrame(tick);
-    };
+      b.geo.attributes.position.needsUpdate = true;
+      b.mat.opacity = 1 - t;
+      return true;
+    });
 
-    requestAnimationFrame(tick);
+    if (this.bursts.length > 0) {
+      this.rafId = requestAnimationFrame(this.tick);
+    } else {
+      this.rafId = null;
+    }
+  };
+
+  private clearAll(): void {
+    for (const b of this.bursts) {
+      this.scene.remove(b.points);
+      b.geo.dispose();
+      b.mat.dispose();
+    }
+    this.bursts = [];
   }
 
   dispose(): void {
     this.active = false;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    this.clearAll();
   }
 
   reset(): void {

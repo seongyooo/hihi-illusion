@@ -28,7 +28,7 @@ import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
-import { GraphicsSettings, COLOR_DEFAULTS } from './GraphicsSettings';
+import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
 import { ProgressStore }      from './ProgressStore';
@@ -96,7 +96,7 @@ export class GameManager {
     this.audio      = new AudioManager();
 
     this.particles         = new ParticleSystem(this.renderer.scene);
-    this.starBackground    = new StarBackground(this.renderer.scene);
+    this.starBackground    = new StarBackground(this.renderer.scene, { starCount: isMobileDevice() ? 500 : 1400 });
     this.starBackground.setVisible(GraphicsSettings.starBackground);
 
     this.orbit = new OrbitControls(this.renderer.camera, this.renderer.renderer.domElement);
@@ -859,6 +859,7 @@ export class GameManager {
 
     if (this.goalMarker) {
       gsap.killTweensOf(this.goalMarker.position);
+      gsap.killTweensOf(this.goalMarker.scale);
       this.renderer.scene.remove(this.goalMarker);
       this.goalMarker.geometry.dispose();
       (this.goalMarker.material as THREE.Material).dispose();

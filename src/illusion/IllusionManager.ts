@@ -72,8 +72,12 @@ export class IllusionManager {
 
   // 상태 변경 확정에 필요한 지속 시간 (프레임률 무관)
   private static readonly DEBOUNCE_MS = 100;
+  private frameCount = 0;
 
   update(graph: PathGraph): void {
+    // 2프레임마다 1회만 계산 (모바일 발열 최적화 — debounce 100ms로 응답성 손실 없음)
+    if (++this.frameCount % 2 !== 0) return;
+
     const azimuth   = this.currentAzimuth;
     const elevation = this.currentElevation;
     const now       = performance.now();

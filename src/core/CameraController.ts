@@ -90,6 +90,7 @@ export class CameraController {
   /** Immediately kill the fly-in tween without resolving the Promise. */
   cancel(): void {
     this.currentTl?.kill();
+    gsap.killTweensOf(this.camera.position);  // pulse() 트윈도 정리
     this.isAnimating = false;
     this.currentTl   = null;
   }
