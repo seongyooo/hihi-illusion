@@ -49,7 +49,7 @@ type Tool = 'place' | 'erase' | 'select';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const GRID_SIZE = 14;
+const GRID_SIZE = 100;
 const DEFAULT_COLOR = '#A8C5DA';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -244,17 +244,18 @@ export class LevelEditor {
     this.scene.add(dir);
     this.scene.add(new THREE.HemisphereLight(0xA8D8EA, 0xFCBAD3, 0.4));
 
-    // Grid
-    this.gridHelper = new THREE.GridHelper(14, 14, 0x4444aa, 0x333366);
-    this.gridHelper.position.set(7, floorY(0), 7);
+    // Grid — 100×100, 중심 (50, 0, 50)
+    const half = GRID_SIZE / 2;
+    this.gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_SIZE, 0x4444aa, 0x333366);
+    this.gridHelper.position.set(half, floorY(0), half);
     this.scene.add(this.gridHelper);
 
-    // Floor plane for raycasting
-    const planeGeo = new THREE.PlaneGeometry(14, 14);
+    // Floor plane for raycasting — 그리드와 동일 영역
+    const planeGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
     const planeMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
     this.floorPlane = new THREE.Mesh(planeGeo, planeMat);
     this.floorPlane.rotation.x = -Math.PI / 2;
-    this.floorPlane.position.set(7, floorY(0), 7);
+    this.floorPlane.position.set(half, floorY(0), half);
     this.scene.add(this.floorPlane);
 
     // Ghost mesh
