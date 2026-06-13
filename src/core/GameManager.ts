@@ -265,18 +265,19 @@ export class GameManager {
       this.editor.show();
     };
 
-    // 로비: 기존 커스텀 스테이지 수정
+    // 로비: 커스텀 스테이지 수정
     this.editorLobby.onEdit = (stageNum) => {
       this.editorLobby.hide();
       this.editor.loadCustomStage(stageNum);
       this.editor.show();
     };
 
-    // 로비: 내장 스테이지 수정
-    this.editorLobby.onEditBuiltin = async (stageNum) => {
+    // 로비: 커스텀 스테이지 플레이
+    this.editorLobby.onPlay = (stageNum) => {
+      const saved = CustomLevelStore.getByStage(stageNum);
+      if (!saved) return;
       this.editorLobby.hide();
-      await this.editor.loadBuiltinStage(stageNum);
-      this.editor.show();
+      this.loadCustomLevel(saved.data, () => this.editorLobby.show());
     };
 
     // 로비 닫기 → 타이틀
@@ -784,7 +785,7 @@ export class GameManager {
     this._startCameraFlyIn(data);
   }
 
-  private async loadCustomLevel(data: LevelData): Promise<void> {
+  private async loadCustomLevel(data: LevelData, onExit?: () => void): Promise<void> {
     this.unloadCurrent();
     this.stageSelect.hide();
     this.isTutorial    = false;
@@ -792,7 +793,7 @@ export class GameManager {
     this.tutorialMoved = false;
 
     this._initLevelObjects(data);
-    this.hud.enableSkip(() => { this.stageSelect.show(); });
+    this.hud.enableSkip(() => { onExit ? onExit() : this.stageSelect.show(); });
     this._startCameraFlyIn(data);
   }
 

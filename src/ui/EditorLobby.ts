@@ -1,14 +1,13 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
-import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 
 export class EditorLobby {
   private el: HTMLElement;
   private gridEl!: HTMLElement;
 
-  onNew:          () => void                  = () => {};
-  onEdit:         (stageNum: number) => void  = () => {};
-  onEditBuiltin:  (stageNum: number) => void  = () => {};
-  onClose:        () => void                  = () => {};
+  onNew:   () => void                  = () => {};
+  onEdit:  (stageNum: number) => void  = () => {};
+  onPlay:  (stageNum: number) => void  = () => {};
+  onClose: () => void                  = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -45,38 +44,6 @@ export class EditorLobby {
     header.appendChild(newBtn);
 
     this.el.appendChild(header);
-
-    // Built-in stages section
-    const builtinSection = document.createElement('div');
-    builtinSection.className = 'editor-lobby__section';
-
-    const builtinTitle = document.createElement('h3');
-    builtinTitle.textContent = 'BUILT-IN STAGES';
-    builtinSection.appendChild(builtinTitle);
-
-    const builtinGrid = document.createElement('div');
-    builtinGrid.className = 'editor-lobby__grid';
-
-    for (const num of CUSTOM_STAGE_NUMS) {
-      const card = document.createElement('div');
-      card.className = 'editor-lobby__card';
-
-      const numEl = document.createElement('span');
-      numEl.className = 'editor-lobby__card-num';
-      numEl.textContent = `Stage ${num}`;
-
-      const editBtn = document.createElement('button');
-      editBtn.className = 'editor-btn primary';
-      editBtn.textContent = 'Edit';
-      editBtn.addEventListener('click', () => this.onEditBuiltin(num));
-
-      card.appendChild(numEl);
-      card.appendChild(editBtn);
-      builtinGrid.appendChild(card);
-    }
-
-    builtinSection.appendChild(builtinGrid);
-    this.el.appendChild(builtinSection);
 
     // Custom stages section
     const section = document.createElement('div');
@@ -148,6 +115,11 @@ export class EditorLobby {
       name.className = 'editor-lobby__card-name';
       name.textContent = level.data.name;
 
+      const playBtn = document.createElement('button');
+      playBtn.className = 'editor-btn primary';
+      playBtn.textContent = '▶ Play';
+      playBtn.addEventListener('click', () => this.onPlay(level.stageNum));
+
       const dlBtn = document.createElement('button');
       dlBtn.className = 'editor-btn';
       dlBtn.textContent = '↓';
@@ -159,7 +131,7 @@ export class EditorLobby {
       });
 
       const editBtn = document.createElement('button');
-      editBtn.className = 'editor-btn primary';
+      editBtn.className = 'editor-btn';
       editBtn.textContent = 'Edit';
       editBtn.addEventListener('click', () => this.onEdit(level.stageNum));
 
@@ -174,6 +146,7 @@ export class EditorLobby {
 
       const btnRow = document.createElement('div');
       btnRow.className = 'editor-lobby__card-btns';
+      btnRow.appendChild(playBtn);
       btnRow.appendChild(dlBtn);
       btnRow.appendChild(editBtn);
       btnRow.appendChild(delBtn);
