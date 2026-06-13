@@ -1453,24 +1453,29 @@ export class LevelEditor {
     }
     this.zoneOverlays.clear();
 
-    // 구역별로 색깔 오버레이 재생성
+    // 구역별로 바닥 색깔 타일 재생성
     this.zones.forEach((zone, zi) => {
       const color = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
       for (const nodeId of zone.nodeIds) {
         const block = this.blocks.find(b => b.id === nodeId);
         if (!block) continue;
-        const geo = new THREE.PlaneGeometry(0.88, 0.88);
+        // 1×1 타일을 블록이 위치한 floor 바닥면에 깔기
+        const geo = new THREE.PlaneGeometry(1.0, 1.0);
         const mat = new THREE.MeshBasicMaterial({
           color,
           transparent: true,
-          opacity: 0.40,
+          opacity: 0.60,
           depthWrite: false,
           side: THREE.DoubleSide,
         });
         const overlay = new THREE.Mesh(geo, mat);
         overlay.rotation.x = -Math.PI / 2;
-        const wp = blockWorldPos(block.gridX, block.floor, block.gridZ);
-        overlay.position.set(wp.x, wp.y + 0.26, wp.z);  // 블록 윗면 바로 위
+        // 블록 바닥면 y = floorY(block.floor) + 아주 살짝 위
+        overlay.position.set(
+          block.gridX + 0.5,
+          floorY(block.floor) + 0.01,
+          block.gridZ + 0.5,
+        );
         overlay.renderOrder = 1;
         this.scene.add(overlay);
         this.zoneOverlays.set(nodeId, overlay);
@@ -1491,12 +1496,20 @@ export class LevelEditor {
       const wrap = document.createElement('div');
       wrap.style.cssText = 'border:1px solid #ddd;border-radius:4px;padding:6px;margin-bottom:6px;';
 
-      // 헤더: ID + 삭제 버튼
+      // 헤더: 색상 뱃지 + ID + 삭제 버튼
+      const zoneColor = LevelEditor.ZONE_COLORS[zi % LevelEditor.ZONE_COLORS.length];
+      const zoneColorCss = '#' + zoneColor.toString(16).padStart(6, '0');
+      // 존 카드 왼쪽 테두리를 구역 색으로
+      wrap.style.borderLeft = `4px solid ${zoneColorCss}`;
+
       const header = document.createElement('div');
       header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
       const title = document.createElement('strong');
-      title.style.fontSize = '12px';
-      title.textContent = `📍 ${zone.id}`;
+      title.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:5px;';
+      const badge = document.createElement('span');
+      badge.style.cssText = `display:inline-block;width:12px;height:12px;border-radius:2px;background:${zoneColorCss};flex-shrink:0;`;
+      title.appendChild(badge);
+      title.appendChild(document.createTextNode(zone.id));
       const delBtn = document.createElement('button');
       delBtn.className = 'editor-btn';
       delBtn.textContent = '✕';
