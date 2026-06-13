@@ -15,6 +15,7 @@ export class CharacterController {
   private currentNode: PathNode;
   private isMoving = false;
   private pendingTarget: PathNode | null = null;
+  private _currentTarget: PathNode | null = null;
   private onArrival?:   (nodeId: string) => void;
   private onDepart?:    (nodeId: string) => void;
   private shouldBlock?: () => boolean;
@@ -41,7 +42,11 @@ export class CharacterController {
 
   moveTo(target: PathNode): void {
     if (target === this.currentNode) return;
-    if (this.isMoving) this.stop(); // 이동 중 새 목적지 → 현재 경로 취소 후 즉시 리다이렉트
+    if (this.isMoving) {
+      if (target === this._currentTarget) return; // 이미 향하고 있는 목적지 — 중단 없이 계속 이동
+      this.stop(); // 다른 목적지 → 현재 경로 취소 후 리다이렉트
+    }
+    this._currentTarget = target;
     this._startMove(target);
   }
 
@@ -67,8 +72,9 @@ export class CharacterController {
    * 튜토리얼 장애물 연출처럼 외부에서 캐릭터를 멈춰야 할 때 사용.
    */
   stop(): void {
-    this._movePath    = [];
-    this.pendingTarget = null;
+    this._movePath      = [];
+    this.pendingTarget  = null;
+    this._currentTarget = null;
     gsap.killTweensOf(this.character.mesh.position);
     gsap.killTweensOf(this.character.mesh.rotation);
     this.character.stopWalk();
@@ -128,7 +134,8 @@ export class CharacterController {
 
     if (this._movePath.length === 0) {
       // 최종 목적지 도달
-      this.isMoving = false;
+      this.isMoving       = false;
+      this._currentTarget = null;
       this.character.stopWalk();
       this.onArrival?.(this.currentNode.id);
       if (this.pendingTarget && this.pendingTarget !== this.currentNode) {
