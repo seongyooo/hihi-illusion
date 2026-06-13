@@ -5,17 +5,11 @@ import { ProgressStore }     from '../core/ProgressStore';
 const TOTAL_STAGES       = 30;
 const BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS);
 
-const DEV_UNLOCK_TAPS  = 10;   // 연타 횟수
-const DEV_RESET_MS     = 3000; // 이 시간 안에 안 누르면 카운터 초기화
-
 export class StageSelectUI {
   private el: HTMLElement;
   onSelect:   (stageNum: number) => void = () => {};
   onBack:     () => void = () => {};
   onTutorial: () => void = () => {};
-
-  private tapCount    = 0;
-  private tapTimer:   ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -39,8 +33,6 @@ export class StageSelectUI {
     const title = document.createElement('h2');
     title.className = 'stage-select__title';
     title.textContent = 'SELECT STAGE';
-    title.style.cursor = 'default';
-    title.addEventListener('click', () => this.onTitleTap(title));
     this.el.appendChild(title);
 
     const grid = document.createElement('div');
@@ -94,36 +86,4 @@ export class StageSelectUI {
     this.el.classList.remove('visible');
   }
 
-  private onTitleTap(titleEl: HTMLElement): void {
-    // 타이머 리셋
-    if (this.tapTimer !== null) clearTimeout(this.tapTimer);
-    this.tapTimer = setTimeout(() => {
-      this.tapCount = 0;
-      this.tapTimer = null;
-    }, DEV_RESET_MS);
-
-    this.tapCount++;
-
-    // 진행 피드백: 남은 횟수 표시
-    if (this.tapCount < DEV_UNLOCK_TAPS) {
-      titleEl.textContent = `SELECT STAGE ${'·'.repeat(this.tapCount)}`;
-      return;
-    }
-
-    // 10번 달성 → 전체 잠금 해제
-    clearTimeout(this.tapTimer!);
-    this.tapTimer = null;
-    this.tapCount = 0;
-
-    ProgressStore.unlockAll(TOTAL_STAGES);
-
-    // 타이틀 플래시 효과
-    titleEl.textContent = '🔓 ALL STAGES UNLOCKED';
-    titleEl.style.color = '#FFD700';
-    setTimeout(() => {
-      titleEl.textContent = 'SELECT STAGE';
-      titleEl.style.color = '';
-      this.buildGrid();
-    }, 1500);
-  }
 }

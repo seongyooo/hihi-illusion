@@ -1,5 +1,10 @@
 import { GraphicsSettings, COLOR_DEFAULTS, EXPOSURE_DEFAULT, BLOCK_RADIUS_DEFAULT, BLOCK_XZ_DEFAULT, ROTATE_SPEED_DEFAULT, DAMPING_FACTOR_DEFAULT } from '../core/GraphicsSettings';
 import { SettingsPreview } from './SettingsPreview';
+import { ProgressStore } from '../core/ProgressStore';
+
+const TOTAL_STAGES     = 30;
+const DEV_UNLOCK_TAPS  = 10;
+const DEV_RESET_MS     = 3000;
 
 interface ColorRow { swatch: HTMLDivElement; picker: HTMLInputElement; }
 interface SliderRow { slider: HTMLInputElement; valueEl: HTMLSpanElement; }
@@ -25,6 +30,9 @@ export class SettingsScreen {
   private expRow!:            SliderRow;
   private rotateRow!:         SliderRow;
   private dampingRow!:        SliderRow;
+
+  private tapCount  = 0;
+  private tapTimer: ReturnType<typeof setTimeout> | null = null;
 
   onClose:                () => void = () => {};
   onQualityChange:        (enhanced: boolean)      => void = () => {};
@@ -74,6 +82,8 @@ export class SettingsScreen {
     const previewLabel = document.createElement('div');
     previewLabel.className = 'settings-section-label settings-section-label--first';
     previewLabel.textContent = 'PREVIEW';
+    previewLabel.style.cursor = 'default';
+    previewLabel.addEventListener('click', () => this.onPreviewTap(previewLabel));
     previewPanel.appendChild(previewLabel);
 
     this.preview = new SettingsPreview(220, 220);
@@ -662,6 +672,39 @@ export class SettingsScreen {
     this.onDampingFactorChange(DAMPING_FACTOR_DEFAULT);
 
     this.preview.refresh();
+  }
+
+  // ── Dev unlock cheat ──────────────────────────────────────────────
+
+  private onPreviewTap(labelEl: HTMLElement): void {
+    if (this.tapTimer !== null) clearTimeout(this.tapTimer);
+    this.tapTimer = setTimeout(() => {
+      this.tapCount = 0;
+      this.tapTimer = null;
+      labelEl.textContent = 'PREVIEW';
+      labelEl.style.color = '';
+    }, DEV_RESET_MS);
+
+    this.tapCount++;
+
+    if (this.tapCount < DEV_UNLOCK_TAPS) {
+      labelEl.textContent = `PREVIEW ${'·'.repeat(this.tapCount)}`;
+      return;
+    }
+
+    // 10번 달성 → 전체 잠금 해제
+    clearTimeout(this.tapTimer!);
+    this.tapTimer = null;
+    this.tapCount = 0;
+
+    ProgressStore.unlockAll(TOTAL_STAGES);
+
+    labelEl.textContent = '🔓 ALL UNLOCKED';
+    labelEl.style.color = '#FFD700';
+    setTimeout(() => {
+      labelEl.textContent = 'PREVIEW';
+      labelEl.style.color = '';
+    }, 1500);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
