@@ -43,8 +43,13 @@ export class CharacterController {
   moveTo(target: PathNode): void {
     if (target === this.currentNode) return;
     if (this.isMoving) {
-      if (target === this._currentTarget) return; // 이미 향하고 있는 목적지 — 중단 없이 계속 이동
-      this.stop(); // 다른 목적지 → 현재 경로 취소 후 리다이렉트
+      if (target === this._currentTarget) return; // 이미 이 목적지로 이동 중 — 무시
+      // 다른 목적지: 현재 한 스텝(≤0.25s)만 마친 뒤 자연스럽게 리다이렉트
+      // stop()으로 스냅하지 않고 pendingTarget만 교체
+      this._currentTarget = target;
+      this._movePath      = [];       // 남은 경로 비우기 (현재 진행 중인 스텝은 완료됨)
+      this.pendingTarget  = target;
+      return;
     }
     this._currentTarget = target;
     this._startMove(target);
