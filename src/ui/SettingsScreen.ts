@@ -699,16 +699,21 @@ export class SettingsScreen {
       return;
     }
 
-    // 10번 달성 → 전체 잠금 해제
+    // 10번 달성 → 개발자 모드 토글 (ON이면 전체 잠금 해제 포함)
     clearTimeout(this.tapTimer!);
     this.tapTimer = null;
     this.tapCount = 0;
 
-    ProgressStore.unlockAll(TOTAL_STAGES);
-    ProgressStore.setDeveloperMode();
-
-    labelEl.textContent = '🔓 ALL UNLOCKED';
-    labelEl.style.color = '#FFD700';
+    if (ProgressStore.isDeveloperMode()) {
+      ProgressStore.clearDeveloperMode();
+      labelEl.textContent = '🔒 DEV MODE OFF';
+      labelEl.style.color = '#FF8888';
+    } else {
+      ProgressStore.unlockAll(TOTAL_STAGES);
+      ProgressStore.setDeveloperMode();
+      labelEl.textContent = '🔓 ALL UNLOCKED';
+      labelEl.style.color = '#FFD700';
+    }
     setTimeout(() => {
       labelEl.textContent = 'PREVIEW';
       labelEl.style.color = '';
