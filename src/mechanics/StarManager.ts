@@ -4,7 +4,6 @@ import type { PathNode } from '../world/PathGraph';
 import type { ParticleSystem } from '../fx/ParticleSystem';
 
 export class StarManager {
-  private scene:     THREE.Scene;
   private particles: ParticleSystem;
   // nodeId → 3D 메시 (수집 전까지 유지)
   private starMeshes:    Map<string, THREE.Mesh> = new Map();
@@ -13,8 +12,7 @@ export class StarManager {
   private collectedIds: Set<string> = new Set();
   private total = 0;
 
-  constructor(scene: THREE.Scene, particles: ParticleSystem) {
-    this.scene     = scene;
+  constructor(_scene: THREE.Scene, particles: ParticleSystem) {
     this.particles = particles;
   }
 
@@ -31,9 +29,8 @@ export class StarManager {
   }
 
   private _createStarMesh(nodeId: string, node: PathNode): void {
-    const wp = new THREE.Vector3();
-    node.mesh.getWorldPosition(wp);
-    const baseY = wp.y + node.halfHeight + 0.38;
+    // 블록 로컬 좌표 기준 — 부모화하면 블록(패트롤 포함)이 움직일 때 자동으로 따라감
+    const localY = node.halfHeight + 0.38;
 
     const geo = new THREE.OctahedronGeometry(0.17, 0);
     const mat = new THREE.MeshLambertMaterial({
@@ -42,8 +39,8 @@ export class StarManager {
       emissiveIntensity: 0.45,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(wp.x, baseY, wp.z);
-    this.scene.add(mesh);
+    mesh.position.set(0, localY, 0);
+    node.mesh.add(mesh);  // scene 직접 추가 대신 블록 메시의 자식으로 부모화
     this.starMeshes.set(nodeId, mesh);
 
     // 자전
@@ -53,9 +50,9 @@ export class StarManager {
       repeat:   -1,
       ease:     'none',
     });
-    // 둥실 떠오르기
+    // 둥실 떠오르기 (로컬 Y 기준)
     gsap.to(mesh.position, {
-      y:        baseY + 0.15,
+      y:        localY + 0.15,
       duration: 1.0,
       yoyo:     true,
       repeat:   -1,
@@ -87,17 +84,21 @@ export class StarManager {
   repositionStar(nodeId: string, node: PathNode): void {
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return;
-    const wp = new THREE.Vector3();
-    node.mesh.getWorldPosition(wp);
-    const baseY = wp.y + node.halfHeight + 0.38;
+    const localY = node.halfHeight + 0.38;
+
+    // 부모가 바뀐 경우(튜토리얼 블록 소환 등) 다시 부모화
+    if (mesh.parent !== node.mesh) {
+      mesh.removeFromParent();
+      node.mesh.add(mesh);
+    }
 
     gsap.killTweensOf(mesh.position);
     gsap.killTweensOf(mesh.rotation);
-    mesh.position.set(wp.x, baseY, wp.z);
+    mesh.position.set(0, localY, 0);
     mesh.visible = true;
 
     gsap.to(mesh.position, {
-      y: baseY + 0.15, duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      y: localY + 0.15, duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
     });
     gsap.to(mesh.rotation, {
       y: Math.PI * 2, duration: 2.2, repeat: -1, ease: 'none',
@@ -116,8 +117,10 @@ export class StarManager {
     this.collectedIds.add(nodeId);
     this.starMeshes.delete(nodeId);
 
-    // 파티클 버스트
-    this.particles.burst(mesh.position.clone(), 0xFFD700, 18, 1.5, 0.5);
+    // 파티클 버스트 — 별이 블록 자식이므로 월드 좌표로 변환
+    const wp = new THREE.Vector3();
+    mesh.getWorldPosition(wp);
+    this.particles.burst(wp, 0xFFD700, 18, 1.5, 0.5);
 
     // 크기 0으로 축소 후 제거 (QA-10: collectingMeshes로 추적)
     gsap.killTweensOf(mesh.position);
@@ -129,7 +132,7 @@ export class StarManager {
       ease: 'back.in',
       onComplete: () => {
         this.collectingMeshes.delete(mesh);
-        this.scene.remove(mesh);
+        mesh.removeFromParent();
         mesh.geometry.dispose();
         (mesh.material as THREE.Material).dispose();
       },
@@ -159,7 +162,7 @@ export class StarManager {
     for (const mesh of this.starMeshes.values()) {
       gsap.killTweensOf(mesh.position);
       gsap.killTweensOf(mesh.rotation);
-      this.scene.remove(mesh);
+      mesh.removeFromParent();  // 블록 자식이거나 씬 직속이거나 모두 처리
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
     }
@@ -168,7 +171,7 @@ export class StarManager {
     // QA-10: scale-down 중인 메시도 강제 종료
     for (const mesh of this.collectingMeshes) {
       gsap.killTweensOf(mesh.scale);
-      this.scene.remove(mesh);
+      mesh.removeFromParent();
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
     }

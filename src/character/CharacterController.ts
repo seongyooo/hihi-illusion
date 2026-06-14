@@ -155,6 +155,12 @@ export class CharacterController {
 
     const node = this._movePath.shift()!;
     const prev = this.currentNode;
+
+    // 이동 블록(패트롤 등) 위치 변화로 인접성이 사라진 경우 이동 취소
+    if (!prev.neighbors.includes(node)) {
+      this.stop();
+      return;
+    }
     const dx   = node.position.x - prev.position.x;
     const dz   = node.position.z - prev.position.z;
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LevelData } from '../world/Level';
+import type { PatrolDef } from '../world/PatrolManager';
 import { Block } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
 
@@ -16,6 +17,7 @@ interface EditorBlock {
   color: string;
   walkable: boolean;
   isSpike: boolean;
+  spikeType: 'always' | 'blinking';
   mesh: THREE.Group;  // Block.mesh (THREE.Group with per-face materials)
 }
 
@@ -113,6 +115,9 @@ export class LevelEditor {
   private starNodeIds:     string[] = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
+  private patrolConns:      PatrolDef[] = [];
+  private patrolArrows:     THREE.ArrowHelper[] = [];
+  private patrolListEl!:    HTMLElement;
   private zones: ZoneEntry[] = [];
   private zoneCounter = 0;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
@@ -172,12 +177,16 @@ export class LevelEditor {
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private spikeInput!: HTMLInputElement;
+  private spikeTypeSelect!: HTMLSelectElement;
   private spikeModeBtn!: HTMLButtonElement;
+  private spikeModeType: 'always' | 'blinking' = 'always';
   private spikeMode = false;
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
   private toolBtns: Partial<Record<Tool, HTMLButtonElement>> = {};
+  private axisLabelEls: HTMLElement[] = [];
+  private axisArrows:   THREE.ArrowHelper[] = [];
 
   constructor(container: HTMLElement) {
     // ── Build DOM ────────────────────────────────────────────────────────────
@@ -288,6 +297,9 @@ export class LevelEditor {
     this.goalMarker = new THREE.Mesh(sphereGeo, new THREE.MeshLambertMaterial({ color: 0xFFD700 }));
     this.goalMarker.visible = false;
     this.scene.add(this.goalMarker);
+
+    // ── 3D 축 레이블 (그리드 끝 모서리) ────────────────────────────────────
+    this._buildAxisArrows();
 
     // ── Events ───────────────────────────────────────────────────────────────
     this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
@@ -435,7 +447,29 @@ export class LevelEditor {
         this.spikeModeBtn.classList.toggle('active', this.spikeMode);
       });
       spikeModeRow.appendChild(this.spikeModeBtn);
+
+      // Spike mode type selector
+      const spikeModeTypeRow = document.createElement('div');
+      spikeModeTypeRow.className = 'editor-row';
+      const spikeModeTypeLabel = document.createElement('label');
+      spikeModeTypeLabel.textContent = 'Spike Type:';
+      const spikeModeTypeSelect = document.createElement('select');
+      spikeModeTypeSelect.className = 'editor-input';
+      spikeModeTypeSelect.style.flex = '1';
+      [['always', '항상 (Always)'], ['blinking', '깜빡임 (Blinking)']].forEach(([val, text]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = text;
+        spikeModeTypeSelect.appendChild(opt);
+      });
+      spikeModeTypeSelect.addEventListener('change', () => {
+        this.spikeModeType = spikeModeTypeSelect.value as 'always' | 'blinking';
+      });
+      spikeModeTypeRow.appendChild(spikeModeTypeLabel);
+      spikeModeTypeRow.appendChild(spikeModeTypeSelect);
+
       sec.appendChild(spikeModeRow);
+      sec.appendChild(spikeModeTypeRow);
     }));
 
     // Selected block
@@ -490,6 +524,31 @@ export class LevelEditor {
       spikeRow.appendChild(spikeLabel);
       spikeRow.appendChild(this.spikeInput);
       sec.appendChild(spikeRow);
+
+      const spikeTypeRow = document.createElement('div');
+      spikeTypeRow.className = 'editor-row';
+      const spikeTypeLabel = document.createElement('label');
+      spikeTypeLabel.textContent = 'Spike Type:';
+      this.spikeTypeSelect = document.createElement('select');
+      this.spikeTypeSelect.className = 'editor-input';
+      this.spikeTypeSelect.style.flex = '1';
+      [['always', '항상 (Always)'], ['blinking', '깜빡임 (Blinking)']].forEach(([val, text]) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = text;
+        this.spikeTypeSelect.appendChild(opt);
+      });
+      this.spikeTypeSelect.addEventListener('change', () => {
+        if (this.selectedBlock) {
+          this.selectedBlock.spikeType = this.spikeTypeSelect.value as 'always' | 'blinking';
+          if (this.selectedBlock.isSpike) {
+            this._setSpikeIndicator(this.selectedBlock, true);
+          }
+        }
+      });
+      spikeTypeRow.appendChild(spikeTypeLabel);
+      spikeTypeRow.appendChild(this.spikeTypeSelect);
+      sec.appendChild(spikeTypeRow);
 
       const startBtn = document.createElement('button');
       startBtn.className = 'editor-btn';
@@ -1000,6 +1059,193 @@ export class LevelEditor {
       });
     }));
 
+    // Patrol Blocks
+    p.appendChild(this.buildSection('PATROL BLOCKS', (sec) => {
+      this.patrolListEl = document.createElement('div');
+      sec.appendChild(this.patrolListEl);
+      this.rebuildPatrolList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Patrol';
+      addBtn.style.cssText = 'width:100%;margin-top:6px;';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-add-form';
+
+      // ── 폼 상태 ──────────────────────────────────────────────────────────
+      let ptSrcId  = '';
+      let ptDist   = 0;
+
+      // ── Source ───────────────────────────────────────────────────────────
+      const srcRow = document.createElement('div');
+      srcRow.className = 'editor-row';
+      const srcLabel = document.createElement('label');
+      srcLabel.textContent = 'Source:';
+      const srcDisplay = document.createElement('input');
+      srcDisplay.className = 'editor-input';
+      srcDisplay.readOnly = true;
+      srcDisplay.placeholder = '↗ 클릭';
+      srcDisplay.style.flex = '1';
+      const srcPickBtn = document.createElement('button');
+      srcPickBtn.className = 'editor-btn';
+      srcPickBtn.textContent = '↗';
+      srcPickBtn.title = '소스 블록 선택';
+      srcPickBtn.addEventListener('click', () => this.startPick(b => {
+        ptSrcId = b.id;
+        srcDisplay.value = b.id;
+        // 목적지 초기화
+        ptDist = 0;
+        destDisplay.value = '';
+        updatePreviewArrow();
+      }));
+      srcRow.appendChild(srcLabel);
+      srcRow.appendChild(srcDisplay);
+      srcRow.appendChild(srcPickBtn);
+      form.appendChild(srcRow);
+
+      // ── Axis ─────────────────────────────────────────────────────────────
+      const axisRow = document.createElement('div');
+      axisRow.className = 'editor-row';
+      const axisLabel = document.createElement('label');
+      axisLabel.textContent = 'Axis:';
+      const axisSelect = document.createElement('select');
+      axisSelect.className = 'editor-input';
+      axisSelect.style.flex = '1';
+      [
+        ['x',  '+X (빨강 →)'],
+        ['-x', '−X (빨강 ←)'],
+        ['z',  '+Z (파랑 →)'],
+        ['-z', '−Z (파랑 ←)'],
+        ['y',  '+Y (초록 ↑)'],
+        ['-y', '−Y (초록 ↓)'],
+      ].forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = t;
+        axisSelect.appendChild(o);
+      });
+      axisSelect.addEventListener('change', () => {
+        // 축 바뀌면 목적지 초기화
+        ptDist = 0;
+        destDisplay.value = '';
+        updatePreviewArrow();
+      });
+      axisRow.appendChild(axisLabel);
+      axisRow.appendChild(axisSelect);
+      form.appendChild(axisRow);
+
+      // ── Destination (pick) ────────────────────────────────────────────────
+      const destRow = document.createElement('div');
+      destRow.className = 'editor-row';
+      const destLabel = document.createElement('label');
+      destLabel.textContent = 'Dest:';
+      const destDisplay = document.createElement('input');
+      destDisplay.className = 'editor-input';
+      destDisplay.readOnly = true;
+      destDisplay.placeholder = '↗ 목적지 선택';
+      destDisplay.style.flex = '1';
+      const destPickBtn = document.createElement('button');
+      destPickBtn.className = 'editor-btn';
+      destPickBtn.textContent = '↗';
+      destPickBtn.title = '목적지 블록 선택';
+      destPickBtn.addEventListener('click', () => {
+        if (!ptSrcId) { alert('Source 블록을 먼저 선택하세요.'); return; }
+        this.startPick(b => {
+          if (b.id === ptSrcId) return;
+          const srcBlock  = this.blocks.find(bl => bl.id === ptSrcId);
+          if (!srcBlock) return;
+          const axis     = axisSelect.value as PatrolDef['axis'];
+          const baseAxis = axis.replace('-', '') as 'x' | 'y' | 'z';
+          const dist =
+            baseAxis === 'x' ? Math.abs(b.gridX - srcBlock.gridX) :
+            baseAxis === 'z' ? Math.abs(b.gridZ - srcBlock.gridZ) :
+            Math.abs(b.floor - srcBlock.floor) * 0.5;
+          if (dist < 0.01) {
+            destDisplay.value = `${b.id} — 같은 위치!`;
+            return;
+          }
+          ptDist = Math.round(dist * 100) / 100;
+          destDisplay.value = `${b.id}  (${ptDist} units)`;
+          updatePreviewArrow();
+        });
+      });
+      destRow.appendChild(destLabel);
+      destRow.appendChild(destDisplay);
+      destRow.appendChild(destPickBtn);
+      form.appendChild(destRow);
+
+      // ── Duration ─────────────────────────────────────────────────────────
+      const durRow = document.createElement('div');
+      durRow.className = 'editor-row';
+      const durLabel = document.createElement('label');
+      durLabel.textContent = 'Duration:';
+      const durInput = document.createElement('input');
+      durInput.className = 'editor-input';
+      durInput.type = 'number'; durInput.step = '0.1'; durInput.min = '0.1';
+      durInput.value = '1.5'; durInput.style.width = '60px';
+      const durUnit = document.createElement('span');
+      durUnit.style.cssText = 'font-size:11px;color:#888';
+      durUnit.textContent = 'sec/way';
+      durRow.appendChild(durLabel);
+      durRow.appendChild(durInput);
+      durRow.appendChild(durUnit);
+      form.appendChild(durRow);
+
+      // ── 미리보기 화살표 (씬에 임시 추가) ─────────────────────────────────
+      let previewArrow: THREE.ArrowHelper | null = null;
+      const updatePreviewArrow = () => {
+        if (previewArrow) { this.scene.remove(previewArrow); previewArrow = null; }
+        if (!ptSrcId || ptDist <= 0) return;
+        const src = this.blocks.find(b => b.id === ptSrcId);
+        if (!src) return;
+        const axis     = axisSelect.value as PatrolDef['axis'];
+        const sign     = axis.startsWith('-') ? -1 : 1;
+        const baseAxis = axis.replace('-', '') as 'x' | 'y' | 'z';
+        const origin = src.mesh.position.clone();
+        origin.y += 0.35;
+        const dir = new THREE.Vector3(
+          baseAxis === 'x' ? sign : 0,
+          baseAxis === 'y' ? sign : 0,
+          baseAxis === 'z' ? sign : 0,
+        );
+        previewArrow = new THREE.ArrowHelper(dir, origin, ptDist, 0xFFAA00, 0.25, 0.15);
+        this.scene.add(previewArrow);
+      };
+
+      // ── Add 버튼 ─────────────────────────────────────────────────────────
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn primary';
+      confirmBtn.textContent = 'Add';
+      confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
+      confirmBtn.addEventListener('click', () => {
+        if (!ptSrcId || ptDist <= 0) { alert('Source와 Dest 블록을 모두 선택하세요.'); return; }
+        if (this.patrolConns.some(p => p.nodeId === ptSrcId)) {
+          alert(`${ptSrcId}는 이미 패트롤 블록입니다.`); return;
+        }
+        const axis     = axisSelect.value as PatrolDef['axis'];
+        const duration = parseFloat(durInput.value) || 1.5;
+        this.patrolConns.push({ nodeId: ptSrcId, axis, distance: ptDist, duration });
+        this._rebuildPatrolArrows();
+        this.rebuildPatrolList();
+        // 폼 초기화
+        ptSrcId = ''; ptDist = 0;
+        srcDisplay.value = ''; destDisplay.value = '';
+        if (previewArrow) { this.scene.remove(previewArrow); previewArrow = null; }
+        form.classList.remove('open');
+      });
+      form.appendChild(confirmBtn);
+      sec.appendChild(form);
+
+      addBtn.addEventListener('click', () => {
+        form.classList.toggle('open');
+        if (!form.classList.contains('open')) {
+          if (previewArrow) { this.scene.remove(previewArrow); previewArrow = null; }
+          this.cancelPick();
+        }
+      });
+    }));
+
     // Zones
     p.appendChild(this.buildSection('ZONES', (sec) => {
       this.zoneListEl = document.createElement('div');
@@ -1500,7 +1746,8 @@ export class LevelEditor {
       });
     }
     if (!on) return;
-    const mat = new THREE.MeshBasicMaterial({ color: 0xFF2200 });
+    const color = 0xFF2200; // 항상 빨간색 (always/blinking 동일)
+    const mat = new THREE.MeshBasicMaterial({ color });
     const geo = new THREE.ConeGeometry(0.18, 0.28, 4);
     const cone = new THREE.Mesh(geo, mat);
     cone.position.y = 0.25 + 0.14; // 블록 상단(+0.25) + 콘 반높이
@@ -1541,6 +1788,60 @@ export class LevelEditor {
       // key를 zone.id로 저장 (1구역 = 1오버레이)
       this.zoneOverlays.set(zone.id, overlay);
     });
+  }
+
+  private rebuildPatrolList(): void {
+    if (!this.patrolListEl) return;
+    this.patrolListEl.innerHTML = '';
+    if (this.patrolConns.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '패트롤 없음';
+      this.patrolListEl.appendChild(empty);
+      return;
+    }
+    this.patrolConns.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;';
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `${p.nodeId}  ${p.axis.toUpperCase().replace('-', '−')}  ${p.distance}u  ${p.duration}s`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn';
+      del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => {
+        this.patrolConns.splice(i, 1);
+        this._rebuildPatrolArrows();
+        this.rebuildPatrolList();
+      });
+      row.appendChild(info);
+      row.appendChild(del);
+      this.patrolListEl.appendChild(row);
+    });
+  }
+
+  /** 에디터 씬에 패트롤 방향 화살표를 다시 그린다 */
+  private _rebuildPatrolArrows(): void {
+    for (const arr of this.patrolArrows) this.scene.remove(arr);
+    this.patrolArrows = [];
+
+    for (const p of this.patrolConns) {
+      const block = this.blocks.find(b => b.id === p.nodeId);
+      if (!block) continue;
+      const sign     = p.axis.startsWith('-') ? -1 : 1;
+      const baseAxis = p.axis.replace('-', '') as 'x' | 'y' | 'z';
+      const origin = block.mesh.position.clone();
+      origin.y += 0.35;
+      const dir = new THREE.Vector3(
+        baseAxis === 'x' ? sign : 0,
+        baseAxis === 'y' ? sign : 0,
+        baseAxis === 'z' ? sign : 0,
+      );
+      const arr = new THREE.ArrowHelper(dir, origin, p.distance, 0x44AAFF, 0.2, 0.12);
+      this.scene.add(arr);
+      this.patrolArrows.push(arr);
+    }
   }
 
   private rebuildZoneList(): void {
@@ -1662,6 +1963,7 @@ export class LevelEditor {
       this.colorInput.value = b.color;
       this.walkableInput.checked = b.walkable;
       this.spikeInput.checked    = b.isSpike;
+      this.spikeTypeSelect.value = b.spikeType;
     } else {
       this.selIdEl.textContent = '—';
       this.selFloorEl.textContent = '—';
@@ -1724,6 +2026,7 @@ export class LevelEditor {
       color: this.currentColor,
       walkable: true,
       isSpike: this.spikeMode,
+      spikeType: this.spikeModeType,
       mesh: blockInst.mesh,
     };
     if (this.spikeMode) this._setSpikeIndicator(block, true);
@@ -2016,6 +2319,7 @@ export class LevelEditor {
     this.renderer.render(this.scene, this.camera);
     this.updateAngleOverlay();
     this.updateLabels();
+    this._updateAxisLabels();
   };
 
   private updateAngleOverlay(): void {
@@ -2029,6 +2333,52 @@ export class LevelEditor {
     const elevation = Math.atan2(dy, horizDist) * (180 / Math.PI);
     this.angleOverlay.textContent =
       `azimuth: ${azimuth.toFixed(1)}°  |  elevation: ${elevation.toFixed(1)}°`;
+  }
+
+  /** 그리드 끝 모서리에 3D 축 화살표와 HTML 레이블을 생성한다 */
+  private _buildAxisArrows(): void {
+    // 그리드 범위를 살짝 벗어난 위치 (0,0 모서리 기준)
+    const origin = new THREE.Vector3(-1, 0.05, -1);
+    const len = 3;
+
+    const axes: Array<{ dir: THREE.Vector3; color: number; label: string; cssColor: string }> = [
+      { dir: new THREE.Vector3(1, 0, 0), color: 0xFF4444, label: 'X', cssColor: '#FF6666' },
+      { dir: new THREE.Vector3(0, 0, 1), color: 0x4466FF, label: 'Z', cssColor: '#6699FF' },
+      { dir: new THREE.Vector3(0, 1, 0), color: 0x33CC55, label: 'Y', cssColor: '#55EE77' },
+    ];
+
+    for (const { dir, color, label, cssColor } of axes) {
+      const arrow = new THREE.ArrowHelper(dir, origin, len, color, 0.4, 0.25);
+      this.scene.add(arrow);
+      this.axisArrows.push(arrow);
+
+      // HTML 레이블 — updateLabels() 루프 바깥에서 관리
+      const el = document.createElement('div');
+      el.style.cssText = `position:absolute;pointer-events:none;font:bold 13px monospace;color:${cssColor};
+        text-shadow:0 0 4px #000,0 0 2px #000;transform:translate(-50%,-50%);`;
+      el.textContent = label;
+      el.dataset['axisDir'] = `${dir.x},${dir.y},${dir.z}`;
+      this.labelsContainer.appendChild(el);
+      this.axisLabelEls.push(el);
+    }
+  }
+
+  /** 매 프레임: 3D 축 레이블 HTML 위치를 카메라 투영으로 갱신 */
+  private _updateAxisLabels(): void {
+    const w = this.viewportEl.clientWidth;
+    const h = this.viewportEl.clientHeight;
+    const origin = new THREE.Vector3(-1, 0.05, -1);
+    const len = 3;
+
+    this.axisLabelEls.forEach((el) => {
+      const raw = el.dataset['axisDir']!.split(',').map(Number);
+      const tip = origin.clone().addScaledVector(new THREE.Vector3(raw[0], raw[1], raw[2]), len + 0.6);
+      tip.project(this.camera);
+      if (tip.z > 1) { el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      el.style.left = `${(tip.x * 0.5 + 0.5) * w}px`;
+      el.style.top  = `${(-tip.y * 0.5 + 0.5) * h}px`;
+    });
   }
 
   // ── Block ID labels ───────────────────────────────────────────────────────
@@ -2088,7 +2438,7 @@ export class LevelEditor {
         color: b.color,
         size: [1, 0.5, 1] as [number, number, number],
         walkable: b.walkable,
-        ...(b.isSpike ? { isSpike: true } : {}),
+        ...(b.isSpike ? { isSpike: true, spikeType: b.spikeType } : {}),
       })),
       ladders: this.ladderConns,
       conditionalLadders: (() => {
@@ -2114,6 +2464,7 @@ export class LevelEditor {
           ...(sw.type === 'move' && t.moveTarget ? { moveTarget: t.moveTarget } : {}),
         }))
       ) : undefined,
+      patrols: this.patrolConns.length > 0 ? this.patrolConns.map(p => ({ ...p })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -2155,6 +2506,9 @@ export class LevelEditor {
     this.teleporterConns = [];
     this.starNodeIds     = [];
     this.switchConns     = [];
+    this.patrolConns     = [];
+    for (const arr of this.patrolArrows) this.scene.remove(arr);
+    this.patrolArrows    = [];
     this.zones           = [];
     this.zoneCounter     = 0;
     // 오버레이 초기화
@@ -2200,6 +2554,7 @@ export class LevelEditor {
         color: bd.color,
         walkable: bd.walkable,
         isSpike: !!bd.isSpike,
+        spikeType: bd.spikeType ?? 'always',
         mesh: blockInst.mesh,
       };
       if (bd.isSpike) this._setSpikeIndicator(block, true);
@@ -2240,6 +2595,11 @@ export class LevelEditor {
       }
       this.switchConns = Array.from(map.values());
     }
+
+    // Patrols 복원
+    this.patrolConns = (data.patrols ?? []).map(p => ({ ...p }));
+    this._rebuildPatrolArrows();
+    this.rebuildPatrolList();
 
     // Zones 복원
     this.zones = (data.zones ?? []).map(z => ({
@@ -2357,6 +2717,9 @@ export class LevelEditor {
         }
       });
     }
+
+    for (const arr of this.patrolArrows) this.scene.remove(arr);
+    this.patrolArrows = [];
 
     this.ghostMesh.geometry.dispose();
     (this.ghostMesh.material as THREE.Material).dispose();

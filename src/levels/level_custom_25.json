@@ -1,0 +1,208 @@
+{
+  "id": "custom_stage_25",
+  "name": "Stage 25",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        3.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        4.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b003",
+      "position": [
+        5.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [
+        6.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b006",
+      "position": [
+        6.5,
+        2.75,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b007",
+      "position": [
+        6.5,
+        2.75,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b008",
+      "position": [
+        6.5,
+        2.75,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b009",
+      "position": [
+        6.5,
+        2.75,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b014",
+      "position": [
+        3.5,
+        0.25,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b015",
+      "position": [
+        5.5,
+        0.25,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b016",
+      "position": [
+        4.5,
+        0.25,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [],
+  "stars": [
+    {
+      "nodeId": "b004"
+    },
+    {
+      "nodeId": "b009"
+    }
+  ],
+  "patrols": [
+    {
+      "nodeId": "b004",
+      "axis": "y",
+      "distance": 2.5,
+      "duration": 1.5
+    },
+    {
+      "nodeId": "b009",
+      "axis": "-y",
+      "distance": 2.5,
+      "duration": 1.5
+    }
+  ],
+  "illusionConnections": [],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b014"
+  },
+  "initialCamera": {
+    "azimuth": 45,
+    "polar": 33,
+    "distance": 14,
+    "targetY": 0
+  }
+}

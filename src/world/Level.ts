@@ -4,27 +4,35 @@ import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
 
 // ---------- 가시 메시 생성 ----------
+export const SPIKE_H      = 0.22;
+export const SPIKE_TRAVEL = SPIKE_H + 0.12; // 가시가 블록 안으로 숨는 거리
+
 export function buildSpikesMesh(bd: BlockData): THREE.Group {
   const group = new THREE.Group();
-  const mat   = new THREE.MeshLambertMaterial({ color: 0xCC2020 });
+  const mat   = new THREE.MeshLambertMaterial({ color: 0xCC2020 }); // always/blinking 모두 빨간색
   const [bx, by, bz] = bd.position;
-  const [bw, bh, bdp] = bd.size;
-  const topY  = by + bh / 2;
-  const spikeH = 0.22;
+  const [, bh] = bd.size;
+  const topY   = by + bh / 2;
   const spikeR = 0.065;
-  const cols  = Math.max(1, Math.round(bw));
-  const rows  = Math.max(1, Math.round(bdp));
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows; r++) {
-      const geo  = new THREE.ConeGeometry(spikeR, spikeH, 5);
-      const mesh = new THREE.Mesh(geo, mat.clone());
-      mesh.position.set(
-        bx - bw / 2 + (c + 0.5) * (bw / cols),
-        topY + spikeH / 2,
-        bz - bdp / 2 + (r + 0.5) * (bdp / rows),
-      );
-      group.add(mesh);
-    }
+  const off    = 0.28; // X자 패턴 오프셋
+  // X자 형태: 중앙 1개 + 대각선 4개
+  const positions: [number, number, number][] = [
+    [bx,       topY + SPIKE_H / 2, bz],
+    [bx - off, topY + SPIKE_H / 2, bz - off],
+    [bx + off, topY + SPIKE_H / 2, bz - off],
+    [bx - off, topY + SPIKE_H / 2, bz + off],
+    [bx + off, topY + SPIKE_H / 2, bz + off],
+  ];
+  for (const [x, y, z] of positions) {
+    const geo  = new THREE.ConeGeometry(spikeR, SPIKE_H, 5);
+    const mesh = new THREE.Mesh(geo, mat.clone());
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+  }
+  // blinking 가시는 초기에 숨겨진 위치에서 시작
+  if (bd.spikeType === 'blinking') {
+    group.visible = false;
+    group.position.y = -SPIKE_TRAVEL;
   }
   return group;
 }
@@ -87,6 +95,7 @@ export interface BlockData {
   walkable: boolean;
   variant?: string;
   isSpike?: boolean;
+  spikeType?: 'always' | 'blinking';
 }
 
 export interface RotatingSectionData {
@@ -137,6 +146,12 @@ export interface LevelData {
     duration: number;
     mode:     'auto' | 'trigger';
   }>;
+  patrols?: Array<{
+    nodeId:   string;
+    axis:     'x' | '-x' | 'y' | '-y' | 'z' | '-z';
+    distance: number;
+    duration: number;
+  }>;
   stars?: Array<{ nodeId: string }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
@@ -157,7 +172,21 @@ export class Level {
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
   private spikeNodeIds: Set<string> = new Set();
+  private blinkingNodeIds: Set<string> = new Set();
+  private blinkingSpikeGroups: Map<string, THREE.Group> = new Map();
+  private blinkIsActive  = false; // 현재 사이클에서 가시가 위험 상태인가
   private scene: THREE.Scene;
+
+  // blinking 속도 설정 (dev에서 조절 가능)
+  blinkOnDuration  = 1.5; // 가시 올라와 있는 시간(초)
+  blinkOffDuration = 1.0; // 가시 내려가 있는 시간(초)
+
+  // 애니메이션 길이 (고정값)
+  private static readonly EMERGE_DURATION  = 0.25; // 올라오는 모션 시간
+  private static readonly RETRACT_DURATION = 0.2;  // 내려가는 모션 시간
+
+  // 가시가 활성화될 때 호출되는 콜백 (각 nodeId 전달)
+  private onSpikeActivated: ((nodeId: string) => void) | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -169,6 +198,9 @@ export class Level {
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
+    this.blinkingNodeIds.clear();
+    this.blinkingSpikeGroups.clear();
+    this.blinkIsActive = false;
     this.scene.remove(this.group);
     this.group = new THREE.Group();
 
@@ -198,7 +230,12 @@ export class Level {
       if (bd.walkable) this.walkableMeshes.push(block.mesh);
       if (bd.isSpike) {
         this.spikeNodeIds.add(bd.id);
-        this.group.add(buildSpikesMesh(bd));
+        const spikeGroup = buildSpikesMesh(bd);
+        this.group.add(spikeGroup);
+        if (bd.spikeType === 'blinking') {
+          this.blinkingNodeIds.add(bd.id);
+          this.blinkingSpikeGroups.set(bd.id, spikeGroup);
+        }
       }
     }
 
@@ -233,6 +270,69 @@ export class Level {
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
   getSpikeNodeIds(): Set<string>                     { return this.spikeNodeIds; }
 
+  /** blinking 가시가 현재 위험한 상태(올라오는 중/올라와 있음/내려가는 중)인지 반환. always 타입이면 항상 true. */
+  isBlinkingSpikeActive(nodeId: string): boolean {
+    if (!this.blinkingNodeIds.has(nodeId)) return true;
+    return this.blinkIsActive;
+  }
+
+  /** 가시가 활성화(올라오기 시작)될 때 호출될 콜백을 등록한다. */
+  setSpikeActivationCallback(cb: (nodeId: string) => void): void {
+    this.onSpikeActivated = cb;
+  }
+
+  /** blinking 속도 설정 (dev 패널에서 호출) */
+  setBlinkSpeed(onDuration: number, offDuration: number): void {
+    this.blinkOnDuration  = onDuration;
+    this.blinkOffDuration = offDuration;
+  }
+
+  /** 매 프레임 호출 — blinking 가시 슬라이드 애니메이션 */
+  update(): void {
+    if (this.blinkingSpikeGroups.size === 0) return;
+
+    const E = Level.EMERGE_DURATION;
+    const R = Level.RETRACT_DURATION;
+    const period = this.blinkOnDuration + this.blinkOffDuration;
+    const phase  = (performance.now() / 1000) % period;
+
+    // smoothstep (3t²-2t³) — 부드러운 가속/감속
+    const smoothstep = (t: number) => t * t * (3 - 2 * t);
+
+    let progress: number;  // 0 = 완전히 내려감, 1 = 완전히 올라옴
+    let isActive: boolean; // 플레이어에게 위험한 상태
+
+    if (phase < E) {
+      // 올라오는 모션
+      progress = smoothstep(phase / E);
+      isActive = true;
+    } else if (phase < this.blinkOnDuration - R) {
+      // 완전히 올라온 상태
+      progress = 1;
+      isActive = true;
+    } else if (phase < this.blinkOnDuration) {
+      // 내려가는 모션
+      progress = smoothstep(1 - (phase - (this.blinkOnDuration - R)) / R);
+      isActive = true;
+    } else {
+      // 완전히 내려간 상태
+      progress = 0;
+      isActive = false;
+    }
+
+    const prevActive = this.blinkIsActive;
+    this.blinkIsActive = isActive;
+
+    this.blinkingSpikeGroups.forEach((group, nodeId) => {
+      group.visible    = isActive;
+      group.position.y = -SPIKE_TRAVEL * (1 - progress);
+      // 활성화 전환 시 콜백 (내려감→올라옴 시작)
+      if (isActive && !prevActive) {
+        this.onSpikeActivated?.(nodeId);
+      }
+    });
+  }
+
   /** Apply a global hex color to all blocks, or restore each block's original JSON color. */
   recolorAllBlocks(hexOverride: number | null): void {
     this.blocks.forEach(block => block.recolor(hexOverride));
@@ -262,5 +362,8 @@ export class Level {
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
+    this.blinkingNodeIds.clear();
+    this.blinkingSpikeGroups.clear();
+    this.onSpikeActivated = null;
   }
 }

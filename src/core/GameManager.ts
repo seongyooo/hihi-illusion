@@ -26,6 +26,7 @@ import { TeleportManager }    from '../mechanics/TeleportManager';
 import { StarManager }        from '../mechanics/StarManager';
 import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
+import { PatrolManager }      from '../world/PatrolManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -62,6 +63,7 @@ export class GameManager {
   private starMgr:          StarManager      | null = null;
   private switchMgr:        SwitchManager   | null = null;
   private elevatorMgr:      ElevatorManager | null = null;
+  private patrolMgr:        PatrolManager   | null = null;
   private tutorialSequencer: TutorialSequencer | null = null;
   private tutorialInputLocked = false;
   private goalGlow:         THREE.PointLight | null = null;
@@ -79,6 +81,11 @@ export class GameManager {
   // ── Stage tracking ────────────────────────────────────────────────────
   private currentStageNum = 0;  // 0 = tutorial, 1+ = actual stages
 
+  // ── Current level reload info (for respawn-restart) ──────────────────
+  private _currentLevelId:    string    | null = null;  // 빌트인 레벨 id
+  private _currentCustomData: LevelData | null = null;  // 커스텀 레벨 data
+  private _currentCustomExit: (() => void) | undefined = undefined;
+
   // ── Fly-in cancellation ───────────────────────────────────────────────
   private flyInCancelFn: (() => void) | null = null;
 
@@ -94,8 +101,6 @@ export class GameManager {
   private currentZoneId:    string | null = null;
   private zoneCameraTween:  gsap.core.Tween | null = null;
 
-  // ── Respawn ───────────────────────────────────────────────────────────
-  private startNodeId = '';
 
   constructor(container: HTMLElement) {
     this.debug      = new URLSearchParams(location.search).has('debug');
@@ -490,13 +495,18 @@ export class GameManager {
       this.elevatorMgr.setup(data.elevators!, this.graph);
     }
 
+    // PatrolManager
+    this.patrolMgr = new PatrolManager(this.renderer.scene);
+    if ((data.patrols ?? []).length > 0) {
+      this.patrolMgr.setup(data.patrols!, this.graph);
+    }
+
     // Character — 타입은 항상 settings 값 사용, 튜토리얼은 색상만 기본값 유지
     this.character = new Character(GraphicsSettings.characterType as CharacterType);
     if (this.isTutorial) {
       this.character.setBodyColor(COLOR_DEFAULTS.charBody);
       this.character.setHeadColor(COLOR_DEFAULTS.charHead);
     }
-    this.startNodeId  = data.character.startNodeId;
     const startNode   = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
@@ -520,8 +530,8 @@ export class GameManager {
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
         },
         onArrival: (nodeId) => {
-          // 가시 블록 — 즉시 리스폰
-          if (this.level!.getSpikeNodeIds().has(nodeId)) {
+          // 가시 블록 — 즉시 리스폰 (blinking 타입은 가시가 표시 중일 때만)
+          if (this.level!.getSpikeNodeIds().has(nodeId) && this.level!.isBlinkingSpikeActive(nodeId)) {
             this._respawn();
             return;
           }
@@ -589,6 +599,16 @@ export class GameManager {
       }
     );
     this.renderer.scene.add(this.character.mesh);
+
+    // blinking 가시 활성화 콜백 — 플레이어가 서 있는 블록에 가시가 올라오면 즉시 리스폰
+    this.level.setSpikeActivationCallback((nodeId) => {
+      if (this.controller?.getCurrentNode().id === nodeId) {
+        this._respawn();
+      }
+    });
+
+    // dev 모드: blinking 속도 조절 패널
+    if (this.debug) this._setupBlinkDevPanel();
 
     // InputManager (섹션 드래그/스냅 포함)
     const interactTargets = [
@@ -753,6 +773,8 @@ export class GameManager {
     const mod  = await meta.file();
     const data = mod.default as unknown as LevelData;
 
+    this._currentLevelId    = id;
+    this._currentCustomData = null;
     this.isTutorial    = this.currentStageNum === 0;
     this.goalReached   = false;
     this.tutorialMoved = false;
@@ -798,6 +820,10 @@ export class GameManager {
     this.isTutorial    = false;
     this.goalReached   = false;
     this.tutorialMoved = false;
+
+    this._currentCustomData = data;
+    this._currentCustomExit = onExit;
+    this._currentLevelId    = null;
 
     this._initLevelObjects(data);
     this.hud.enableSkip(() => { onExit ? onExit() : this.stageSelect.show(); });
@@ -972,6 +998,8 @@ export class GameManager {
     this.switchMgr   = null;
     this.elevatorMgr?.dispose();
     this.elevatorMgr = null;
+    this.patrolMgr?.dispose();
+    this.patrolMgr = null;
     this.tutorialSequencer?.dispose();
     this.tutorialSequencer    = null;
     this.tutorialInputLocked  = false;
@@ -1182,15 +1210,84 @@ export class GameManager {
     });
   }
 
-  /** 가시 블록 착지 시 시작 지점으로 리스폰 */
+  /** dev 모드: blinking 가시 속도 조절 패널 생성 */
+  private _blinkDevPanel: HTMLElement | null = null;
+  private _setupBlinkDevPanel(): void {
+    this._blinkDevPanel?.remove();
+    const panel = document.createElement('div');
+    panel.style.cssText = [
+      'position:fixed', 'bottom:60px', 'left:12px', 'z-index:9999',
+      'background:rgba(0,0,0,0.75)', 'color:#fff', 'padding:8px 12px',
+      'border-radius:6px', 'font:12px/1.6 monospace', 'pointer-events:all',
+    ].join(';');
+
+    const makeRow = (label: string, min: number, max: number, step: number, initial: number, onChange: (v: number) => void) => {
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.gap = '6px';
+      row.style.marginBottom = '2px';
+      const lbl = document.createElement('span');
+      lbl.textContent = label;
+      lbl.style.minWidth = '90px';
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min  = String(min);
+      slider.max  = String(max);
+      slider.step = String(step);
+      slider.value = String(initial);
+      slider.style.width = '100px';
+      const num = document.createElement('span');
+      num.textContent = `${initial.toFixed(1)}s`;
+      num.style.minWidth = '32px';
+      slider.addEventListener('input', () => {
+        const v = parseFloat(slider.value);
+        num.textContent = `${v.toFixed(1)}s`;
+        onChange(v);
+      });
+      row.appendChild(lbl);
+      row.appendChild(slider);
+      row.appendChild(num);
+      return row;
+    };
+
+    const title = document.createElement('div');
+    title.textContent = '🗡 Blink Speed (dev)';
+    title.style.marginBottom = '4px';
+    title.style.fontWeight = 'bold';
+    panel.appendChild(title);
+
+    const updateSpeed = () => {
+      if (this.level) {
+        this.level.setBlinkSpeed(onVal, offVal);
+      }
+    };
+    let onVal  = this.level?.blinkOnDuration  ?? 1.5;
+    let offVal = this.level?.blinkOffDuration ?? 1.0;
+
+    panel.appendChild(makeRow('On (active)', 0.5, 5.0, 0.1, onVal,  (v) => { onVal  = v; updateSpeed(); }));
+    panel.appendChild(makeRow('Off (hidden)', 0.5, 5.0, 0.1, offVal, (v) => { offVal = v; updateSpeed(); }));
+
+    document.body.appendChild(panel);
+    this._blinkDevPanel = panel;
+  }
+
+  /** 가시 블록 착지 시 레벨 전체 재시작 (별 등 모든 상태 초기화) */
   private _respawn(): void {
-    const startNode = this.graph?.getNode(this.startNodeId);
-    if (!startNode || !this.controller || !this.character) return;
+    if (!this.character) return;
+    // 파티클 + 사운드 피드백
     this.particles.burst(this.character.mesh.position.clone(), 0xFF3322, 18, 1.5, 0.8);
     this.audio.playTeleport();
-    this.controller.stop();
-    this.controller.teleportTo(startNode);
-    this.cameraCtrl.pulse(0.35);
+    // 레벨 전체 재로드
+    this._reloadCurrentLevel();
+  }
+
+  private _reloadCurrentLevel(): void {
+    if (this._currentCustomData) {
+      this.loadCustomLevel(this._currentCustomData, this._currentCustomExit);
+    } else if (this._currentLevelId) {
+      this.loadLevel(this._currentLevelId);
+    }
   }
 
   /** 월드 좌표 (x, z)가 속한 구역 반환. 없으면 null */
@@ -1474,6 +1571,8 @@ export class GameManager {
     }
 
     if (this.graph) this.elevatorMgr?.update(this.graph);
+    if (this.graph) this.patrolMgr?.update(this.graph);
+    this.level?.update();
     this.controller?.update();
     this.renderer.render();
   }
