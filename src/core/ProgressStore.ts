@@ -48,4 +48,8 @@ export class ProgressStore {
   static setDeveloperMode(): void {
     localStorage.setItem(KEY_DEV_MODE, '1');
   }
+
+  static clearDeveloperMode(): void {
+    localStorage.removeItem(KEY_DEV_MODE);
+  }
 }

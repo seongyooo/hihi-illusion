@@ -984,6 +984,11 @@ export class GameManager {
     this.input?.dispose();
     this.input = null;
 
+    // StarManager를 먼저 dispose — 별이 블록 메시의 자식이므로
+    // level.dispose()의 traverse보다 먼저 제거해야 double-dispose 방지
+    this.starMgr?.dispose();
+    this.starMgr = null;
+
     this.level.dispose();
     this.level = null;
 
@@ -992,8 +997,6 @@ export class GameManager {
     this.illusionMgr = null;
     this.teleportMgr?.dispose();
     this.teleportMgr = null;
-    this.starMgr?.dispose();
-    this.starMgr = null;
     this.switchMgr?.dispose();
     this.switchMgr   = null;
     this.elevatorMgr?.dispose();

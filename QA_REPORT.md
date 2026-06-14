@@ -1,7 +1,120 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-10  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + **12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget)**
+> 최종 업데이트: 2026-06-14  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + **13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화)**
+
+---
+
+## 13차 QA (2026-06-14) — PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화
+
+### 변경 내용
+
+| 항목 | 파일 |
+|------|------|
+| `PatrolManager.ts` — 신규 파일: axis `'-x'|'-y'|'-z'` 음수 방향 지원, 인게임 점선 제거 | `PatrolManager.ts` |
+| `LevelEditor.ts` — 2D 캔버스 축 오버레이 제거, 3D `ArrowHelper` 축 레이블로 교체; 패트롤 axis 드롭다운 ±6방향 추가 | `LevelEditor.ts` |
+| `CharacterController.ts` — `_advance()` 인접성 검사 추가: `prev.neighbors.includes(node)` 실패 시 `stop()` | `CharacterController.ts` |
+| `StarManager.ts` — 별 메시를 `scene.add` → `node.mesh.add`(블록 자식)로 변경, 파티클 위치 `getWorldPosition()`, `dispose()` `removeFromParent()` | `StarManager.ts` |
+| `Level.ts` — `LevelData.patrols[].axis` 타입 `'x'|'y'|'z'` → `'x'|'-x'|'y'|'-y'|'z'|'-z'` | `Level.ts` |
+
+---
+
+### 정상 확인 항목
+
+| 항목 | 확인 위치 | 결과 |
+|------|---------|------|
+| `PatrolDef.axis` — `'-x'|'-y'|'-z'` 포함 6종 타입 정의 | `PatrolManager.ts:7` | ✅ |
+| `_startLoop()` — `sign = axis.startsWith('-') ? -1 : 1`으로 부호 추출, `baseAxis = axis.replace('-','')` | `PatrolManager.ts:74-75` | ✅ |
+| target 계산 — `originX + (baseAxis === 'x' ? sign * distance : 0)` 3축 올바름 | `PatrolManager.ts:77-79` | ✅ |
+| `dispose()` — `tween.kill()` → `mesh.position.set(origin*)` 위치 복원 | `PatrolManager.ts:63-70` | ✅ |
+| `update()` — `tween.isActive()` 중일 때만 50ms 스로틀로 `graph.refresh()` | `PatrolManager.ts:48-60` | ✅ |
+| `_buildAxisArrows()` — 원점 (-1,0.05,-1)에 X(빨강)/Z(파랑)/Y(초록) ArrowHelper 추가 | `LevelEditor.ts:2335-2370` | ✅ |
+| `_updateAxisLabels()` — 매 프레임 팁 위치 camera.project()로 HTML 레이블 갱신 | `LevelEditor.ts:2373-2385` | ✅ |
+| 패트롤 axis 드롭다운 — `+X/-X/+Z/-Z/+Y/-Y` 6개 옵션 | `LevelEditor.ts:1120-1131` | ✅ |
+| 목적지 pick — `baseAxis = axis.replace('-','')` 추출 후 거리 계산 | `LevelEditor.ts:1155-1161` | ✅ |
+| 미리보기 화살표 — `sign * 1`로 음수 방향 화살표 표시 | `LevelEditor.ts:1200-1207` | ✅ |
+| `_rebuildPatrolArrows()` — 음수 axis 부호 추출 후 ArrowHelper 방향 벡터 생성 | `LevelEditor.ts:1824-1841` | ✅ |
+| `CharacterController._advance()` — `prev.neighbors.includes(node)` 실패 시 `stop()` → `currentNode` = prev 유지 | `CharacterController.ts:159-163` | ✅ |
+| `stop()` 후 `update()` — `currentNode`(prev)의 `getWorldPosition()`으로 정착 | `CharacterController.ts:88-93` | ✅ |
+| 고정 블록 이동 — neighbors 변하지 않으므로 기존 pathfinding 무영향 | `PathGraph.ts:129-151` | ✅ |
+| `StarManager._createStarMesh()` — `mesh.position.set(0, localY, 0)` 로컬 좌표, `node.mesh.add(mesh)` | `StarManager.ts:42-43` | ✅ |
+| 패트롤 블록 이동 시 별 자동 추종 — Three.js 씬 그래프 부모화로 처리 | `StarManager.ts:43` | ✅ |
+| `tryCollect()` — `mesh.getWorldPosition(wp)` 월드 좌표로 파티클 버스트 위치 변환 | `StarManager.ts:121-123` | ✅ |
+| `dispose()` — `mesh.removeFromParent()` (블록 자식이든 씬 직속이든 처리) | `StarManager.ts:165,174` | ✅ |
+| `repositionStar()` — `mesh.parent !== node.mesh` 시 재부모화 | `StarManager.ts:90-93` | ✅ |
+
+---
+
+### 신규 버그
+
+---
+
+#### QA-P01 — `unloadCurrent()` StarManager double-dispose: `level.dispose()` → `starMgr.dispose()` 순서 역전 필요 (`GameManager.ts:987,995`) — **P2**
+
+`StarManager`가 별 메시를 블록 메시(`node.mesh`)의 자식으로 부모화하면서 dispose 순서가 충돌한다.
+
+현재 `unloadCurrent()` 실행 순서:
+
+```typescript
+// GameManager.ts
+this.level.dispose();    // line 987 — group.traverse()로 별 geometry/material 먼저 dispose
+// ...
+this.starMgr?.dispose(); // line 995 — 이미 dispose된 geometry/material 재 dispose
+```
+
+`Level.dispose()`는 `this.group.traverse(child => { if (child instanceof THREE.Mesh) { child.geometry.dispose(); ... } })` 를 호출한다. 별 메시는 블록 그룹(level.group의 자손 THREE.Mesh)이므로 traverse가 이를 방문해 geometry/material을 먼저 해제한다. 이후 `StarManager.dispose()`가 동일 geometry/material을 다시 dispose 시도한다.
+
+WebGL에서 이미 삭제된 버퍼를 재삭제하는 것은 대부분 무음 실패하지만 일부 WebGL 구현에서 오류 로그가 발생하며, 별 collect 도중(collectingMeshes) 레벨 언로드 시 타이밍에 따라 문제가 생길 수 있다.
+
+**수정 방향:**
+```typescript
+// unloadCurrent() 내 순서 교체
+this.starMgr?.dispose();  // ← 먼저 블록에서 제거 + 리소스 해제
+this.starMgr = null;
+// ...
+this.level.dispose();      // ← 이후 블록 메시 해제 (별은 이미 제거됨)
+```
+
+---
+
+#### QA-P02 — `LevelEditor.dispose()` 3D 축 화살표 미정리 (`LevelEditor.ts:2704`) — **P3**
+
+`_buildAxisArrows()`에서 생성한 `THREE.ArrowHelper` 객체 3개가 `LevelEditor.dispose()`에서 씬에서 제거되지 않는다. `patrolArrows`는 정리되고 있으나 `axisArrows`는 누락됐다.
+
+```typescript
+// dispose() — 현재 (패트롤 화살표만 정리)
+for (const arr of this.patrolArrows) this.scene.remove(arr);
+this.patrolArrows = [];
+// axisArrows 정리 없음 ← 버그
+```
+
+ArrowHelper는 내부적으로 LineSegments + Mesh(cone)를 가지므로 geometry와 material이 GPU에 남는다. 에디터가 열렸다 닫힐 때마다 3개씩 누적된다.
+
+**수정 방향:**
+```typescript
+for (const arr of this.axisArrows) this.scene.remove(arr);
+this.axisArrows = [];
+```
+
+---
+
+#### QA-P03 — `CharacterController`: 패트롤 블록 탑승 애니메이션 완료 후 위치 스냅 (`CharacterController.ts:188`) — **P4**
+
+`_advance()`에서 GSAP는 `node.position.x/y/z`를 **호출 시점**에 캡처해 고정값으로 트위닝한다. 0.25s 애니메이션 동안 패트롤 블록이 이동하면, 캐릭터는 블록의 T0 위치로 애니메이션 완료 후 `update()`가 블록의 T1 현재 위치로 즉시 스냅한다.
+
+이동 속도(duration ≥ 1.0s)와 애니메이션 길이(0.25s) 차이를 고려하면 최대 스냅 거리는 0.25 / duration × distance units이다. duration=1.5, distance=3 기준 최대 약 0.5 units. 빠른 패트롤 블록에서 시각적으로 감지될 수 있다.
+
+**권장 조치:** `_advance()`에서 패트롤 노드로 이동하는 마지막 스텝에 한해 `mesh.getWorldPosition()`으로 실시간 좌표를 읽거나, 패트롤 블록 탑승 전 블록이 정지(repeatDelay 구간)할 때까지 대기하는 로직 추가. 현재 게임 규모에서는 P4(미관 이슈)로 분류.
+
+---
+
+### 13차 QA 신규 버그 요약
+
+| ID | 우선순위 | 상태 | 내용 | 파일 |
+|---|---|---|---|---|
+| QA-P01 | P2 | ✅ 수정 | `unloadCurrent()` 에서 `starMgr.dispose()` → `level.dispose()` 순서 교체 | `GameManager.ts` |
+| QA-P02 | P3 | ✅ 수정 | `LevelEditor.dispose()`에 `axisArrows` 정리 루프 추가 | `LevelEditor.ts` |
+| QA-P03 | P4 | ✅ 수정 | `_advance()` onComplete에서 `node.mesh.getWorldPosition()`으로 즉시 동기화 | `CharacterController.ts` |
 
 ---
 

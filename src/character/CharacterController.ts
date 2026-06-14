@@ -169,6 +169,14 @@ export class CharacterController {
     const tl = gsap.timeline({
       onComplete: () => {
         this.currentNode = node;
+        // 이동 블록(패트롤 등): 0.25s 애니메이션 동안 블록이 이동했을 수 있으므로
+        // 트위닝이 끝난 직후 실제 현재 위치로 스냅해 update()의 한 프레임 지연 없앰
+        node.mesh.getWorldPosition(this._wp);
+        this.character.setPosition(
+          this._wp.x,
+          this._wp.y + node.halfHeight,
+          this._wp.z,
+        );
         // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
         // (QA-06: 이중 발동 방지 — 마지막 노드에서 tl.onComplete + 경로소진 양쪽 호출되던 문제)
         if (this._movePath.length > 0) {

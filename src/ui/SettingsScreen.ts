@@ -33,6 +33,8 @@ export class SettingsScreen {
 
   private tapCount  = 0;
   private tapTimer: ReturnType<typeof setTimeout> | null = null;
+  private graphicsTapCount  = 0;
+  private graphicsTapTimer: ReturnType<typeof setTimeout> | null = null;
 
   onClose:                () => void = () => {};
   onQualityChange:        (enhanced: boolean)      => void = () => {};
@@ -95,7 +97,12 @@ export class SettingsScreen {
     body.className = 'settings-screen__body';
 
     // — GRAPHICS —
-    body.appendChild(this.makeSection('GRAPHICS'));
+    const graphicsLabel = document.createElement('div');
+    graphicsLabel.className = 'settings-section-label';
+    graphicsLabel.textContent = 'GRAPHICS';
+    graphicsLabel.style.cursor = 'default';
+    graphicsLabel.addEventListener('click', () => this.onGraphicsTap(graphicsLabel));
+    body.appendChild(graphicsLabel);
 
     const qualityRow = this.makeToggleRow(
       'Enhanced Rendering',
@@ -704,6 +711,42 @@ export class SettingsScreen {
     labelEl.style.color = '#FFD700';
     setTimeout(() => {
       labelEl.textContent = 'PREVIEW';
+      labelEl.style.color = '';
+    }, 1500);
+  }
+
+  private onGraphicsTap(labelEl: HTMLElement): void {
+    if (this.graphicsTapTimer !== null) clearTimeout(this.graphicsTapTimer);
+    this.graphicsTapTimer = setTimeout(() => {
+      this.graphicsTapCount = 0;
+      this.graphicsTapTimer = null;
+      labelEl.textContent = 'GRAPHICS';
+      labelEl.style.color = '';
+    }, DEV_RESET_MS);
+
+    this.graphicsTapCount++;
+
+    if (this.graphicsTapCount < DEV_UNLOCK_TAPS) {
+      labelEl.textContent = `GRAPHICS ${'·'.repeat(this.graphicsTapCount)}`;
+      return;
+    }
+
+    // 10번 달성 → 개발자 모드 토글
+    clearTimeout(this.graphicsTapTimer!);
+    this.graphicsTapTimer = null;
+    this.graphicsTapCount = 0;
+
+    if (ProgressStore.isDeveloperMode()) {
+      ProgressStore.clearDeveloperMode();
+      labelEl.textContent = '🔒 DEV MODE OFF';
+      labelEl.style.color = '#FF8888';
+    } else {
+      ProgressStore.setDeveloperMode();
+      labelEl.textContent = '🔓 DEV MODE ON';
+      labelEl.style.color = '#FFD700';
+    }
+    setTimeout(() => {
+      labelEl.textContent = 'GRAPHICS';
       labelEl.style.color = '';
     }, 1500);
   }

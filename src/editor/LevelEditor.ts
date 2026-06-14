@@ -2720,6 +2720,8 @@ export class LevelEditor {
 
     for (const arr of this.patrolArrows) this.scene.remove(arr);
     this.patrolArrows = [];
+    for (const arr of this.axisArrows) this.scene.remove(arr);
+    this.axisArrows = [];
 
     this.ghostMesh.geometry.dispose();
     (this.ghostMesh.material as THREE.Material).dispose();
