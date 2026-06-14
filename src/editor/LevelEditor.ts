@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LevelData } from '../world/Level';
 import type { PatrolDef } from '../world/PatrolManager';
+import type { GravityFlipDef } from '../world/GravityFlipManager';
 import { Block } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
 
@@ -115,9 +116,16 @@ export class LevelEditor {
   private starNodeIds:     string[] = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
-  private patrolConns:      PatrolDef[] = [];
-  private patrolArrows:     THREE.ArrowHelper[] = [];
-  private patrolListEl!:    HTMLElement;
+  private patrolConns:        PatrolDef[] = [];
+  private patrolArrows:       THREE.ArrowHelper[] = [];
+  private patrolListEl!:      HTMLElement;
+  private gravityFlipConns:     GravityFlipDef[] = [];
+  private gravityFlipListEl!:   HTMLElement;
+  private gravityPreviewFlipped = false;
+  private _gravityOrigins:      Map<string, number> = new Map();
+  private gravityTabBarEl:      HTMLElement | null = null;
+  private gravityNormalTab:     HTMLButtonElement | null = null;
+  private gravityFlippedTab:    HTMLButtonElement | null = null;
   private zones: ZoneEntry[] = [];
   private zoneCounter = 0;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
@@ -340,6 +348,40 @@ export class LevelEditor {
     closeBtn.addEventListener('click', () => this.onClose());
     closeBar.appendChild(closeBtn);
     p.appendChild(closeBar);
+
+    // ── Gravity preview tabs (중력 반전 설정이 있을 때만 표시) ─────────────────
+    const gTabBar = document.createElement('div');
+    gTabBar.style.cssText = 'display:none;flex-direction:row;border-bottom:1px solid #2a2a2a;flex-shrink:0;';
+    this.gravityTabBarEl = gTabBar;
+
+    const gNormalBtn = document.createElement('button');
+    gNormalBtn.style.cssText = 'flex:1;padding:7px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#1e1e1e;color:#ccc;border-right:1px solid #2a2a2a;';
+    gNormalBtn.textContent = '⬆ Normal';
+    this.gravityNormalTab = gNormalBtn;
+
+    const gFlippedBtn = document.createElement('button');
+    gFlippedBtn.style.cssText = 'flex:1;padding:7px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#1e1e1e;color:#ccc;';
+    gFlippedBtn.textContent = '⬇ Flipped';
+    this.gravityFlippedTab = gFlippedBtn;
+
+    const setGTab = (flipped: boolean) => {
+      gNormalBtn.style.background  = flipped ? '#1e1e1e' : '#2d4a7a';
+      gNormalBtn.style.color        = flipped ? '#888'    : '#fff';
+      gFlippedBtn.style.background  = flipped ? '#5a2d7a' : '#1e1e1e';
+      gFlippedBtn.style.color       = flipped ? '#fff'    : '#888';
+    };
+    setGTab(false);
+
+    gNormalBtn.addEventListener('click', () => {
+      if (this.gravityPreviewFlipped) { this._setGravityPreview(false); setGTab(false); }
+    });
+    gFlippedBtn.addEventListener('click', () => {
+      if (!this.gravityPreviewFlipped) { this._setGravityPreview(true); setGTab(true); }
+    });
+
+    gTabBar.appendChild(gNormalBtn);
+    gTabBar.appendChild(gFlippedBtn);
+    p.appendChild(gTabBar);
 
     // Floor
     p.appendChild(this.buildSection('FLOOR', (sec) => {
@@ -1246,6 +1288,128 @@ export class LevelEditor {
       });
     }));
 
+    // Gravity Flip
+    p.appendChild(this.buildSection('GRAVITY FLIP', (sec) => {
+      this.gravityFlipListEl = document.createElement('div');
+      sec.appendChild(this.gravityFlipListEl);
+      this.rebuildGravityFlipList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Gravity Flip';
+      addBtn.style.cssText = 'width:100%;margin-top:6px;';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-add-form';
+
+      let gfTrigger = '';
+      let gfLanding = '';
+      let gfBlockIds: string[] = [];
+      let gfPivotY = 1.5;
+
+      // Trigger
+      const trigRow = document.createElement('div');
+      trigRow.className = 'editor-row';
+      const trigLabel = document.createElement('label');
+      trigLabel.textContent = 'Trigger:';
+      const trigDisplay = document.createElement('input');
+      trigDisplay.className = 'editor-input'; trigDisplay.readOnly = true;
+      trigDisplay.placeholder = '↗ 클릭'; trigDisplay.style.flex = '1';
+      const trigPickBtn = document.createElement('button');
+      trigPickBtn.className = 'editor-btn'; trigPickBtn.textContent = '↗';
+      trigPickBtn.addEventListener('click', () => this.startPick(b => {
+        gfTrigger = b.id;
+        trigDisplay.value = b.id;
+        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
+      }));
+      trigRow.append(trigLabel, trigDisplay, trigPickBtn);
+      form.appendChild(trigRow);
+
+      // Landing
+      const landRow = document.createElement('div');
+      landRow.className = 'editor-row';
+      const landLabel = document.createElement('label');
+      landLabel.textContent = 'Landing:';
+      const landDisplay = document.createElement('input');
+      landDisplay.className = 'editor-input'; landDisplay.readOnly = true;
+      landDisplay.placeholder = '↗ 클릭'; landDisplay.style.flex = '1';
+      const landPickBtn = document.createElement('button');
+      landPickBtn.className = 'editor-btn'; landPickBtn.textContent = '↗';
+      landPickBtn.addEventListener('click', () => this.startPick(b => {
+        gfLanding = b.id;
+        landDisplay.value = b.id;
+        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
+      }));
+      landRow.append(landLabel, landDisplay, landPickBtn);
+      form.appendChild(landRow);
+
+      // Block IDs list
+      const blockListLabel = document.createElement('div');
+      blockListLabel.style.cssText = 'font-size:10px;color:#aaa;margin-top:4px;';
+      blockListLabel.textContent = 'Flip Blocks:';
+      form.appendChild(blockListLabel);
+
+      const blockListEl = document.createElement('div');
+      blockListEl.style.cssText = 'font-size:10px;background:#111;padding:4px;border-radius:3px;min-height:20px;margin-bottom:4px;word-break:break-all;';
+      form.appendChild(blockListEl);
+
+      const updateBlockList = () => {
+        blockListEl.textContent = gfBlockIds.length ? gfBlockIds.join(', ') : '(없음)';
+      };
+      updateBlockList();
+
+      const addBlockRow = document.createElement('div');
+      addBlockRow.className = 'editor-row';
+      const addBlockBtn = document.createElement('button');
+      addBlockBtn.className = 'editor-btn'; addBlockBtn.textContent = '↗ Add Block';
+      addBlockBtn.style.flex = '1';
+      addBlockBtn.addEventListener('click', () => this.startPick(b => {
+        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
+      }));
+      const clearBlockBtn = document.createElement('button');
+      clearBlockBtn.className = 'editor-btn'; clearBlockBtn.textContent = '× Clear';
+      clearBlockBtn.addEventListener('click', () => { gfBlockIds = []; updateBlockList(); });
+      addBlockRow.append(addBlockBtn, clearBlockBtn);
+      form.appendChild(addBlockRow);
+
+      // Pivot Y
+      const pivotRow = document.createElement('div');
+      pivotRow.className = 'editor-row';
+      const pivotLabel = document.createElement('label');
+      pivotLabel.textContent = 'Pivot Y:';
+      const pivotInput = document.createElement('input');
+      pivotInput.className = 'editor-input'; pivotInput.type = 'number';
+      pivotInput.value = '1.5'; pivotInput.step = '0.25'; pivotInput.style.flex = '1';
+      pivotInput.addEventListener('input', () => { gfPivotY = parseFloat(pivotInput.value) || 1.5; });
+      pivotRow.append(pivotLabel, pivotInput);
+      form.appendChild(pivotRow);
+
+      // Confirm
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn editor-btn--primary';
+      confirmBtn.textContent = '✓ Add';
+      confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
+      confirmBtn.addEventListener('click', () => {
+        if (!gfTrigger || !gfLanding || gfBlockIds.length === 0) {
+          alert('Trigger, Landing, Blocks를 모두 설정하세요.'); return;
+        }
+        this.gravityFlipConns.push({ triggerNodeId: gfTrigger, landingNodeId: gfLanding, blockIds: [...gfBlockIds], pivotY: gfPivotY });
+        this.rebuildGravityFlipList();
+        gfTrigger = ''; gfLanding = ''; gfBlockIds = []; gfPivotY = 1.5;
+        trigDisplay.value = ''; landDisplay.value = ''; pivotInput.value = '1.5';
+        updateBlockList();
+        form.classList.remove('open');
+      });
+      form.appendChild(confirmBtn);
+      sec.appendChild(form);
+
+      addBtn.addEventListener('click', () => {
+        form.classList.toggle('open');
+        if (!form.classList.contains('open')) this.cancelPick();
+      });
+    }));
+
     // Zones
     p.appendChild(this.buildSection('ZONES', (sec) => {
       this.zoneListEl = document.createElement('div');
@@ -1790,6 +1954,84 @@ export class LevelEditor {
     });
   }
 
+  private rebuildGravityFlipList(): void {
+    if (!this.gravityFlipListEl) return;
+    this.gravityFlipListEl.innerHTML = '';
+
+    // 탭 바 표시 / 숨김 처리
+    if (this.gravityTabBarEl) {
+      const hasFlips = this.gravityFlipConns.length > 0;
+      this.gravityTabBarEl.style.display = hasFlips ? 'flex' : 'none';
+      // 설정이 모두 지워졌는데 Flipped 모드였다면 Normal로 복원
+      if (!hasFlips && this.gravityPreviewFlipped) {
+        this._setGravityPreview(false);
+        if (this.gravityNormalTab)  this.gravityNormalTab.style.background  = '#2d4a7a';
+        if (this.gravityNormalTab)  this.gravityNormalTab.style.color        = '#fff';
+        if (this.gravityFlippedTab) this.gravityFlippedTab.style.background  = '#1e1e1e';
+        if (this.gravityFlippedTab) this.gravityFlippedTab.style.color       = '#888';
+      }
+    }
+    if (this.gravityFlipConns.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '중력 반전 없음';
+      this.gravityFlipListEl.appendChild(empty);
+      return;
+    }
+    this.gravityFlipConns.forEach((gf, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;';
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `T:${gf.triggerNodeId} → L:${gf.landingNodeId}  pivotY=${gf.pivotY}  (${gf.blockIds.length} blocks)`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn';
+      del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => {
+        this.gravityFlipConns.splice(i, 1);
+        this.rebuildGravityFlipList();
+      });
+      row.appendChild(info);
+      row.appendChild(del);
+      this.gravityFlipListEl.appendChild(row);
+    });
+  }
+
+  /**
+   * 에디터의 블록 메시를 중력 반전 프리뷰 상태에 맞게 이동시킨다.
+   * flipped=true → gravityFlipConns의 blockIds를 pivotY 기준 Y 대칭 위치로 이동
+   * flipped=false → 원래 위치로 복원
+   */
+  private _setGravityPreview(flipped: boolean): void {
+    if (flipped === this.gravityPreviewFlipped) return;
+
+    if (flipped) {
+      this._gravityOrigins.clear();
+      for (const gf of this.gravityFlipConns) {
+        for (const blockId of gf.blockIds) {
+          const block = this.blocks.find(b => b.id === blockId);
+          if (!block) continue;
+          const originY = block.mesh.position.y;
+          if (!this._gravityOrigins.has(blockId)) {
+            this._gravityOrigins.set(blockId, originY);
+          }
+          block.mesh.position.y = 2 * gf.pivotY - originY;
+        }
+      }
+    } else {
+      for (const [blockId, originY] of this._gravityOrigins) {
+        const block = this.blocks.find(b => b.id === blockId);
+        if (block) block.mesh.position.y = originY;
+      }
+      this._gravityOrigins.clear();
+    }
+
+    this.gravityPreviewFlipped = flipped;
+    this.updateMarkers();
+    this._rebuildPatrolArrows();  // 패트롤 화살표도 새 위치에 맞게 갱신
+  }
+
   private rebuildPatrolList(): void {
     if (!this.patrolListEl) return;
     this.patrolListEl.innerHTML = '';
@@ -2119,10 +2361,13 @@ export class LevelEditor {
   // ── Markers ───────────────────────────────────────────────────────────────
 
   private updateMarkers(): void {
+    // 중력 프리뷰 상태에서는 mesh.position.y (실제 이동된 위치)를 사용
+    const blockTopY = (b: EditorBlock) => b.mesh.position.y + 0.25; // center + halfHeight(0.25)
+
     const startBlock = this.blocks.find(b => b.id === this.startNodeId);
     if (startBlock) {
       const p = blockWorldPos(startBlock.gridX, startBlock.floor, startBlock.gridZ);
-      this.startMarker.position.set(p.x, p.y + 0.45, p.z);
+      this.startMarker.position.set(p.x, blockTopY(startBlock) + 0.2, p.z);
       this.startMarker.visible = true;
     } else {
       this.startMarker.visible = false;
@@ -2131,7 +2376,7 @@ export class LevelEditor {
     const midBlock = this.blocks.find(b => b.id === this.midpointBlockId);
     if (midBlock) {
       const p = blockWorldPos(midBlock.gridX, midBlock.floor, midBlock.gridZ);
-      this.midpointMarker.position.set(p.x, p.y + 0.45, p.z);
+      this.midpointMarker.position.set(p.x, blockTopY(midBlock) + 0.2, p.z);
       this.midpointMarker.visible = true;
     } else {
       this.midpointMarker.visible = false;
@@ -2140,7 +2385,7 @@ export class LevelEditor {
     const goalBlock = this.blocks.find(b => b.id === this.goalBlockId);
     if (goalBlock) {
       const p = blockWorldPos(goalBlock.gridX, goalBlock.floor, goalBlock.gridZ);
-      this.goalMarker.position.set(p.x, p.y + 0.45, p.z);
+      this.goalMarker.position.set(p.x, blockTopY(goalBlock) + 0.2, p.z);
       this.goalMarker.visible = true;
     } else {
       this.goalMarker.visible = false;
@@ -2465,6 +2710,7 @@ export class LevelEditor {
         }))
       ) : undefined,
       patrols: this.patrolConns.length > 0 ? this.patrolConns.map(p => ({ ...p })) : undefined,
+      gravityFlips: this.gravityFlipConns.length > 0 ? this.gravityFlipConns.map(g => ({ ...g, blockIds: [...g.blockIds] })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -2600,6 +2846,15 @@ export class LevelEditor {
     this.patrolConns = (data.patrols ?? []).map(p => ({ ...p }));
     this._rebuildPatrolArrows();
     this.rebuildPatrolList();
+
+    // Gravity Flips 복원 — 먼저 Normal 상태로 리셋 후 데이터 복원
+    if (this.gravityPreviewFlipped) this._setGravityPreview(false);
+    this.gravityPreviewFlipped = false;
+    this._gravityOrigins.clear();
+    if (this.gravityNormalTab)  { this.gravityNormalTab.style.background = '#2d4a7a'; this.gravityNormalTab.style.color = '#fff'; }
+    if (this.gravityFlippedTab) { this.gravityFlippedTab.style.background = '#1e1e1e'; this.gravityFlippedTab.style.color = '#888'; }
+    this.gravityFlipConns = (data.gravityFlips ?? []).map(g => ({ ...g, blockIds: [...g.blockIds] }));
+    this.rebuildGravityFlipList();
 
     // Zones 복원
     this.zones = (data.zones ?? []).map(z => ({

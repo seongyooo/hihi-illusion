@@ -27,6 +27,7 @@ import { StarManager }        from '../mechanics/StarManager';
 import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { PatrolManager }      from '../world/PatrolManager';
+import { GravityFlipManager } from '../world/GravityFlipManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -63,7 +64,8 @@ export class GameManager {
   private starMgr:          StarManager      | null = null;
   private switchMgr:        SwitchManager   | null = null;
   private elevatorMgr:      ElevatorManager | null = null;
-  private patrolMgr:        PatrolManager   | null = null;
+  private patrolMgr:        PatrolManager      | null = null;
+  private gravityFlipMgr:   GravityFlipManager | null = null;
   private tutorialSequencer: TutorialSequencer | null = null;
   private tutorialInputLocked = false;
   private goalGlow:         THREE.PointLight | null = null;
@@ -501,6 +503,23 @@ export class GameManager {
       this.patrolMgr.setup(data.patrols!, this.graph);
     }
 
+    // GravityFlipManager
+    this.gravityFlipMgr = new GravityFlipManager();
+    if ((data.gravityFlips ?? []).length > 0) {
+      this.gravityFlipMgr.setup(
+        data.gravityFlips!,
+        this.graph,
+        (id) => this.level!.blocks.get(id)?.mesh ?? null,
+        {
+          beforeFlip: () => this.controller?.stop(),
+          onFlipComplete: (landingId) => {
+            const node = this.graph?.getNode(landingId);
+            if (node) this.controller?.teleportTo(node);
+          },
+        },
+      );
+    }
+
     // Character — 타입은 항상 settings 값 사용, 튜토리얼은 색상만 기본값 유지
     this.character = new Character(GraphicsSettings.characterType as CharacterType);
     if (this.isTutorial) {
@@ -552,6 +571,9 @@ export class GameManager {
           // 스위치 / 엘리베이터 트리거
           this.switchMgr?.onCharacterArrive(nodeId, this.graph!);
           this.elevatorMgr?.onCharacterArrive(nodeId, this.graph!);
+
+          // 중력 반전 트리거
+          this.gravityFlipMgr?.onArrival(nodeId);
 
           // 별 수집
           if (this.starMgr?.tryCollect(nodeId)) {
@@ -1003,6 +1025,8 @@ export class GameManager {
     this.elevatorMgr = null;
     this.patrolMgr?.dispose();
     this.patrolMgr = null;
+    this.gravityFlipMgr?.dispose();
+    this.gravityFlipMgr = null;
     this.tutorialSequencer?.dispose();
     this.tutorialSequencer    = null;
     this.tutorialInputLocked  = false;

@@ -152,6 +152,12 @@ export interface LevelData {
     distance: number;
     duration: number;
   }>;
+  gravityFlips?: Array<{
+    triggerNodeId: string;
+    landingNodeId: string;
+    blockIds:      string[];
+    pivotY:        number;
+  }>;
   stars?: Array<{ nodeId: string }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
