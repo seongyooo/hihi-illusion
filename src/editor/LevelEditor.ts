@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LevelData } from '../world/Level';
 import type { PatrolDef } from '../world/PatrolManager';
-import type { GravityFlipDef } from '../world/GravityFlipManager';
-import { Block } from '../world/Block';
+import { Block, recolorBlockGroup } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
 
 const FACE_BRIGHTNESS = [0.82, 0.65, 1.0, 0.45, 0.70, 0.55];
@@ -113,22 +112,13 @@ export class LevelEditor {
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private conditionalLadderConns: Array<{ switchNodeId: string; nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
-  private starNodeIds:         string[] = [];
-  private flippedGoalBlockId:  string | null = null;
-  private flippedStarNodeIds:  string[] = [];
-  private flippedMidpointBlockId: string | null = null;
+  private starEntries: Array<{ nodeId: string; flipped: boolean }> = [];
+  private gravityFlipNodeIds:  string[] = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private patrolConns:        PatrolDef[] = [];
   private patrolArrows:       THREE.ArrowHelper[] = [];
   private patrolListEl!:      HTMLElement;
-  private gravityFlipConns:     GravityFlipDef[] = [];
-  private gravityFlipListEl!:   HTMLElement;
-  private gravityPreviewFlipped = false;
-  private _gravityOrigins:      Map<string, {y: number, z: number}> = new Map();
-  private gravityTabBarEl:      HTMLElement | null = null;
-  private gravityNormalTab:     HTMLButtonElement | null = null;
-  private gravityFlippedTab:    HTMLButtonElement | null = null;
   private zones: ZoneEntry[] = [];
   private zoneCounter = 0;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
@@ -146,6 +136,7 @@ export class LevelEditor {
   private startNodeId:    string | null = null;
   private midpointBlockId: string | null = null;
   private goalBlockId:    string | null = null;
+  private goalFlipped                  = false;
   private stageName = 'Custom Level';
   private stageNum = 4;
   private bgColor = '#E8EEF5';
@@ -351,40 +342,6 @@ export class LevelEditor {
     closeBtn.addEventListener('click', () => this.onClose());
     closeBar.appendChild(closeBtn);
     p.appendChild(closeBar);
-
-    // ── Gravity preview tabs (중력 반전 설정이 있을 때만 표시) ─────────────────
-    const gTabBar = document.createElement('div');
-    gTabBar.style.cssText = 'display:none;flex-direction:row;border-bottom:1px solid #2a2a2a;flex-shrink:0;';
-    this.gravityTabBarEl = gTabBar;
-
-    const gNormalBtn = document.createElement('button');
-    gNormalBtn.style.cssText = 'flex:1;padding:7px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#1e1e1e;color:#ccc;border-right:1px solid #2a2a2a;';
-    gNormalBtn.textContent = '⬆ Normal';
-    this.gravityNormalTab = gNormalBtn;
-
-    const gFlippedBtn = document.createElement('button');
-    gFlippedBtn.style.cssText = 'flex:1;padding:7px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#1e1e1e;color:#ccc;';
-    gFlippedBtn.textContent = '⬇ Flipped';
-    this.gravityFlippedTab = gFlippedBtn;
-
-    const setGTab = (flipped: boolean) => {
-      gNormalBtn.style.background  = flipped ? '#1e1e1e' : '#2d4a7a';
-      gNormalBtn.style.color        = flipped ? '#888'    : '#fff';
-      gFlippedBtn.style.background  = flipped ? '#5a2d7a' : '#1e1e1e';
-      gFlippedBtn.style.color       = flipped ? '#fff'    : '#888';
-    };
-    setGTab(false);
-
-    gNormalBtn.addEventListener('click', () => {
-      if (this.gravityPreviewFlipped) { this._setGravityPreview(false); setGTab(false); }
-    });
-    gFlippedBtn.addEventListener('click', () => {
-      if (!this.gravityPreviewFlipped) { this._setGravityPreview(true); setGTab(true); }
-    });
-
-    gTabBar.appendChild(gNormalBtn);
-    gTabBar.appendChild(gFlippedBtn);
-    p.appendChild(gTabBar);
 
     // Floor
     p.appendChild(this.buildSection('FLOOR', (sec) => {
@@ -609,59 +566,70 @@ export class LevelEditor {
 
       const midBtn = document.createElement('button');
       midBtn.className = 'editor-btn';
+      midBtn.textContent = 'Set as Midpoint';
       midBtn.style.marginBottom = '4px';
       midBtn.style.color = '#44DDBB';
       midBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
-        if (this.gravityPreviewFlipped) {
-          this.flippedMidpointBlockId = this.selectedBlock.id;
-        } else {
-          this.midpointBlockId = this.selectedBlock.id;
-        }
+        this.midpointBlockId = this.selectedBlock.id;
         this.updateMarkers();
       });
       sec.appendChild(midBtn);
 
       const clearMidBtn = document.createElement('button');
       clearMidBtn.className = 'editor-btn';
+      clearMidBtn.textContent = 'Clear Midpoint';
       clearMidBtn.style.marginBottom = '4px';
       clearMidBtn.style.fontSize = '10px';
       clearMidBtn.addEventListener('click', () => {
-        if (this.gravityPreviewFlipped) {
-          this.flippedMidpointBlockId = null;
-        } else {
-          this.midpointBlockId = null;
-        }
+        this.midpointBlockId = null;
         this.updateMarkers();
       });
       sec.appendChild(clearMidBtn);
 
       const goalBtn = document.createElement('button');
       goalBtn.className = 'editor-btn';
+      goalBtn.textContent = 'Set as Goal';
       goalBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
-        if (this.gravityPreviewFlipped) {
-          this.flippedGoalBlockId = this.selectedBlock.id;
-          this.goalBlockId = null; // 한 맵에 goal은 하나 — flipped 설정 시 normal 해제
-        } else {
-          this.goalBlockId = this.selectedBlock.id;
-          this.flippedGoalBlockId = null; // normal 설정 시 flipped 해제
-        }
+        this.goalBlockId  = this.selectedBlock.id;
+        this.goalFlipped  = false;
         this.updateMarkers();
       });
       sec.appendChild(goalBtn);
 
-      // 버튼 텍스트를 중력 상태에 맞게 갱신하는 헬퍼 (탭 전환 시 호출)
-      const _updateSelBtnLabels = () => {
-        const suffix = this.gravityPreviewFlipped ? ' (Flipped)' : '';
-        midBtn.textContent    = `Set as Midpoint${suffix}`;
-        clearMidBtn.textContent = `Clear Midpoint${suffix}`;
-        goalBtn.textContent   = `Set as Goal${suffix}`;
-      };
-      _updateSelBtnLabels();
-      // gravityNormalTab / gravityFlippedTab 클릭 시 라벨도 갱신
-      if (this.gravityNormalTab)  this.gravityNormalTab.addEventListener('click',  _updateSelBtnLabels);
-      if (this.gravityFlippedTab) this.gravityFlippedTab.addEventListener('click', _updateSelBtnLabels);
+      const flippedGoalBtn = document.createElement('button');
+      flippedGoalBtn.className = 'editor-btn';
+      flippedGoalBtn.textContent = 'Set as Flipped Goal';
+      flippedGoalBtn.style.background = '#224466';
+      flippedGoalBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        this.goalBlockId  = this.selectedBlock.id;
+        this.goalFlipped  = true;
+        this.updateMarkers();
+      });
+      sec.appendChild(flippedGoalBtn);
+
+      const flipBtn = document.createElement('button');
+      flipBtn.className = 'editor-btn';
+      flipBtn.textContent = 'Toggle Gravity Flip Block';
+      flipBtn.style.marginTop = '4px';
+      flipBtn.style.background = '#005544';
+      flipBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        const id = this.selectedBlock.id;
+        const idx = this.gravityFlipNodeIds.indexOf(id);
+        if (idx === -1) {
+          this.gravityFlipNodeIds.push(id);
+          recolorBlockGroup(this.selectedBlock.mesh, 0x00CCAA, 'default');
+        } else {
+          this.gravityFlipNodeIds.splice(idx, 1);
+          // 원래 블록 색으로 복원
+          recolorBlockGroup(this.selectedBlock.mesh, parseInt(this.selectedBlock.color.replace('#', ''), 16), 'default');
+        }
+        this.updateMarkers();
+      });
+      sec.appendChild(flipBtn);
     });
     p.appendChild(this.selectedSection);
 
@@ -922,7 +890,7 @@ export class LevelEditor {
       });
     }));
 
-    // Stars (gravity-state-aware)
+    // Stars
     p.appendChild(this.buildSection('STARS', (sec) => {
       this.starListEl = document.createElement('div');
       sec.appendChild(this.starListEl);
@@ -942,6 +910,11 @@ export class LevelEditor {
           <label>Node ID:</label><input class="editor-input" id="star-nodeId" style="width:80px" placeholder="e.g. b001">
           <button class="editor-btn" id="star-pick" title="블록 클릭으로 선택">↗</button>
         </div>
+        <div class="editor-row" style="align-items:center;gap:6px;">
+          <label style="min-width:60px">Flipped:</label>
+          <input type="checkbox" id="star-flipped" style="width:16px;height:16px">
+          <span style="font-size:10px;color:#aaa">(블록 아랫면)</span>
+        </div>
       `;
       (this.starFormEl.querySelector('#star-pick') as HTMLButtonElement)
         .addEventListener('click', () => this.startPick(b => {
@@ -952,40 +925,50 @@ export class LevelEditor {
       starAddBtn.textContent = 'Add';
       starAddBtn.style.marginTop = '6px';
       starAddBtn.addEventListener('click', () => {
-        const nodeId = (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value.trim();
-        const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
-        if (nodeId && !list.includes(nodeId)) {
-          list.push(nodeId);
+        const nodeId  = (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value.trim();
+        const flipped = (this.starFormEl.querySelector('#star-flipped') as HTMLInputElement).checked;
+        if (nodeId && !this.starEntries.some(e => e.nodeId === nodeId && e.flipped === flipped)) {
+          this.starEntries.push({ nodeId, flipped });
           this.rebuildStarList();
           (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = '';
         }
       });
-      // 선택된 블록을 바로 추가하는 버튼
+      // 선택된 블록을 바로 추가하는 버튼 (일반 / 반전)
       const starAddSelectedBtn = document.createElement('button');
       starAddSelectedBtn.className = 'editor-btn';
-      starAddSelectedBtn.textContent = 'Add Selected Block';
+      starAddSelectedBtn.textContent = '★ Add Selected (Normal)';
       starAddSelectedBtn.style.marginTop = '4px';
       starAddSelectedBtn.style.width = '100%';
       starAddSelectedBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
         const id = this.selectedBlock.id;
-        const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
-        if (!list.includes(id)) {
-          list.push(id);
+        if (!this.starEntries.some(e => e.nodeId === id && !e.flipped)) {
+          this.starEntries.push({ nodeId: id, flipped: false });
+          this.rebuildStarList();
+        }
+      });
+      const starAddFlippedBtn = document.createElement('button');
+      starAddFlippedBtn.className = 'editor-btn';
+      starAddFlippedBtn.textContent = '★↓ Add Selected (Flipped)';
+      starAddFlippedBtn.style.marginTop = '2px';
+      starAddFlippedBtn.style.width = '100%';
+      starAddFlippedBtn.style.background = '#224466';
+      starAddFlippedBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        const id = this.selectedBlock.id;
+        if (!this.starEntries.some(e => e.nodeId === id && e.flipped)) {
+          this.starEntries.push({ nodeId: id, flipped: true });
           this.rebuildStarList();
         }
       });
       this.starFormEl.appendChild(starAddBtn);
       this.starFormEl.appendChild(starAddSelectedBtn);
+      this.starFormEl.appendChild(starAddFlippedBtn);
       sec.appendChild(this.starFormEl);
 
       addBtn.addEventListener('click', () => {
         this.starFormEl.classList.toggle('open');
       });
-
-      // 탭 전환 시 리스트 다시 그리기
-      if (this.gravityNormalTab)  this.gravityNormalTab.addEventListener('click',  () => this.rebuildStarList());
-      if (this.gravityFlippedTab) this.gravityFlippedTab.addEventListener('click', () => this.rebuildStarList());
     }));
 
     // Switches
@@ -1315,77 +1298,6 @@ export class LevelEditor {
           if (previewArrow) { this.scene.remove(previewArrow); previewArrow = null; }
           this.cancelPick();
         }
-      });
-    }));
-
-    // Gravity Flip
-    p.appendChild(this.buildSection('GRAVITY FLIP', (sec) => {
-      this.gravityFlipListEl = document.createElement('div');
-      sec.appendChild(this.gravityFlipListEl);
-      this.rebuildGravityFlipList();
-
-      const addBtn = document.createElement('button');
-      addBtn.className = 'editor-btn';
-      addBtn.textContent = '+ Add Gravity Flip';
-      addBtn.style.cssText = 'width:100%;margin-top:6px;';
-      sec.appendChild(addBtn);
-
-      const form = document.createElement('div');
-      form.className = 'editor-add-form';
-
-      let gfTrigger = '';
-      let gfPivotY = 1.5;
-
-      // Trigger
-      const trigRow = document.createElement('div');
-      trigRow.className = 'editor-row';
-      const trigLabel = document.createElement('label');
-      trigLabel.textContent = 'Trigger:';
-      const trigDisplay = document.createElement('input');
-      trigDisplay.className = 'editor-input'; trigDisplay.readOnly = true;
-      trigDisplay.placeholder = '↗ 클릭'; trigDisplay.style.flex = '1';
-      const trigPickBtn = document.createElement('button');
-      trigPickBtn.className = 'editor-btn'; trigPickBtn.textContent = '↗';
-      trigPickBtn.addEventListener('click', () => this.startPick(b => {
-        gfTrigger = b.id;
-        trigDisplay.value = b.id;
-      }));
-      trigRow.append(trigLabel, trigDisplay, trigPickBtn);
-      form.appendChild(trigRow);
-
-      // Pivot Y
-      const pivotRow = document.createElement('div');
-      pivotRow.className = 'editor-row';
-      const pivotLabel = document.createElement('label');
-      pivotLabel.textContent = 'Pivot Y:';
-      const pivotInput = document.createElement('input');
-      pivotInput.className = 'editor-input'; pivotInput.type = 'number';
-      pivotInput.value = '1.5'; pivotInput.step = '0.25'; pivotInput.style.flex = '1';
-      pivotInput.addEventListener('input', () => { gfPivotY = parseFloat(pivotInput.value) || 1.5; });
-      pivotRow.append(pivotLabel, pivotInput);
-      form.appendChild(pivotRow);
-
-      // Confirm
-      const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'editor-btn editor-btn--primary';
-      confirmBtn.textContent = '✓ Add';
-      confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
-      confirmBtn.addEventListener('click', () => {
-        if (!gfTrigger) {
-          alert('Trigger 블록을 선택하세요.'); return;
-        }
-        this.gravityFlipConns.push({ triggerNodeId: gfTrigger, pivotY: gfPivotY });
-        this.rebuildGravityFlipList();
-        gfTrigger = ''; gfPivotY = 1.5;
-        trigDisplay.value = ''; pivotInput.value = '1.5';
-        form.classList.remove('open');
-      });
-      form.appendChild(confirmBtn);
-      sec.appendChild(form);
-
-      addBtn.addEventListener('click', () => {
-        form.classList.toggle('open');
-        if (!form.classList.contains('open')) this.cancelPick();
       });
     }));
 
@@ -1804,33 +1716,34 @@ export class LevelEditor {
 
   private rebuildStarList(): void {
     this.starListEl.innerHTML = '';
-    const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
-    const color = this.gravityPreviewFlipped ? '#AA44FF' : '#FFD700';
-    if (list.length === 0) {
+    if (this.starEntries.length === 0) {
       const empty = document.createElement('div');
       empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
-      empty.textContent = this.gravityPreviewFlipped ? '(뒤집힌 상태 별 없음)' : '(별 없음)';
+      empty.textContent = '(별 없음)';
       this.starListEl.appendChild(empty);
     }
-    list.forEach((nodeId, i) => {
+    this.starEntries.forEach((entry, i) => {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
-      item.innerHTML = `<span style="color:${color}">★</span> <span>${nodeId}</span>`;
+      const icon  = entry.flipped ? `<span style="color:#44CCFF">★↓</span>` : `<span style="color:#FFD700">★</span>`;
+      const label = entry.flipped ? `${entry.nodeId} (F)` : entry.nodeId;
+      item.innerHTML = `${icon} <span>${label}</span>`;
 
       const edit = document.createElement('button');
       edit.textContent = '✎';
       edit.title = '편집';
       edit.addEventListener('click', () => {
-        list.splice(i, 1);
+        this.starEntries.splice(i, 1);
         this.starFormEl.classList.add('open');
-        (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = nodeId;
+        (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = entry.nodeId;
+        (this.starFormEl.querySelector('#star-flipped') as HTMLInputElement).checked = entry.flipped;
         this.rebuildStarList();
       });
 
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
-        list.splice(i, 1);
+        this.starEntries.splice(i, 1);
         this.rebuildStarList();
       });
       item.appendChild(edit);
@@ -1939,89 +1852,6 @@ export class LevelEditor {
       // key를 zone.id로 저장 (1구역 = 1오버레이)
       this.zoneOverlays.set(zone.id, overlay);
     });
-  }
-
-  private rebuildGravityFlipList(): void {
-    if (!this.gravityFlipListEl) return;
-    this.gravityFlipListEl.innerHTML = '';
-
-    // 탭 바 표시 / 숨김 처리
-    if (this.gravityTabBarEl) {
-      const hasFlips = this.gravityFlipConns.length > 0;
-      this.gravityTabBarEl.style.display = hasFlips ? 'flex' : 'none';
-      // 설정이 모두 지워졌는데 Flipped 모드였다면 Normal로 복원
-      if (!hasFlips && this.gravityPreviewFlipped) {
-        this._setGravityPreview(false);
-        if (this.gravityNormalTab)  this.gravityNormalTab.style.background  = '#2d4a7a';
-        if (this.gravityNormalTab)  this.gravityNormalTab.style.color        = '#fff';
-        if (this.gravityFlippedTab) this.gravityFlippedTab.style.background  = '#1e1e1e';
-        if (this.gravityFlippedTab) this.gravityFlippedTab.style.color       = '#888';
-      }
-    }
-    if (this.gravityFlipConns.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
-      empty.textContent = '중력 반전 없음';
-      this.gravityFlipListEl.appendChild(empty);
-      return;
-    }
-    this.gravityFlipConns.forEach((gf, i) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;';
-      const info = document.createElement('span');
-      info.style.flex = '1';
-      info.textContent = `T:${gf.triggerNodeId}  pivotY=${gf.pivotY}`;
-      const del = document.createElement('button');
-      del.className = 'editor-btn';
-      del.textContent = '✕';
-      del.style.cssText = 'padding:1px 6px;font-size:11px;';
-      del.addEventListener('click', () => {
-        this.gravityFlipConns.splice(i, 1);
-        this.rebuildGravityFlipList();
-      });
-      row.appendChild(info);
-      row.appendChild(del);
-      this.gravityFlipListEl.appendChild(row);
-    });
-  }
-
-  /**
-   * 에디터의 블록 메시를 중력 반전 프리뷰 상태에 맞게 이동시킨다.
-   * flipped=true → 전체 맵을 pivotY/pivotZ 기준으로 Y·Z 대칭 위치로 이동 (실제 GravityFlipManager의 X축 180° 회전과 동일 효과)
-   * flipped=false → 원래 위치로 복원
-   */
-  private _setGravityPreview(flipped: boolean): void {
-    if (flipped === this.gravityPreviewFlipped) return;
-
-    if (flipped && this.gravityFlipConns.length > 0) {
-      const gf = this.gravityFlipConns[0];
-      const pivotY = gf.pivotY;
-      // pivotZ는 모든 블록의 Z 중심으로 계산
-      const zVals = this.blocks.map(b => b.mesh.position.z);
-      const pivotZ = zVals.length ? (Math.min(...zVals) + Math.max(...zVals)) / 2 : 0;
-
-      this._gravityOrigins.clear();
-      for (const block of this.blocks) {
-        const originY = block.mesh.position.y;
-        const originZ = block.mesh.position.z;
-        this._gravityOrigins.set(block.id, { y: originY, z: originZ });
-        block.mesh.position.y = 2 * pivotY - originY;
-        block.mesh.position.z = 2 * pivotZ - originZ;
-      }
-    } else {
-      for (const [blockId, origin] of this._gravityOrigins) {
-        const block = this.blocks.find(b => b.id === blockId);
-        if (block) {
-          block.mesh.position.y = origin.y;
-          block.mesh.position.z = origin.z;
-        }
-      }
-      this._gravityOrigins.clear();
-    }
-
-    this.gravityPreviewFlipped = flipped;
-    this.updateMarkers();
-    this._rebuildPatrolArrows();  // 패트롤 화살표도 새 위치에 맞게 갱신
   }
 
   private rebuildPatrolList(): void {
@@ -2287,11 +2117,9 @@ export class LevelEditor {
 
     if (this.startNodeId    === block.id) this.startNodeId    = this.blocks[0]?.id ?? null;
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
-    if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
-    if (this.flippedMidpointBlockId === block.id) this.flippedMidpointBlockId = null;
-    if (this.flippedGoalBlockId     === block.id) this.flippedGoalBlockId     = null;
-    this.starNodeIds        = this.starNodeIds.filter(id => id !== block.id);
-    this.flippedStarNodeIds = this.flippedStarNodeIds.filter(id => id !== block.id);
+    if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; }
+    this.starEntries        = this.starEntries.filter(e => e.nodeId !== block.id);
+    this.gravityFlipNodeIds = this.gravityFlipNodeIds.filter(id => id !== block.id);
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
@@ -2373,9 +2201,8 @@ export class LevelEditor {
       this.startMarker.visible = false;
     }
 
-    // Midpoint — 현재 탭의 midpoint만 표시
-    const activeMidId = this.gravityPreviewFlipped ? this.flippedMidpointBlockId : this.midpointBlockId;
-    const midBlock = this.blocks.find(b => b.id === activeMidId);
+    // Midpoint
+    const midBlock = this.blocks.find(b => b.id === this.midpointBlockId);
     if (midBlock) {
       const p = markerPos(midBlock);
       this.midpointMarker.position.set(p.x, p.y + 0.2, p.z);
@@ -2384,16 +2211,13 @@ export class LevelEditor {
       this.midpointMarker.visible = false;
     }
 
-    // Goal — 항상 하나의 goal 마커 표시 (flipped goal이 있으면 보라색, normal이면 금색)
-    const activeGoalId = this.flippedGoalBlockId ?? this.goalBlockId; // 어느 탭이든 설정된 것
-    const isFlippedGoal = !!this.flippedGoalBlockId && !this.goalBlockId;
-    const goalBlock = this.blocks.find(b => b.id === activeGoalId);
+    // Goal — gold (normal) or blue (flipped)
+    const goalBlock = this.blocks.find(b => b.id === this.goalBlockId);
     if (goalBlock) {
-      const p = markerPos(goalBlock);
-      this.goalMarker.position.set(p.x, p.y + 0.2, p.z);
-      (this.goalMarker.material as THREE.MeshLambertMaterial).color.setHex(
-        isFlippedGoal ? 0xAA44FF : 0xFFD700,
-      );
+      const p       = markerPos(goalBlock);
+      const offsetY = this.goalFlipped ? -0.2 : 0.2;
+      this.goalMarker.position.set(p.x, p.y + offsetY, p.z);
+      (this.goalMarker.material as THREE.MeshLambertMaterial).color.setHex(this.goalFlipped ? 0x44CCFF : 0xFFD700);
       this.goalMarker.visible = true;
     } else {
       this.goalMarker.visible = false;
@@ -2706,10 +2530,8 @@ export class LevelEditor {
           : undefined;
       })(),
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
-      stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
-      flippedGoal:    this.flippedGoalBlockId ? { blockId: this.flippedGoalBlockId } : undefined,
-      flippedStars:   this.flippedStarNodeIds.length > 0 ? this.flippedStarNodeIds.map(id => ({ nodeId: id })) : undefined,
-      flippedMidpoint: this.flippedMidpointBlockId ? { blockId: this.flippedMidpointBlockId } : undefined,
+      stars: this.starEntries.length > 0 ? this.starEntries.map(e => ({ nodeId: e.nodeId, ...(e.flipped ? { flipped: true } : {}) })) : undefined,
+      gravityFlipBlocks: this.gravityFlipNodeIds.length > 0 ? this.gravityFlipNodeIds.map(id => ({ nodeId: id })) : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
         sw.targets.map(t => ({
@@ -2721,7 +2543,6 @@ export class LevelEditor {
         }))
       ) : undefined,
       patrols: this.patrolConns.length > 0 ? this.patrolConns.map(p => ({ ...p })) : undefined,
-      gravityFlips: this.gravityFlipConns.length > 0 ? this.gravityFlipConns.map(g => ({ ...g })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -2735,7 +2556,7 @@ export class LevelEditor {
         : undefined,
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
-      goal: { blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '' },
+      goal: { blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '', ...(this.goalFlipped ? { flipped: true } : {}) },
       ...(this.initCam ? { initialCamera: this.initCam } : {}),
     };
   }
@@ -2761,10 +2582,9 @@ export class LevelEditor {
     this.ladderConns             = [];
     this.conditionalLadderConns  = [];
     this.teleporterConns = [];
-    this.starNodeIds            = [];
-    this.flippedStarNodeIds     = [];
-    this.flippedGoalBlockId     = null;
-    this.flippedMidpointBlockId = null;
+    this.starEntries            = [];
+    this.gravityFlipNodeIds     = [];
+    this.goalFlipped            = false;
     this.switchConns     = [];
     this.patrolConns     = [];
     for (const arr of this.patrolArrows) this.scene.remove(arr);
@@ -2788,6 +2608,7 @@ export class LevelEditor {
     this.startNodeId     = data.character.startNodeId;
     this.midpointBlockId = data.midpoint?.blockId ?? null;
     this.goalBlockId     = data.goal.blockId;
+    this.goalFlipped     = data.goal.flipped ?? false;
 
     // Extract stageNum from id if possible
     const match = data.id.match(/(\d+)$/);
@@ -2840,10 +2661,9 @@ export class LevelEditor {
       cl.pairs.map(p => ({ switchNodeId: cl.switchNodeId, nodeA: p.nodeA, nodeB: p.nodeB }))
     );
     this.teleporterConns = data.teleporters ?? [];
-    this.starNodeIds          = (data.stars ?? []).map(s => s.nodeId);
-    this.flippedStarNodeIds   = (data.flippedStars ?? []).map(s => s.nodeId);
-    this.flippedGoalBlockId   = data.flippedGoal?.blockId ?? null;
-    this.flippedMidpointBlockId = data.flippedMidpoint?.blockId ?? null;
+    this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false }));
+    this.goalFlipped          = data.goal.flipped ?? false;
+    this.gravityFlipNodeIds   = (data.gravityFlipBlocks ?? []).map(g => g.nodeId);
     // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
     // 각 타깃은 자신의 moveTarget을 개별 보유
     {
@@ -2863,15 +2683,6 @@ export class LevelEditor {
     this.patrolConns = (data.patrols ?? []).map(p => ({ ...p }));
     this._rebuildPatrolArrows();
     this.rebuildPatrolList();
-
-    // Gravity Flips 복원 — 먼저 Normal 상태로 리셋 후 데이터 복원
-    if (this.gravityPreviewFlipped) this._setGravityPreview(false);
-    this.gravityPreviewFlipped = false;
-    this._gravityOrigins.clear();
-    if (this.gravityNormalTab)  { this.gravityNormalTab.style.background = '#2d4a7a'; this.gravityNormalTab.style.color = '#fff'; }
-    if (this.gravityFlippedTab) { this.gravityFlippedTab.style.background = '#1e1e1e'; this.gravityFlippedTab.style.color = '#888'; }
-    this.gravityFlipConns = (data.gravityFlips ?? []).map(g => ({ triggerNodeId: g.triggerNodeId, pivotY: g.pivotY }));
-    this.rebuildGravityFlipList();
 
     // Zones 복원
     this.zones = (data.zones ?? []).map(z => ({

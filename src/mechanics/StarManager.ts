@@ -10,6 +10,7 @@ export class StarManager {
   // QA-10: scale-down 애니메이션 중인 메시 — dispose 시 강제 종료 대상
   private collectingMeshes: Set<THREE.Mesh> = new Set();
   private collectedIds: Set<string> = new Set();
+  private flippedStarIds: Set<string> = new Set();
   private total = 0;
 
   constructor(_scene: THREE.Scene, particles: ParticleSystem) {
@@ -17,20 +18,23 @@ export class StarManager {
   }
 
   setup(
-    stars: Array<{ nodeId: string }>,
+    stars: Array<{ nodeId: string; flipped?: boolean }>,
     getNode: (id: string) => PathNode | undefined,
   ): void {
     this.total = stars.length;
-    for (const { nodeId } of stars) {
+    for (const { nodeId, flipped } of stars) {
       const node = getNode(nodeId);
       if (!node) continue;
-      this._createStarMesh(nodeId, node);
+      const isFlipped = flipped ?? false;
+      if (isFlipped) this.flippedStarIds.add(nodeId);
+      this._createStarMesh(nodeId, node, isFlipped);
     }
   }
 
-  private _createStarMesh(nodeId: string, node: PathNode): void {
+  private _createStarMesh(nodeId: string, node: PathNode, isFlipped: boolean): void {
     // 블록 로컬 좌표 기준 — 부모화하면 블록(패트롤 포함)이 움직일 때 자동으로 따라감
-    const localY = node.halfHeight + 0.38;
+    // Normal stars: top of block; Flipped stars: bottom of block
+    const localY = isFlipped ? -(node.halfHeight + 0.38) : node.halfHeight + 0.38;
 
     const geo = new THREE.OctahedronGeometry(0.17, 0);
     const mat = new THREE.MeshLambertMaterial({
@@ -50,9 +54,10 @@ export class StarManager {
       repeat:   -1,
       ease:     'none',
     });
-    // 둥실 떠오르기 (로컬 Y 기준)
+    // 둥실 떠오르기/내려가기 (로컬 Y 기준, 반전별은 아래로)
+    const floatY = isFlipped ? localY - 0.15 : localY + 0.15;
     gsap.to(mesh.position, {
-      y:        localY + 0.15,
+      y:        floatY,
       duration: 1.0,
       yoyo:     true,
       repeat:   -1,
@@ -84,7 +89,8 @@ export class StarManager {
   repositionStar(nodeId: string, node: PathNode): void {
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return;
-    const localY = node.halfHeight + 0.38;
+    const isFlipped = this.flippedStarIds.has(nodeId);
+    const localY = isFlipped ? -(node.halfHeight + 0.38) : node.halfHeight + 0.38;
 
     // 부모가 바뀐 경우(튜토리얼 블록 소환 등) 다시 부모화
     if (mesh.parent !== node.mesh) {
@@ -97,8 +103,9 @@ export class StarManager {
     mesh.position.set(0, localY, 0);
     mesh.visible = true;
 
+    const floatY = isFlipped ? localY - 0.15 : localY + 0.15;
     gsap.to(mesh.position, {
-      y: localY + 0.15, duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      y: floatY, duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
     });
     gsap.to(mesh.rotation, {
       y: Math.PI * 2, duration: 2.2, repeat: -1, ease: 'none',
@@ -108,8 +115,11 @@ export class StarManager {
   /**
    * 해당 노드에 별이 있으면 수집 처리.
    * 수집됐으면 true, 이미 수집했거나 별 없으면 false 반환.
+   * isPlayerFlipped: 플레이어가 현재 중력 반전 상태인지 여부.
+   * 별의 flipped 상태와 일치해야만 수집 가능.
    */
-  tryCollect(nodeId: string): boolean {
+  tryCollect(nodeId: string, isPlayerFlipped: boolean): boolean {
+    if (this.flippedStarIds.has(nodeId) !== isPlayerFlipped) return false;
     if (this.collectedIds.has(nodeId)) return false;
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return false;
@@ -154,28 +164,6 @@ export class StarManager {
   }
 
   /**
-   * 중력 반전 후 모든 별 메시의 로컬 Y 오프셋을 뒤집는다.
-   * 반전 시: 블록 아래쪽(로컬 -Y) 에 배치돼야 플레이어 관점에서 "위"처럼 보임.
-   */
-  repositionForFlip(isFlipped: boolean, getNode: (id: string) => PathNode | undefined): void {
-    const sign = isFlipped ? -1 : 1;
-    for (const [nodeId, mesh] of this.starMeshes) {
-      const node = getNode(nodeId);
-      if (!node) continue;
-      const localY = sign * (node.halfHeight + 0.38);
-      gsap.killTweensOf(mesh.position);
-      mesh.position.y = localY;
-      gsap.to(mesh.position, {
-        y:        localY + sign * 0.15,
-        duration: 1.0,
-        yoyo:     true,
-        repeat:   -1,
-        ease:     'sine.inOut',
-      });
-    }
-  }
-
-  /**
    * 미수집 별 메시를 모두 현재 노드 위치로 재배치한다.
    * QA-08: RotatingSection 스냅 완료 후 호출.
    */
@@ -207,6 +195,7 @@ export class StarManager {
     this.collectingMeshes.clear();
 
     this.collectedIds.clear();
+    this.flippedStarIds.clear();
     this.total = 0;
   }
 }

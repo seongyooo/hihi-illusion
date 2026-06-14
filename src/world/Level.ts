@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { Block } from './Block';
 import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
@@ -112,32 +113,6 @@ export interface ZoneDef {
   depth: number;   // Z 방향 칸 수
 }
 
-// ---------- 중력 반전 트리거 블록 시각 표시 ----------
-export function buildGravityFlipMarker(blockPos: [number, number, number], blockHalfH: number): THREE.Group {
-  const group = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0xAA44FF, emissive: 0x660099, emissiveIntensity: 0.4 });
-  const coneR = 0.09;
-  const coneH = 0.20;
-
-  // 위 화살표 (↑)
-  const upCone = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 6), mat.clone());
-  upCone.position.y = coneH / 2 + 0.06;
-  group.add(upCone);
-
-  // 아래 화살표 (↓)
-  const downCone = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 6), mat.clone());
-  downCone.rotation.z = Math.PI;
-  downCone.position.y = -(coneH / 2 + 0.06);
-  group.add(downCone);
-
-  // 연결 막대
-  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 6), mat.clone());
-  group.add(cyl);
-
-  group.position.set(blockPos[0], blockPos[1] + blockHalfH + 0.50, blockPos[2]);
-  return group;
-}
-
 export interface LevelData {
   id: string;
   name: string;
@@ -178,18 +153,12 @@ export interface LevelData {
     distance: number;
     duration: number;
   }>;
-  gravityFlips?: Array<{
-    triggerNodeId: string;
-    pivotY:        number;
-  }>;
-  stars?: Array<{ nodeId: string }>;
-  flippedGoal?: { blockId: string };
-  flippedStars?: Array<{ nodeId: string }>;
-  flippedMidpoint?: { blockId: string };
+  stars?: Array<{ nodeId: string; flipped?: boolean }>;
+  gravityFlipBlocks?: Array<{ nodeId: string }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string };
-  goal: { blockId: string };
+  goal: { blockId: string; flipped?: boolean };
   initialCamera?: {
     azimuth:  number;   // Y축 회전 각도 (degrees, 0 = +Z 방향)
     polar:    number;   // 수직 각도 (degrees, 0 = 정수리, 90 = 수평)
@@ -201,16 +170,15 @@ export interface LevelData {
 export class Level {
   public blocks: Map<string, Block> = new Map();
   public sections: RotatingSection[] = [];
-  /** 회전 피벗 오브젝트 — GravityFlipManager가 이걸 X축으로 회전시켜 전체 레벨을 뒤집는다 */
-  private flipPivot: THREE.Object3D = new THREE.Object3D();
   private group: THREE.Group = new THREE.Group();
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
   private spikeNodeIds: Set<string> = new Set();
+  private gravityFlipNodeIds: Set<string> = new Set();
+  private portalGroups: THREE.Group[] = [];
   private blinkingNodeIds: Set<string> = new Set();
   private blinkingSpikeGroups: Map<string, THREE.Group> = new Map();
   private blinkIsActive  = false; // 현재 사이클에서 가시가 위험 상태인가
-  private gravityFlipSpinners: THREE.Group[] = [];
   private scene: THREE.Scene;
 
   // blinking 속도 설정 (dev에서 조절 가능)
@@ -234,12 +202,11 @@ export class Level {
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
+    this.gravityFlipNodeIds.clear();
+    this.portalGroups = [];
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
     this.blinkIsActive = false;
-    this.gravityFlipSpinners = [];
-    this.scene.remove(this.flipPivot);
-    this.flipPivot = new THREE.Object3D();
     this.group = new THREE.Group();
 
     // Apply level background color
@@ -300,28 +267,23 @@ export class Level {
       this.sections.push(section);
     }
 
-    // 중력 반전 트리거 블록 시각 표시 (보라색 + ↕ 화살표)
-    for (const gf of data.gravityFlips ?? []) {
-      const bd = data.blocks.find(b => b.id === gf.triggerNodeId);
-      const block = this.blocks.get(gf.triggerNodeId);
-      if (bd && block) {
-        block.recolor(0x8B00FF); // 보라색 tint
-        const halfH = bd.size[1] / 2;
-        const spinner = buildGravityFlipMarker(bd.position, halfH);
-        this.group.add(spinner);
-        this.gravityFlipSpinners.push(spinner);
-      }
+    // 중력 반전 블록 — 블록은 그대로 표시하고 위·아래 사각형 링 펄스 이펙트 추가
+    for (const gf of data.gravityFlipBlocks ?? []) {
+      const bd = data.blocks.find(b => b.id === gf.nodeId);
+      if (!bd) continue;
+      this.gravityFlipNodeIds.add(gf.nodeId);
+      const effectGroup = this._buildRingEffect(bd);
+      this.group.add(effectGroup);
+      this.portalGroups.push(effectGroup);
     }
 
-    this.flipPivot.add(this.group);
-    this.scene.add(this.flipPivot);
+    this.scene.add(this.group);
   }
 
   getGroup(): THREE.Group               { return this.group; }
-  /** GravityFlipManager가 X축 회전에 사용하는 피벗 오브젝트 */
-  getFlipPivot(): THREE.Object3D        { return this.flipPivot; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
+  getGravityFlipNodeIds(): Set<string>  { return this.gravityFlipNodeIds; }
   getSpikeNodeIds(): Set<string>                     { return this.spikeNodeIds; }
 
   /** blinking 가시가 현재 위험한 상태(올라오는 중/올라와 있음/내려가는 중)인지 반환. always 타입이면 항상 true. */
@@ -341,14 +303,8 @@ export class Level {
     this.blinkOffDuration = offDuration;
   }
 
-  /** 매 프레임 호출 — blinking 가시 슬라이드 애니메이션 + 중력 반전 트리거 스피너 회전 */
+  /** 매 프레임 호출 — blinking 가시 슬라이드 애니메이션 */
   update(): void {
-    // 중력 반전 트리거 화살표 Y축 회전
-    const dt = performance.now() / 1000;
-    for (const spinner of this.gravityFlipSpinners) {
-      spinner.rotation.y = dt * 1.8; // ~0.3 rps
-    }
-
     if (this.blinkingSpikeGroups.size === 0) return;
 
     const E = Level.EMERGE_DURATION;
@@ -408,24 +364,93 @@ export class Level {
     this.blocks.forEach(block => block.rebuildGeometry());
   }
 
+  /**
+   * 중력 반전 블록 이펙트 — 블록 위·아래로 사각형 링들이 Y축 방향으로 퍼져나가며 펄스
+   * LineBasicMaterial은 WebGL 제한으로 굵기 설정 불가 → BoxGeometry 4개로 테두리 구성
+   */
+  private _buildRingEffect(bd: BlockData): THREE.Group {
+    const [bx, by, bz] = bd.position;
+    const [bw, bh, bdz] = bd.size;
+
+    const group    = new THREE.Group();
+    const COLOR    = 0x00DDBB;
+    const RINGS    = 5;
+    const SPACING  = 0.13;
+    const DURATION = 1.8;
+    const STAGGER  = DURATION / RINGS;
+    const THICK    = 0.06;   // 막대 XZ 굵기
+    const BAR_H    = 0.015;  // 막대 Y 두께
+
+    for (const side of [-1, 1] as const) {
+      for (let i = 0; i < RINGS; i++) {
+        const y = by + side * (bh / 2 + 0.008 + i * SPACING);
+
+        const mat = new THREE.MeshBasicMaterial({
+          color:       COLOR,
+          transparent: true,
+          opacity:     0,
+          depthWrite:  false,
+        });
+
+        // 사각형 테두리 = 4개의 막대
+        const ring = new THREE.Group();
+        ring.position.set(bx, y, bz);
+
+        const barDefs: [number, number, number, number, number, number][] = [
+          [bw + THICK, BAR_H, THICK,  0,          0,  bdz / 2],  // 앞
+          [bw + THICK, BAR_H, THICK,  0,          0, -bdz / 2],  // 뒤
+          [THICK,      BAR_H, bdz,    bw / 2,     0,  0      ],  // 우
+          [THICK,      BAR_H, bdz,   -bw / 2,     0,  0      ],  // 좌
+        ];
+        for (const [w, h, d, px, py, pz] of barDefs) {
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+          mesh.position.set(px, py, pz);
+          ring.add(mesh);
+        }
+
+        group.add(ring);
+
+        const delay = i * STAGGER;
+        gsap.fromTo(ring.scale,
+          { x: 1, z: 1 },
+          { x: 0.8, z: 0.8, duration: DURATION, delay, repeat: -1, ease: 'power2.out' },
+        );
+        gsap.fromTo(mat,
+          { opacity: 0.9 },
+          { opacity: 0,     duration: DURATION, delay, repeat: -1, ease: 'power2.out' },
+        );
+      }
+    }
+
+    return group;
+  }
+
   dispose(): void {
+    // 포탈 링 GSAP 트윈 먼저 정리 (scale: Group, opacity: MeshBasicMaterial)
+    for (const pg of this.portalGroups) {
+      pg.traverse(child => {
+        gsap.killTweensOf(child.scale);
+        if (child instanceof THREE.Mesh) gsap.killTweensOf(child.material);
+      });
+    }
+
     this.group.traverse(child => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose();
-        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        if (Array.isArray(child.material)) child.material.forEach(m => (m as THREE.Material).dispose());
         else (child.material as THREE.Material).dispose();
       }
     });
-    this.scene.remove(this.flipPivot);
-    this.flipPivot = new THREE.Object3D();
+    this.scene.remove(this.group);
     this.blocks.clear();
     this.sections       = [];
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
+    this.gravityFlipNodeIds.clear();
+    this.portalGroups = [];
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
-    this.gravityFlipSpinners = [];
     this.onSpikeActivated = null;
   }
 }

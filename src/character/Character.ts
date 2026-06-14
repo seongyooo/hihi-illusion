@@ -272,6 +272,10 @@ export class Character {
     this.mesh.position.set(x, y, z);
   }
 
+  setFlipped(flipped: boolean): void {
+    this.mesh.rotation.x = flipped ? Math.PI : 0;
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────
 
   /** 메시 생성 + scene 추가 헬퍼 */

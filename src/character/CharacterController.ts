@@ -23,6 +23,7 @@ export class CharacterController {
 
   // 남은 경로 (한 스텝씩 소비)
   private _movePath: PathNode[] = [];
+  private _flipped = false;
 
   constructor(
     character: Character,
@@ -55,10 +56,25 @@ export class CharacterController {
     this._startMove(target);
   }
 
+  setFlipped(v: boolean): void {
+    this._flipped = v;
+    this.character.setFlipped(v);
+  }
+
+  isFlipped(): boolean { return this._flipped; }
+
+  /** 뒤집힘 상태에 따른 블록 상단/하단 Y 반환 */
+  private _nodeY(node: PathNode): number {
+    return this._flipped
+      ? node.position.y - 2 * node.halfHeight  // 블록 바닥면
+      : node.position.y;                        // 블록 윗면 (기존)
+  }
+
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
     node.mesh.getWorldPosition(this._wp);
-    this.character.setPosition(this._wp.x, this._wp.y + node.halfHeight, this._wp.z);
+    const yOff = this._flipped ? -node.halfHeight : node.halfHeight;
+    this.character.setPosition(this._wp.x, this._wp.y + yOff, this._wp.z);
     this.currentNode = node;
   }
 
@@ -86,9 +102,10 @@ export class CharacterController {
     this.isMoving = false;
     // 현재 노드 위치로 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
+      this._wp.y + yOff,
       this._wp.z,
     );
   }
@@ -107,9 +124,10 @@ export class CharacterController {
     this._movePath    = [];
     // 현재 노드 위치로 즉시 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     char.setPosition(
       this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
+      this._wp.y + yOff,
       this._wp.z,
     );
   }
@@ -172,9 +190,10 @@ export class CharacterController {
         // 이동 블록(패트롤 등): 0.25s 애니메이션 동안 블록이 이동했을 수 있으므로
         // 트위닝이 끝난 직후 실제 현재 위치로 스냅해 update()의 한 프레임 지연 없앰
         node.mesh.getWorldPosition(this._wp);
+        const _yOff = this._flipped ? -node.halfHeight : node.halfHeight;
         this.character.setPosition(
           this._wp.x,
-          this._wp.y + node.halfHeight,
+          this._wp.y + _yOff,
           this._wp.z,
         );
         // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
@@ -193,14 +212,16 @@ export class CharacterController {
       });
     }
 
+    const targetY  = this._nodeY(node);
+    const arcDelta = this._flipped ? -0.08 : 0.08;
     tl.to(this.character.mesh.position, {
       x: node.position.x,
-      y: node.position.y + 0.08,
+      y: targetY + arcDelta,
       z: node.position.z,
       duration: 0.15,
       ease: 'power1.out',
     }).to(this.character.mesh.position, {
-      y: node.position.y,
+      y: targetY,
       duration: 0.1,
       ease: 'power1.in',
     });
@@ -210,9 +231,10 @@ export class CharacterController {
   update(): void {
     if (this.isMoving) return;
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
+      this._wp.y + yOff,
       this._wp.z,
     );
   }
