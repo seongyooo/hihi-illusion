@@ -1086,6 +1086,24 @@ canvas {
   border: 1px solid #2a2a4a;
   border-radius: 8px;
   background: #1a1a30;
+  cursor: grab;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.editor-lobby__card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.editor-lobby__card.drag-over {
+  border-color: #00DDBB;
+  background: #1a2a2a;
+}
+.editor-lobby__card-handle {
+  color: #4444aa;
+  font-size: 16px;
+  cursor: grab;
+  user-select: none;
+  padding: 0 4px;
+  flex-shrink: 0;
 }
 .editor-lobby__card-num {
   font-family: 'Courier New', monospace;

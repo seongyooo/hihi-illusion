@@ -8,7 +8,7 @@ export interface LevelMeta {
 }
 
 // Auto-discover all level_custom_N.json files in this directory
-const customModules = import.meta.glob<{ default: LevelData }>('./level_custom_*.json');
+export const customModules = import.meta.glob<{ default: LevelData }>('./level_custom_*.json');
 
 export const CUSTOM_STAGE_NUMS: number[] = Object.keys(customModules)
   .flatMap(p => {

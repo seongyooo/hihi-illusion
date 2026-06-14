@@ -1,6 +1,7 @@
 import { CustomLevelStore } from '../editor/CustomLevelStore';
 import { ProgressStore }    from '../core/ProgressStore';
-import { CUSTOM_STAGE_NUMS } from '../levels/registry';
+import { CUSTOM_STAGE_NUMS, customModules } from '../levels/registry';
+import type { LevelData } from '../world/Level';
 
 export class EditorLobby {
   private el: HTMLElement;
@@ -53,33 +54,29 @@ export class EditorLobby {
       const builtinSection = document.createElement('div');
       builtinSection.className = 'editor-lobby__section';
 
+      const builtinHeader = document.createElement('div');
+      builtinHeader.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+
       const builtinTitle = document.createElement('h3');
       builtinTitle.textContent = 'BUILT-IN STAGES';
-      builtinSection.appendChild(builtinTitle);
+      builtinTitle.style.margin = '0';
+
+      const applyOrderBtn = document.createElement('button');
+      applyOrderBtn.className = 'editor-btn primary';
+      applyOrderBtn.textContent = '↓ Apply Order';
+      applyOrderBtn.title = '현재 순서로 리넘버링된 JSON 파일 다운로드 → src/levels/ 에 덮어쓰기';
+      applyOrderBtn.addEventListener('click', () => this._downloadReorderedBuiltins());
+
+      builtinHeader.appendChild(builtinTitle);
+      builtinHeader.appendChild(applyOrderBtn);
+      builtinSection.appendChild(builtinHeader);
 
       const builtinGrid = document.createElement('div');
       builtinGrid.className = 'editor-lobby__grid';
-
-      for (const num of CUSTOM_STAGE_NUMS) {
-        const card = document.createElement('div');
-        card.className = 'editor-lobby__card';
-
-        const numEl = document.createElement('span');
-        numEl.className = 'editor-lobby__card-num';
-        numEl.textContent = `Stage ${num}`;
-
-        const editBtn = document.createElement('button');
-        editBtn.className = 'editor-btn primary';
-        editBtn.textContent = 'Edit';
-        editBtn.addEventListener('click', () => this.onEditBuiltin(num));
-
-        card.appendChild(numEl);
-        card.appendChild(editBtn);
-        builtinGrid.appendChild(card);
-      }
-
       builtinSection.appendChild(builtinGrid);
+
       this.el.appendChild(builtinSection);
+      this._buildBuiltinGrid(builtinGrid);
     }
 
     // Custom stages section
@@ -140,9 +137,50 @@ export class EditorLobby {
       return;
     }
 
-    for (const level of all) {
+    let dragSrcIndex = -1;
+
+    for (let idx = 0; idx < all.length; idx++) {
+      const level = all[idx];
       const card = document.createElement('div');
       card.className = 'editor-lobby__card';
+      card.draggable = true;
+      card.dataset.index = String(idx);
+
+      card.addEventListener('dragstart', e => {
+        dragSrcIndex = idx;
+        card.classList.add('dragging');
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('text/plain', String(idx));
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        this.gridEl.querySelectorAll('.editor-lobby__card').forEach(c => c.classList.remove('drag-over'));
+      });
+      card.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
+        this.gridEl.querySelectorAll('.editor-lobby__card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      });
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('drag-over');
+      });
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        const destIndex = idx;
+        if (dragSrcIndex === -1 || dragSrcIndex === destIndex) return;
+        const reordered = [...all];
+        const [moved] = reordered.splice(dragSrcIndex, 1);
+        reordered.splice(destIndex, 0, moved);
+        CustomLevelStore.reorderAll(reordered);
+        this.rebuildGrid();
+      });
+
+      const dragHandle = document.createElement('span');
+      dragHandle.className = 'editor-lobby__card-handle';
+      dragHandle.textContent = '⠿';
+      dragHandle.title = '드래그해서 순서 변경';
 
       const num = document.createElement('span');
       num.className = 'editor-lobby__card-num';
@@ -155,12 +193,14 @@ export class EditorLobby {
       const playBtn = document.createElement('button');
       playBtn.className = 'editor-btn primary';
       playBtn.textContent = '▶ Play';
+      playBtn.draggable = false;
       playBtn.addEventListener('click', () => this.onPlay(level.stageNum));
 
       const dlBtn = document.createElement('button');
       dlBtn.className = 'editor-btn';
       dlBtn.textContent = '↓';
       dlBtn.title = 'JSON 다운로드';
+      dlBtn.draggable = false;
       dlBtn.addEventListener('click', () => {
         const json = JSON.stringify(level.data, null, 2);
         const filename = `level_custom_${level.stageNum}.json`;
@@ -170,11 +210,13 @@ export class EditorLobby {
       const editBtn = document.createElement('button');
       editBtn.className = 'editor-btn';
       editBtn.textContent = 'Edit';
+      editBtn.draggable = false;
       editBtn.addEventListener('click', () => this.onEdit(level.stageNum));
 
       const delBtn = document.createElement('button');
       delBtn.className = 'editor-btn danger';
       delBtn.textContent = 'Delete';
+      delBtn.draggable = false;
       delBtn.addEventListener('click', () => {
         if (!confirm(`Stage ${level.stageNum} "${level.data.name}"을 삭제할까요?`)) return;
         CustomLevelStore.delete(level.stageNum);
@@ -188,10 +230,85 @@ export class EditorLobby {
       btnRow.appendChild(editBtn);
       btnRow.appendChild(delBtn);
 
+      card.appendChild(dragHandle);
       card.appendChild(num);
       card.appendChild(name);
       card.appendChild(btnRow);
       this.gridEl.appendChild(card);
+    }
+  }
+
+  private _buildBuiltinGrid(gridEl: HTMLElement): void {
+    gridEl.innerHTML = '';
+    const order = CustomLevelStore.getBuiltinOrder(CUSTOM_STAGE_NUMS);
+    let dragSrcIndex = -1;
+
+    for (let idx = 0; idx < order.length; idx++) {
+      const num = order[idx];
+      const card = document.createElement('div');
+      card.className = 'editor-lobby__card';
+      card.draggable = true;
+
+      card.addEventListener('dragstart', e => {
+        dragSrcIndex = idx;
+        card.classList.add('dragging');
+        e.dataTransfer!.effectAllowed = 'move';
+        e.dataTransfer!.setData('text/plain', String(idx));
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        gridEl.querySelectorAll('.editor-lobby__card').forEach(c => c.classList.remove('drag-over'));
+      });
+      card.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
+        gridEl.querySelectorAll('.editor-lobby__card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      });
+      card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+      card.addEventListener('drop', e => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        if (dragSrcIndex === -1 || dragSrcIndex === idx) return;
+        const reordered = [...order];
+        const [moved] = reordered.splice(dragSrcIndex, 1);
+        reordered.splice(idx, 0, moved);
+        CustomLevelStore.saveBuiltinOrder(reordered);
+        this._buildBuiltinGrid(gridEl);
+      });
+
+      const dragHandle = document.createElement('span');
+      dragHandle.className = 'editor-lobby__card-handle';
+      dragHandle.textContent = '⠿';
+
+      const numEl = document.createElement('span');
+      numEl.className = 'editor-lobby__card-num';
+      numEl.textContent = `Stage ${num}`;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'editor-btn primary';
+      editBtn.textContent = 'Edit';
+      editBtn.draggable = false;
+      editBtn.addEventListener('click', () => this.onEditBuiltin(num));
+
+      card.appendChild(dragHandle);
+      card.appendChild(numEl);
+      card.appendChild(editBtn);
+      gridEl.appendChild(card);
+    }
+  }
+
+  private async _downloadReorderedBuiltins(): Promise<void> {
+    const order = CustomLevelStore.getBuiltinOrder(CUSTOM_STAGE_NUMS);
+    for (let i = 0; i < order.length; i++) {
+      const srcNum = order[i];
+      const newNum = i + 1;
+      const key = `./level_custom_${srcNum}.json`;
+      const mod = await customModules[key]();
+      const data: LevelData = { ...mod.default, id: `custom_stage_${newNum}` };
+      this.downloadJson(JSON.stringify(data, null, 2), `level_custom_${newNum}.json`);
+      // 브라우저 다운로드 팝업 겹침 방지
+      await new Promise(r => setTimeout(r, 100));
     }
   }
 
