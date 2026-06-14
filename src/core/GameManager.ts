@@ -613,8 +613,11 @@ export class GameManager {
           this.switchMgr?.onCharacterArrive(nodeId, this.graph!);
           this.elevatorMgr?.onCharacterArrive(nodeId, this.graph!);
 
+          // 유효 flip 상태: 플레이어 flip XOR 맵 Y축 180° 회전 flip
+          const effectiveFlipped = this.controller!.isFlipped() !== (this.worldRotateMgr?.isMapFlipped() ?? false);
+
           // 별 수집
-          const _collected = this.starMgr?.tryCollect(nodeId, this.controller!.isFlipped());
+          const _collected = this.starMgr?.tryCollect(nodeId, effectiveFlipped);
           if (_collected) {
             const totalCollected = this.starMgr?.getCollected() ?? 0;
             const totalAll       = this.starMgr?.getTotal() ?? 0;
@@ -633,7 +636,7 @@ export class GameManager {
               // 텔레포트 후 남은 경로를 제거 — 목적지 너머를 클릭했을 때 자동 이동 방지
               this.controller!.stop();
               // QA-07: 텔레포트 목적지 노드의 별 수집 판정
-              const _tpCollected = this.starMgr?.tryCollect(teleportDest, this.controller!.isFlipped());
+              const _tpCollected = this.starMgr?.tryCollect(teleportDest, effectiveFlipped);
               if (_tpCollected) {
                 const totalCollected = this.starMgr?.getCollected() ?? 0;
                 const totalAll       = this.starMgr?.getTotal() ?? 0;
@@ -644,7 +647,7 @@ export class GameManager {
               if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId) {
                 this.onMidpointReached();
               }
-              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && this.controller!.isFlipped() === this._goalFlipped) {
+              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
                 this._tryGoalReached();
               }
               return;
@@ -654,7 +657,7 @@ export class GameManager {
           if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId) {
             this.onMidpointReached();
           }
-          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && this.controller!.isFlipped() === this._goalFlipped) {
+          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
             this._tryGoalReached();
           }
           if (this.isTutorial && !this.tutorialMoved) {

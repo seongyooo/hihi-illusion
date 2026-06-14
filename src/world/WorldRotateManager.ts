@@ -19,6 +19,7 @@ export class WorldRotateManager {
   private defs:        MapRotateDef[]     = [];
   private cumAngles:   Map<string, number> = new Map(); // nodeId → 누적 회전값
   private isAnimating  = false;
+  private _mapFlipped  = false;
 
   private flipPivot:   THREE.Object3D | null = null;
   private levelGroup:  THREE.Group    | null = null;
@@ -82,6 +83,11 @@ export class WorldRotateManager {
     this._rotate(def);
   }
 
+  /** Y축 누적 회전이 홀수 번 (180° 단위) 적용되어 맵이 뒤집힌 상태인지 */
+  isMapFlipped(): boolean {
+    return this._mapFlipped;
+  }
+
   /** 해당 nodeId가 mapRotateBlock인지 */
   has(nodeId: string): boolean {
     return this.defs.some(d => d.nodeId === nodeId);
@@ -109,6 +115,11 @@ export class WorldRotateManager {
       onUpdate: () => { this.onRotateUpdate?.(); },
       onComplete: () => {
         this.isAnimating = false;
+        // Y축 180° 회전마다 맵 flip 상태 토글
+        if (def.axis === 'y') {
+          const turns = Math.round(Math.abs(def.angle) / Math.PI);
+          if (turns % 2 === 1) this._mapFlipped = !this._mapFlipped;
+        }
         this.graph?.refresh();
         this.onRotateComplete?.();
       },
@@ -127,6 +138,7 @@ export class WorldRotateManager {
     this.defs        = [];
     this.cumAngles   = new Map();
     this.isAnimating = false;
+    this._mapFlipped = false;
     this.flipPivot   = null;
     this.levelGroup  = null;
     this.graph       = null;
