@@ -509,13 +509,11 @@ export class GameManager {
       this.gravityFlipMgr.setup(
         data.gravityFlips!,
         this.graph,
-        (id) => this.level!.blocks.get(id)?.mesh ?? null,
+        this.level.getGroup(),
+        this.level.getFlipPivot(),
         {
           beforeFlip: () => this.controller?.stop(),
-          onFlipComplete: (landingId) => {
-            const node = this.graph?.getNode(landingId);
-            if (node) this.controller?.teleportTo(node);
-          },
+          onFlipComplete: () => this._repositionGoalMarkers(),
         },
       );
     }
@@ -919,6 +917,24 @@ export class GameManager {
         this.flyInCancelFn = null;
         this.orbit.enabled = true;
       });
+  }
+
+  /** 중력 반전 후 goal/midpoint 마커를 새 블록 위치로 재배치 */
+  private _repositionGoalMarkers(): void {
+    const _wp = new THREE.Vector3();
+    const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh;
+    if (goalMesh) {
+      goalMesh.getWorldPosition(_wp);
+      if (this.goalGlow)   this.goalGlow.position.set(_wp.x, _wp.y + 1.5, _wp.z);
+      if (this.goalMarker) this.goalMarker.position.set(_wp.x, _wp.y + 0.55, _wp.z);
+    }
+    if (this.midpointBlockId) {
+      const midMesh = this.level?.blocks.get(this.midpointBlockId)?.mesh;
+      if (midMesh) {
+        midMesh.getWorldPosition(_wp);
+        if (this.midpointMarker) this.midpointMarker.position.set(_wp.x, _wp.y + 0.55, _wp.z);
+      }
+    }
   }
 
   private unloadCurrent(): void {
