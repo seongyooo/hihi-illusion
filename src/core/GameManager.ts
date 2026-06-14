@@ -27,6 +27,7 @@ import { StarManager }        from '../mechanics/StarManager';
 import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { PatrolManager }      from '../world/PatrolManager';
+import { WorldRotateManager } from '../world/WorldRotateManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -62,8 +63,10 @@ export class GameManager {
   private teleportMgr:      TeleportManager | null = null;
   private starMgr:          StarManager      | null = null;
   private switchMgr:        SwitchManager   | null = null;
-  private elevatorMgr:      ElevatorManager | null = null;
+  private elevatorMgr:      ElevatorManager    | null = null;
   private patrolMgr:        PatrolManager      | null = null;
+  private worldRotateMgr:   WorldRotateManager | null = null;
+  private _teleportPadNodes: Array<[import('../world/PathGraph').PathNode, import('../world/PathGraph').PathNode]> = [];
   private tutorialSequencer: TutorialSequencer | null = null;
   private tutorialInputLocked = false;
   private goalGlow:         THREE.PointLight | null = null;
@@ -86,6 +89,7 @@ export class GameManager {
   private _currentLevelId:    string    | null = null;  // 빌트인 레벨 id
   private _currentCustomData: LevelData | null = null;  // 커스텀 레벨 data
   private _currentCustomExit: (() => void) | undefined = undefined;
+  private _levelData:         LevelData | null = null;  // 현재 로드된 레벨 원본 data
 
   // ── Fly-in cancellation ───────────────────────────────────────────────
   private flyInCancelFn: (() => void) | null = null;
@@ -360,6 +364,7 @@ export class GameManager {
 
   // NEW-05: 공통 레벨 오브젝트 초기화 (NEW-03: 커스텀 레벨 섹션 지원 포함)
   private _initLevelObjects(data: LevelData): void {
+    this._levelData = data;
     // Level
     this.level = new Level(this.renderer.scene);
     // 튜토리얼은 variant 오버라이드 미적용 (JSON 원본 유지), 나머지는 settings 값 사용
@@ -423,7 +428,7 @@ export class GameManager {
       const glowOffsetY = this._goalFlipped ? -1.5 : 1.5;
       this.goalGlow.position.set(wp.x, wp.y + glowOffsetY, wp.z);
     }
-    this.renderer.scene.add(this.goalGlow);
+    this.level.getGroup().add(this.goalGlow);
 
     if (this.midpointBlockId) {
       this.goalGlow.intensity = 0;
@@ -443,13 +448,13 @@ export class GameManager {
     );
     this.graph.setTeleporters(teleporterPairs);
 
-    this.teleportMgr = new TeleportManager(this.renderer.scene, this.particles);
-    const padNodePairs = teleporterPairs
+    this.teleportMgr = new TeleportManager(this.level.getGroup(), this.particles);
+    this._teleportPadNodes = teleporterPairs
       .map(([a, b]) => [this.graph!.getNode(a), this.graph!.getNode(b)] as const)
       .filter((pair): pair is [NonNullable<typeof pair[0]>, NonNullable<typeof pair[1]>] =>
         pair[0] != null && pair[1] != null
       );
-    if (padNodePairs.length > 0) this.teleportMgr.setupPads(padNodePairs);
+    if (this._teleportPadNodes.length > 0) this.teleportMgr.setupPads(this._teleportPadNodes);
 
     // StarManager
     this.starMgr = new StarManager(this.renderer.scene, this.particles);
@@ -505,6 +510,39 @@ export class GameManager {
       this.patrolMgr.setup(data.patrols!, this.graph);
     }
 
+    // WorldRotateManager — 맵 전체 회전 블록
+    this.worldRotateMgr = new WorldRotateManager();
+    if ((data.mapRotateBlocks ?? []).length > 0) {
+      const bounds = new THREE.Box3().setFromObject(this.level.getGroup());
+      const defs = data.mapRotateBlocks!.map(d => ({
+        ...d,
+        angle: d.angle * (Math.PI / 180), // degrees → radians
+      }));
+      this.worldRotateMgr.setup(
+        defs,
+        this.graph,
+        this.level.getGroup(),
+        this.level.getFlipPivot(),
+        bounds,
+        {
+          beforeRotate: () => {
+            this.controller?.stop();
+          },
+          onRotateUpdate: () => {
+            if (this.graph) this.illusionMgr?.update(this.graph);
+          },
+          onRotateComplete: () => {
+            // PathGraph는 WorldRotateManager 내부에서 refresh() 완료
+            // 착시 연결 재계산
+            if (this.illusionMgr && this.graph && this._levelData) {
+              const newConns = this._buildIllusionConnsWorldSpace(this._levelData);
+              this.illusionMgr.setConnections(newConns, this.graph);
+            }
+          },
+        },
+      );
+    }
+
     // Character — 타입은 항상 settings 값 사용, 튜토리얼은 색상만 기본값 유지
     this.character = new Character(GraphicsSettings.characterType as CharacterType);
     if (this.isTutorial) {
@@ -552,6 +590,9 @@ export class GameManager {
 
           // 튜토리얼 시퀀스 트리거
           this.tutorialSequencer?.onArrival(nodeId);
+
+          // 맵 전체 회전 블록
+          this.worldRotateMgr?.onArrival(nodeId);
 
           // 중력 반전 블록 — 플레이어 flip + camera.up 반전 + 마우스 반전
           if (this.level!.getGravityFlipNodeIds().has(nodeId)) {
@@ -964,14 +1005,14 @@ export class GameManager {
 
     if (this.goalGlow) {
       gsap.killTweensOf(this.goalGlow);
-      this.renderer.scene.remove(this.goalGlow);
+      this.goalGlow.removeFromParent();
       this.goalGlow = null;
     }
 
     if (this.goalMarker) {
       gsap.killTweensOf(this.goalMarker.position);
       gsap.killTweensOf(this.goalMarker.scale);
-      this.renderer.scene.remove(this.goalMarker);
+      this.goalMarker.removeFromParent();
       this.goalMarker.geometry.dispose();
       (this.goalMarker.material as THREE.Material).dispose();
       this.goalMarker = null;
@@ -980,7 +1021,7 @@ export class GameManager {
     if (this.midpointMarker) {
       gsap.killTweensOf(this.midpointMarker.position);
       gsap.killTweensOf(this.midpointMarker.scale);
-      this.renderer.scene.remove(this.midpointMarker);
+      this.midpointMarker.removeFromParent();
       this.midpointMarker.geometry.dispose();
       (this.midpointMarker.material as THREE.Material).dispose();
       this.midpointMarker = null;
@@ -1018,9 +1059,11 @@ export class GameManager {
     this.level.dispose();
     this.level = null;
 
-    this.graph       = null;
-    this.controller  = null;
-    this.illusionMgr = null;
+    this.graph            = null;
+    this.controller       = null;
+    this.illusionMgr      = null;
+    this._levelData       = null;
+    this._teleportPadNodes = [];
     this.teleportMgr?.dispose();
     this.teleportMgr = null;
     this.switchMgr?.dispose();
@@ -1029,6 +1072,8 @@ export class GameManager {
     this.elevatorMgr = null;
     this.patrolMgr?.dispose();
     this.patrolMgr = null;
+    this.worldRotateMgr?.dispose();
+    this.worldRotateMgr = null;
     this.tutorialSequencer?.dispose();
     this.tutorialSequencer    = null;
     this.tutorialInputLocked  = false;
@@ -1058,6 +1103,54 @@ export class GameManager {
    * switch-move 블록의 경우 원래 위치와 이동 후 위치(moveTarget) 두 가지 모두에 대해
    * 각도를 계산하여 등록한다.
    */
+  /**
+   * mapRotateBlocks 회전 후 착시 연결 재계산.
+   * flipPivot.matrixWorld 를 각 블록의 위치/크기에 적용한 뒤
+   * 기존 _buildAutoIllusionConns를 호출한다.
+   */
+  private _buildIllusionConnsWorldSpace(data: LevelData) {
+    if (!this.level) return this._buildAutoIllusionConns(data);
+
+    const pivot = this.level.getFlipPivot();
+    pivot.updateMatrixWorld(true);
+    const mat = pivot.matrixWorld;
+    const e   = mat.elements; // column-major
+
+    // 절댓값 회전 성분: |R[row][col]| = |e[col*4 + row]|
+    const absR = (row: number, col: number) => Math.abs(e[col * 4 + row]);
+    // Y축이 뒤집혔는지 (X축 180° 회전 → R[1][1] < 0)
+    const yFlipped = e[5] < 0;
+
+    const transformed = data.blocks.map(b => {
+      const [bx, by, bz] = b.position;
+      const hw = b.size[0] / 2, hh = b.size[1] / 2, hd = b.size[2] / 2;
+
+      // 블록 중심 월드 좌표
+      const cx = e[0]*bx + e[4]*by + e[8]*bz  + e[12];
+      const cy = e[1]*bx + e[5]*by + e[9]*bz  + e[13];
+      const cz = e[2]*bx + e[6]*by + e[10]*bz + e[14];
+
+      // 월드 AABB 반높이 (항상 양수)
+      const nHW = absR(0,0)*hw + absR(0,1)*hh + absR(0,2)*hd;
+      const nHH = absR(1,0)*hw + absR(1,1)*hh + absR(1,2)*hd;
+      const nHD = absR(2,0)*hw + absR(2,1)*hh + absR(2,2)*hd;
+
+      // Y축 반전 시 "걷는 면"은 월드 AABB 아랫면 (cy - nHH)
+      // _buildAutoIllusionConns 에서 topY = position[1] + size[1]/2 이므로
+      // position[1] = topFaceY - nHH
+      const topFaceY = yFlipped ? cy - nHH : cy + nHH;
+      const adjCY    = topFaceY - nHH;
+
+      return {
+        ...b,
+        position: [cx, adjCY, cz] as [number, number, number],
+        size:     [nHW * 2, nHH * 2, nHD * 2] as [number, number, number],
+      };
+    });
+
+    return this._buildAutoIllusionConns({ ...data, blocks: transformed });
+  }
+
   private _buildAutoIllusionConns(data: LevelData) {
     const blocks = data.blocks;
     const walkable = blocks.filter(b => b.walkable);
@@ -1210,7 +1303,7 @@ export class GameManager {
     const offsetY = this._goalFlipped ? -0.55 : 0.55;
     const floatY  = this._goalFlipped ? wp.y - 0.85 : wp.y + 0.85;
     this.goalMarker.position.set(wp.x, wp.y + offsetY, wp.z);
-    this.renderer.scene.add(this.goalMarker);
+    this.level!.getGroup().add(this.goalMarker);
 
     gsap.to(this.goalMarker.position, {
       y: floatY,
@@ -1230,7 +1323,7 @@ export class GameManager {
     this.midpointMarker = new THREE.Mesh(geo, mat);
     this.midpointMarker.rotation.x = Math.PI / 2;
     this.midpointMarker.position.set(wp.x, wp.y + 0.55, wp.z);
-    this.renderer.scene.add(this.midpointMarker);
+    this.level!.getGroup().add(this.midpointMarker);
 
     gsap.to(this.midpointMarker.position, {
       y: wp.y + 0.85,
@@ -1360,7 +1453,7 @@ export class GameManager {
         duration: 0.35,
         ease: 'back.in',
         onComplete: () => {
-          this.renderer.scene.remove(marker);
+          marker.removeFromParent();
           marker.geometry.dispose();
           (marker.material as THREE.Material).dispose();
         },

@@ -1,0 +1,144 @@
+{
+  "id": "custom_stage_26",
+  "name": "Stage 26",
+  "backgroundColor": "#E8EEF5",
+  "blocks": [
+    {
+      "id": "b001",
+      "position": [
+        4.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b002",
+      "position": [
+        5.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b004",
+      "position": [
+        6.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b005",
+      "position": [
+        7.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b006",
+      "position": [
+        8.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b007",
+      "position": [
+        9.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b008",
+      "position": [
+        10.5,
+        0.25,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        0.5,
+        1
+      ],
+      "walkable": true
+    }
+  ],
+  "ladders": [],
+  "stars": [
+    {
+      "nodeId": "b004"
+    },
+    {
+      "nodeId": "b006"
+    },
+    {
+      "nodeId": "b005",
+      "flipped": true
+    }
+  ],
+  "gravityFlipBlocks": [
+    {
+      "nodeId": "b008"
+    }
+  ],
+  "illusionConnections": [],
+  "character": {
+    "startNodeId": "b001"
+  },
+  "goal": {
+    "blockId": "b001",
+    "flipped": true
+  },
+  "initialCamera": {
+    "azimuth": -71,
+    "polar": 60,
+    "distance": 26,
+    "targetY": 0
+  }
+}

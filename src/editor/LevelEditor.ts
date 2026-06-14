@@ -114,6 +114,7 @@ export class LevelEditor {
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starEntries: Array<{ nodeId: string; flipped: boolean }> = [];
   private gravityFlipNodeIds:  string[] = [];
+  private mapRotateEntries: Array<{ nodeId: string; axis: 'x'|'y'; angle: number; pivotY?: number }> = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private patrolConns:        PatrolDef[] = [];
@@ -630,6 +631,61 @@ export class LevelEditor {
         this.updateMarkers();
       });
       sec.appendChild(flipBtn);
+
+      // ── Map Rotate Block ──
+      const mrLabel = document.createElement('div');
+      mrLabel.style.cssText = 'margin-top:8px;font-size:11px;color:#aaa;';
+      mrLabel.textContent = 'MAP ROTATE BLOCK';
+      sec.appendChild(mrLabel);
+
+      const mrRow = document.createElement('div');
+      mrRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-top:2px;';
+
+      const mrAxisSel = document.createElement('select');
+      mrAxisSel.style.cssText = 'background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      for (const v of ['x','y']) {
+        const o = document.createElement('option'); o.value = v; o.textContent = `${v.toUpperCase()}-axis`; mrAxisSel.appendChild(o);
+      }
+
+      const mrAngleInput = document.createElement('input');
+      mrAngleInput.type = 'number'; mrAngleInput.value = '180'; mrAngleInput.step = '90'; mrAngleInput.min = '90'; mrAngleInput.max = '360';
+      mrAngleInput.style.cssText = 'width:54px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      mrAngleInput.title = '회전 각도 (degrees)';
+
+      const mrPivotInput = document.createElement('input');
+      mrPivotInput.type = 'number'; mrPivotInput.placeholder = 'pivotY'; mrPivotInput.step = '0.5';
+      mrPivotInput.style.cssText = 'width:52px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      mrPivotInput.title = 'X축 회전 전용 pivotY (비워두면 맵 중심)';
+
+      mrRow.appendChild(mrAxisSel);
+      mrRow.appendChild(mrAngleInput);
+      mrRow.appendChild(mrPivotInput);
+      sec.appendChild(mrRow);
+
+      const mrToggleBtn = document.createElement('button');
+      mrToggleBtn.className = 'editor-btn';
+      mrToggleBtn.textContent = 'Toggle Map Rotate Block';
+      mrToggleBtn.style.cssText = 'margin-top:2px;background:#664400;';
+      mrToggleBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        const id  = this.selectedBlock.id;
+        const idx = this.mapRotateEntries.findIndex(e => e.nodeId === id);
+        if (idx === -1) {
+          const entry = {
+            nodeId: id,
+            axis:   mrAxisSel.value as 'x'|'y',
+            angle:  parseFloat(mrAngleInput.value) || 180,
+            ...(mrPivotInput.value !== '' ? { pivotY: parseFloat(mrPivotInput.value) } : {}),
+          };
+          this.mapRotateEntries.push(entry);
+          recolorBlockGroup(this.selectedBlock.mesh, 0xFF8800, 'default');
+        } else {
+          this.mapRotateEntries.splice(idx, 1);
+          recolorBlockGroup(this.selectedBlock.mesh, parseInt(this.selectedBlock.color.replace('#', ''), 16), 'default');
+        }
+        this.updateMarkers();
+      });
+      sec.appendChild(mrToggleBtn);
     });
     p.appendChild(this.selectedSection);
 
@@ -2120,6 +2176,7 @@ export class LevelEditor {
     if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; }
     this.starEntries        = this.starEntries.filter(e => e.nodeId !== block.id);
     this.gravityFlipNodeIds = this.gravityFlipNodeIds.filter(id => id !== block.id);
+    this.mapRotateEntries   = this.mapRotateEntries.filter(e => e.nodeId !== block.id);
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
@@ -2532,6 +2589,7 @@ export class LevelEditor {
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starEntries.length > 0 ? this.starEntries.map(e => ({ nodeId: e.nodeId, ...(e.flipped ? { flipped: true } : {}) })) : undefined,
       gravityFlipBlocks: this.gravityFlipNodeIds.length > 0 ? this.gravityFlipNodeIds.map(id => ({ nodeId: id })) : undefined,
+      mapRotateBlocks: this.mapRotateEntries.length > 0 ? this.mapRotateEntries : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
         sw.targets.map(t => ({
@@ -2584,6 +2642,7 @@ export class LevelEditor {
     this.teleporterConns = [];
     this.starEntries            = [];
     this.gravityFlipNodeIds     = [];
+    this.mapRotateEntries       = [];
     this.goalFlipped            = false;
     this.switchConns     = [];
     this.patrolConns     = [];
@@ -2664,6 +2723,7 @@ export class LevelEditor {
     this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false }));
     this.goalFlipped          = data.goal.flipped ?? false;
     this.gravityFlipNodeIds   = (data.gravityFlipBlocks ?? []).map(g => g.nodeId);
+    this.mapRotateEntries     = (data.mapRotateBlocks   ?? []).map(d => ({ ...d }));
     // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
     // 각 타깃은 자신의 moveTarget을 개별 보유
     {

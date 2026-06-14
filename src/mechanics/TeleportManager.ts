@@ -14,7 +14,7 @@ const PAIR_COLORS = [
 ];
 
 export class TeleportManager {
-  private scene:      THREE.Scene;
+  private parent:     THREE.Object3D;
   private particles:  ParticleSystem;
   private rings:      THREE.Mesh[] = [];
   // nodeId → 해당 패드의 색상 (playEffect에서 재사용)
@@ -22,8 +22,8 @@ export class TeleportManager {
   // nodeId → 해당 노드 위의 링 메시 목록 (SwitchManager 연동용)
   private nodeRings:  Map<string, THREE.Mesh[]> = new Map();
 
-  constructor(scene: THREE.Scene, particles: ParticleSystem) {
-    this.scene     = scene;
+  constructor(parent: THREE.Object3D, particles: ParticleSystem) {
+    this.parent    = parent;
     this.particles = particles;
   }
 
@@ -50,7 +50,7 @@ export class TeleportManager {
       const ring = new THREE.Mesh(geo, mat);
       ring.rotation.x = Math.PI / 2;
       ring.position.set(wp.x, baseY + 0.25 + i * 0.18, wp.z);
-      this.scene.add(ring);
+      this.parent.add(ring);
       this.rings.push(ring);
       this.nodeRings.get(node.id)!.push(ring);
 
@@ -60,6 +60,34 @@ export class TeleportManager {
         duration: 2.0 + i * 0.7,
         repeat: -1,
         ease: 'none',
+      });
+    }
+  }
+
+  /** 맵 회전 후 모든 링을 새 월드 좌표로 재배치 */
+  reposition(pairs: Array<[PathNode, PathNode]>): void {
+    // 기존 링 제거
+    this.dispose();
+    // 노드 목록에서 다시 생성
+    for (const [a, b] of pairs) {
+      const color = PAIR_COLORS[0]; // 색상은 nodeColors에서 복구 불가하므로 재설정
+      this.nodeColors.set(a.id, color);
+      this.nodeColors.set(b.id, color);
+      this.createPadRings(a, color);
+      this.createPadRings(b, color);
+    }
+  }
+
+  /** 맵 회전 후 모든 링 XYZ 위치만 노드 새 월드 좌표로 업데이트 (애니메이션 유지) */
+  repositionRings(nodes: PathNode[]): void {
+    const wp = new THREE.Vector3();
+    for (const node of nodes) {
+      const rings = this.nodeRings.get(node.id);
+      if (!rings) continue;
+      node.mesh.getWorldPosition(wp);
+      const baseY = wp.y + node.halfHeight;
+      rings.forEach((ring, i) => {
+        ring.position.set(wp.x, baseY + 0.25 + i * 0.18, wp.z);
       });
     }
   }
@@ -84,7 +112,7 @@ export class TeleportManager {
   dispose(): void {
     for (const ring of this.rings) {
       gsap.killTweensOf(ring.rotation);
-      this.scene.remove(ring);
+      ring.removeFromParent();
       ring.geometry.dispose();
       (ring.material as THREE.Material).dispose();
     }

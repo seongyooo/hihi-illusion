@@ -155,6 +155,12 @@ export interface LevelData {
   }>;
   stars?: Array<{ nodeId: string; flipped?: boolean }>;
   gravityFlipBlocks?: Array<{ nodeId: string }>;
+  mapRotateBlocks?: Array<{
+    nodeId:  string;
+    axis:    'x' | 'y';
+    angle:   number;   // degrees (예: 180, 90)
+    pivotY?: number;   // X축 회전 전용 피벗 Y (미지정 시 맵 중심)
+  }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string };
@@ -170,11 +176,13 @@ export interface LevelData {
 export class Level {
   public blocks: Map<string, Block> = new Map();
   public sections: RotatingSection[] = [];
-  private group: THREE.Group = new THREE.Group();
+  private group:     THREE.Group = new THREE.Group();
+  private flipPivot: THREE.Group = new THREE.Group(); // mapRotateBlocks 회전 피벗
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
   private spikeNodeIds: Set<string> = new Set();
   private gravityFlipNodeIds: Set<string> = new Set();
+  private mapRotateNodeIds: Set<string> = new Set();
   private portalGroups: THREE.Group[] = [];
   private blinkingNodeIds: Set<string> = new Set();
   private blinkingSpikeGroups: Map<string, THREE.Group> = new Map();
@@ -203,11 +211,13 @@ export class Level {
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
     this.gravityFlipNodeIds.clear();
+    this.mapRotateNodeIds.clear();
     this.portalGroups = [];
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
     this.blinkIsActive = false;
-    this.group = new THREE.Group();
+    this.group     = new THREE.Group();
+    this.flipPivot = new THREE.Group();
 
     // Apply level background color
     this.scene.background = new THREE.Color(data.backgroundColor);
@@ -272,19 +282,34 @@ export class Level {
       const bd = data.blocks.find(b => b.id === gf.nodeId);
       if (!bd) continue;
       this.gravityFlipNodeIds.add(gf.nodeId);
-      const effectGroup = this._buildRingEffect(bd);
+      const effectGroup = this._buildRingEffect(bd, 0x00DDBB);
       this.group.add(effectGroup);
       this.portalGroups.push(effectGroup);
     }
 
-    this.scene.add(this.group);
+    // 맵 회전 블록 — 주황 링 이펙트
+    for (const mr of data.mapRotateBlocks ?? []) {
+      const bd = data.blocks.find(b => b.id === mr.nodeId);
+      if (!bd) continue;
+      this.mapRotateNodeIds.add(mr.nodeId);
+      const effectGroup = this._buildRingEffect(bd, 0xFF8800);
+      this.group.add(effectGroup);
+      this.portalGroups.push(effectGroup);
+    }
+
+    // flipPivot → group 계층으로 씬에 추가
+    // (WorldRotateManager.setup()이 위치 오프셋을 나중에 설정)
+    this.flipPivot.add(this.group);
+    this.scene.add(this.flipPivot);
   }
 
   getGroup(): THREE.Group               { return this.group; }
+  getFlipPivot(): THREE.Group           { return this.flipPivot; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
   getGravityFlipNodeIds(): Set<string>  { return this.gravityFlipNodeIds; }
-  getSpikeNodeIds(): Set<string>                     { return this.spikeNodeIds; }
+  getMapRotateNodeIds(): Set<string>    { return this.mapRotateNodeIds; }
+  getSpikeNodeIds(): Set<string>        { return this.spikeNodeIds; }
 
   /** blinking 가시가 현재 위험한 상태(올라오는 중/올라와 있음/내려가는 중)인지 반환. always 타입이면 항상 true. */
   isBlinkingSpikeActive(nodeId: string): boolean {
@@ -365,15 +390,15 @@ export class Level {
   }
 
   /**
-   * 중력 반전 블록 이펙트 — 블록 위·아래로 사각형 링들이 Y축 방향으로 퍼져나가며 펄스
+   * 블록 이펙트 — 위·아래로 사각형 링들이 Y축 방향으로 퍼져나가며 펄스
    * LineBasicMaterial은 WebGL 제한으로 굵기 설정 불가 → BoxGeometry 4개로 테두리 구성
    */
-  private _buildRingEffect(bd: BlockData): THREE.Group {
+  private _buildRingEffect(bd: BlockData, color: number): THREE.Group {
     const [bx, by, bz] = bd.position;
     const [bw, bh, bdz] = bd.size;
 
     const group    = new THREE.Group();
-    const COLOR    = 0x00DDBB;
+    const COLOR    = color;
     const RINGS    = 5;
     const SPACING  = 0.13;
     const DURATION = 1.8;
@@ -441,14 +466,19 @@ export class Level {
         else (child.material as THREE.Material).dispose();
       }
     });
-    this.scene.remove(this.group);
+    // flipPivot 회전 초기화 후 씬에서 제거 (WorldRotateManager.dispose도 호출하지만 보험)
+    this.flipPivot.rotation.set(0, 0, 0);
+    this.flipPivot.position.set(0, 0, 0);
+    this.group.position.set(0, 0, 0);
+    this.scene.remove(this.flipPivot);
     this.blocks.clear();
-    this.sections       = [];
-    this.walkableMeshes = [];
+    this.sections         = [];
+    this.walkableMeshes   = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
     this.gravityFlipNodeIds.clear();
-    this.portalGroups = [];
+    this.mapRotateNodeIds.clear();
+    this.portalGroups     = [];
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
     this.onSpikeActivated = null;
