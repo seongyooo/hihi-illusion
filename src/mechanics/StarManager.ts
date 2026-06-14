@@ -146,10 +146,32 @@ export class StarManager {
   /** 별이 없는 레벨(total=0)은 항상 true */
   allCollected(): boolean { return this.collectedIds.size >= this.total; }
 
-  /** 모든 미수집 별 메시의 가시성을 일괄 설정 (중력 반전 전환 시 사용) */
+  /** 모든 미수집 별 메시의 가시성을 일괄 설정 */
   setAllVisible(visible: boolean): void {
     for (const mesh of this.starMeshes.values()) {
       mesh.visible = visible;
+    }
+  }
+
+  /**
+   * 중력 반전 후 모든 별 메시의 로컬 Y 오프셋을 뒤집는다.
+   * 반전 시: 블록 아래쪽(로컬 -Y) 에 배치돼야 플레이어 관점에서 "위"처럼 보임.
+   */
+  repositionForFlip(isFlipped: boolean, getNode: (id: string) => PathNode | undefined): void {
+    const sign = isFlipped ? -1 : 1;
+    for (const [nodeId, mesh] of this.starMeshes) {
+      const node = getNode(nodeId);
+      if (!node) continue;
+      const localY = sign * (node.halfHeight + 0.38);
+      gsap.killTweensOf(mesh.position);
+      mesh.position.y = localY;
+      gsap.to(mesh.position, {
+        y:        localY + sign * 0.15,
+        duration: 1.0,
+        yoyo:     true,
+        repeat:   -1,
+        ease:     'sine.inOut',
+      });
     }
   }
 

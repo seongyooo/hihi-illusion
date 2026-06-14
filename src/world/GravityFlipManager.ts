@@ -82,6 +82,12 @@ export class GravityFlipManager {
     return this.states.some(s => s.isFlipped);
   }
 
+  /** 플립 피벗 좌표 반환 (착시 연결 재계산용) */
+  getPivotInfo(): { pivotY: number; pivotZ: number } | null {
+    if (this.states.length === 0) return null;
+    return { pivotY: this.states[0].def.pivotY, pivotZ: this.states[0].pivotZ };
+  }
+
   private _flip(state: FlipState): void {
     if (!this.flipPivot) return;
 

@@ -642,8 +642,10 @@ export class LevelEditor {
         if (!this.selectedBlock) return;
         if (this.gravityPreviewFlipped) {
           this.flippedGoalBlockId = this.selectedBlock.id;
+          this.goalBlockId = null; // 한 맵에 goal은 하나 — flipped 설정 시 normal 해제
         } else {
           this.goalBlockId = this.selectedBlock.id;
+          this.flippedGoalBlockId = null; // normal 설정 시 flipped 해제
         }
         this.updateMarkers();
       });
@@ -2382,15 +2384,15 @@ export class LevelEditor {
       this.midpointMarker.visible = false;
     }
 
-    // Goal — 현재 탭의 goal만 표시 (normal=금색, flipped=보라색)
-    const activeGoalId = this.gravityPreviewFlipped ? this.flippedGoalBlockId : this.goalBlockId;
+    // Goal — 항상 하나의 goal 마커 표시 (flipped goal이 있으면 보라색, normal이면 금색)
+    const activeGoalId = this.flippedGoalBlockId ?? this.goalBlockId; // 어느 탭이든 설정된 것
+    const isFlippedGoal = !!this.flippedGoalBlockId && !this.goalBlockId;
     const goalBlock = this.blocks.find(b => b.id === activeGoalId);
     if (goalBlock) {
       const p = markerPos(goalBlock);
       this.goalMarker.position.set(p.x, p.y + 0.2, p.z);
-      // flipped 상태에서는 보라색으로 구분
       (this.goalMarker.material as THREE.MeshLambertMaterial).color.setHex(
-        this.gravityPreviewFlipped ? 0xAA44FF : 0xFFD700,
+        isFlippedGoal ? 0xAA44FF : 0xFFD700,
       );
       this.goalMarker.visible = true;
     } else {

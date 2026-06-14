@@ -70,6 +70,20 @@ export class IllusionManager {
     return this.connections.some(c => c.wasActive);
   }
 
+  /** 중력 반전 후 새 블록 위치 기준으로 연결 목록을 교체한다. 기존 활성 엣지는 그래프에서 초기화된다. */
+  setConnections(conns: IllusionConnectionConfig[], graph: PathGraph): void {
+    // 기존 활성 연결 해제
+    for (const c of this.connections) {
+      if (c.wasActive) graph.setIllusionEdge(c.nodeAId, c.nodeBId, false);
+    }
+    this.connections = conns.map(c => ({
+      ...c,
+      wasActive:     false,
+      pendingActive: null,
+      pendingStart:  0,
+    }));
+  }
+
   // 상태 변경 확정에 필요한 지속 시간 (프레임률 무관)
   private static readonly DEBOUNCE_MS = 100;
   private frameCount = 0;
