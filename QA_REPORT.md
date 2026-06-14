@@ -1,7 +1,52 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-14  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + **13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화)**
+> 최종 업데이트: 2026-06-15  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + 13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화) + **14차 QA (mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치)**
+
+---
+
+## 14차 QA (2026-06-15) — mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치
+
+### 변경 내용
+1. 에디터 로드 시 gravityFlip / mapRotate 블록 색상 복원
+2. 선택 패널에 현재 설정 상태 표시 및 편집 가능하도록 개선
+3. Gravity flip 후 착시 작동 (IllusionManager.setFlipped)
+4. Map Rotate 완료 후 요소(goalGlow/goalMarker/midpointMarker/텔레포터 링) 재배치
+
+### 결과
+
+| ID | 항목 | 판정 |
+|----|------|------|
+| QA14-01 | 에디터 로드 시 gravityFlip 블록 청록색 복원 | ✅ 정상 |
+| QA14-02 | 에디터 로드 시 mapRotate 블록 주황색 복원 | ✅ 정상 |
+| QA14-03 | 선택 블록이 start이면 패널에 ✓ START 표시 | ✅ 정상 |
+| QA14-04 | 선택 블록이 goal이면 ✓ GOAL / ✓ FLIPPED GOAL 표시 | ✅ 정상 |
+| QA14-05 | gravity flip 버튼 ON/OFF 상태 텍스트·색상 반영 | ✅ 정상 |
+| QA14-06 | mapRotate 선택 시 기존 axis/angle/pivotY 값 inputs에 채움 | ✅ 정상 |
+| QA14-07 | mapRotate Add / Update / Remove 버튼 전환 | ✅ 정상 |
+| QA14-08 | IllusionManager.setFlipped() — currentElevation 부호 반전 | ✅ 정상 |
+| QA14-09 | gravity flip 시 illusionMgr.setFlipped(newFlipped) 호출 | ✅ 정상 |
+| QA14-10 | _refreshWorldElements() null 가드 완전성 | ✅ 정상 |
+| QA14-11 | _refreshWorldElements() GSAP killTweensOf 처리 | ✅ 정상 |
+| QA14-12 | TeleportManager.repositionRings() worldToLocal 변환 | ✅ 정상 |
+| QA14-13 | unloadCurrent() cleanup 완전성 | ✅ 정상 |
+| QA14-14 | TypeScript 컴파일 | ✅ 에러 없음 |
+
+### 경미한 이슈 (게임플레이 영향 없음)
+
+**[QA14-W1] TeleportManager.reposition() — 데드 코드 + 색상 버그**
+- `reposition()` 메서드 내부에서 `nodeColors`를 clear한 뒤 재생성하므로 저장된 색상을 복구할 수 없어 항상 `PAIR_COLORS[0]`만 사용됨
+- **실제 영향**: 없음 — 해당 메서드는 현재 GameManager 어디서도 호출되지 않음 (`repositionRings()`만 사용)
+- 권장: 데드 코드 제거
+
+**[QA14-W2] updateSelectedPanel() else 분기 — 이전 블록 입력값 잔류**
+- 블록 미선택 시 `colorInput`, `walkableInput`, `spikeInput`, `spikeTypeSelect`를 기본값으로 초기화하지 않음
+- **실제 영향**: 없음 — `selectedBlock`이 null이므로 해당 입력을 건드려도 데이터 변경 없음. 시각적 혼란만 가능
+- 권장: 미선택 분기에 기본값 리셋 추가
+
+### 종합 판정
+
+**게임플레이 영향 버그: 없음 (PASS)**
 
 ---
 

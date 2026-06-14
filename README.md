@@ -12,16 +12,19 @@ A Monument Valley-inspired isometric puzzle game built with Three.js and TypeScr
 
 ## Features
 
-- **16 hand-crafted puzzle stages** + tutorial
+- **26 hand-crafted puzzle stages** + tutorial
 - Isometric camera with orbit controls (configurable rotate speed & damping)
-- Illusion mechanics — false paths activated at specific camera angles
+- Illusion mechanics — false paths activated at specific camera angles; works after gravity flip
 - Teleporters, midpoint markers, goal markers
 - Stage clear animations with particle effects
 - Star collectibles on each stage
 - **Switches** — `hold` / `toggle` modes, `spawn` / `move` types; supports multi-target moves
 - **Elevators** — `auto` / `trigger` modes with vertical rail visuals
+- **Gravity Flip** — player walks on block undersides; camera, stars, goal all flip-aware
+- **Map Rotate Blocks** — whole-map rotation around X or Y axis with configurable angle; goal/teleporter elements follow rotation in real-time
 - `initialCamera` per-stage fly-in from a preset angle
 - Built-in level editor with per-target `moveTarget`, CAMERA panel, and auto-discovered stage list
+- Editor: drag-and-drop stage reordering; selected block shows current settings (gravity flip, map rotate axis/angle, goal/start state)
 - Custom stages saved to `localStorage`; auto-discovered via `import.meta.glob`
 - Star background mode
 - Mobile-accessible via local network
@@ -69,13 +72,13 @@ npm run preview
 src/
 ├── core/         # GameManager, Renderer, CameraController, InputManager
 │                 # TutorialSequencer, GraphicsSettings
-├── world/        # Level, Block, PathGraph, RotatingSection
+├── world/        # Level, Block, PathGraph, RotatingSection, WorldRotateManager
 │                 # SwitchManager, ElevatorManager, StarBackground
 ├── character/    # Character, CharacterController
 ├── ui/           # TitleScreen, StageSelectUI, HUD, EditorLobby
 │                 # SettingsScreen, SettingsPreview, TutorialHint, BlockLabels
 ├── editor/       # LevelEditor, CustomLevelStore
-├── levels/       # level01.json (tutorial), level_custom_1~16.json, registry.ts
+├── levels/       # level01.json (tutorial), level_custom_1~26.json, registry.ts
 ├── illusion/     # IllusionManager
 ├── mechanics/    # TeleportManager, StarManager
 ├── fx/           # AudioManager, ParticleSystem
@@ -89,6 +92,10 @@ Click the **DEV** button on the title screen to open the editor lobby. You can c
 Key editor features:
 - **SWITCHES panel** — configure hold/toggle mode, spawn/move type, per-target `moveTarget` offset
 - **CAMERA panel** — set `initialCamera` (yaw, pitch, distance) for stage fly-in
+- **MAP ROTATE BLOCK** — assign axis (X/Y), angle (degrees), optional pivotY; block turns orange
+- **Gravity Flip Block** — toggle on selected block; block turns cyan
+- **Selected block panel** — shows current role (start / goal / flipped goal) and special settings; inline edit for map rotate axis/angle/pivotY
+- **Drag-and-drop reordering** — reorder custom stages and built-in stages directly in the editor lobby
 - **Builtin stage loading** — auto-discovered from `level_custom_*.json` via `import.meta.glob`
 
 ## Stage Registry
@@ -206,16 +213,19 @@ Monument Valley에서 영감을 받은 아이소메트릭 퍼즐 게임으로, T
 
 ## 주요 기능
 
-- **16개의 수제 퍼즐 스테이지** + 튜토리얼
+- **26개의 수제 퍼즐 스테이지** + 튜토리얼
 - 회전 속도·감쇠 조절 가능한 아이소메트릭 카메라
-- 착시 메커닉 — 특정 카메라 각도에서만 활성화되는 가짜 경로
+- 착시 메커닉 — 특정 카메라 각도에서만 활성화되는 가짜 경로; 중력 반전 후에도 정상 작동
 - 텔레포터, 중간 지점 마커, 목표 마커
 - 스테이지 클리어 애니메이션 및 파티클 이펙트
 - 각 스테이지별 별 수집 요소
 - **스위치** — `hold` / `toggle` 모드, `spawn` / `move` 타입; 다중 타깃 이동 지원
 - **엘리베이터** — `auto` / `trigger` 모드, 수직 레일 시각화
+- **중력 반전(Gravity Flip)** — 블록 아랫면 이동; 카메라·별·골 모두 반전 상태 인식
+- **맵 회전 블록(Map Rotate)** — X·Y축 전체 맵 회전, 회전 중 목표·텔레포터 요소 실시간 추적
 - 스테이지별 `initialCamera`로 플라이-인 진입 연출
 - 내장 레벨 에디터 (per-target `moveTarget`, CAMERA 패널, 자동 스테이지 목록)
+- 에디터: 드래그&드롭 스테이지 순서 변경; 선택 블록 현재 설정 표시·편집
 - 커스텀 스테이지 `localStorage` 저장 및 `import.meta.glob` 자동 탐색
 - 별빛 배경 모드
 - 동일 Wi-Fi에서 모바일 접속 가능
@@ -263,13 +273,13 @@ npm run preview
 src/
 ├── core/         # GameManager, Renderer, CameraController, InputManager
 │                 # TutorialSequencer, GraphicsSettings
-├── world/        # Level, Block, PathGraph, RotatingSection
+├── world/        # Level, Block, PathGraph, RotatingSection, WorldRotateManager
 │                 # SwitchManager, ElevatorManager, StarBackground
 ├── character/    # Character, CharacterController
 ├── ui/           # TitleScreen, StageSelectUI, HUD, EditorLobby
 │                 # SettingsScreen, SettingsPreview, TutorialHint, BlockLabels
 ├── editor/       # LevelEditor, CustomLevelStore
-├── levels/       # level01.json (튜토리얼), level_custom_1~16.json, registry.ts
+├── levels/       # level01.json (튜토리얼), level_custom_1~26.json, registry.ts
 ├── illusion/     # IllusionManager
 ├── mechanics/    # TeleportManager, StarManager
 ├── fx/           # AudioManager, ParticleSystem
@@ -283,6 +293,10 @@ src/
 주요 에디터 기능:
 - **SWITCHES 패널** — hold/toggle 모드, spawn/move 타입, per-target `moveTarget` 오프셋 설정
 - **CAMERA 패널** — 스테이지 플라이-인용 `initialCamera` (yaw, pitch, distance) 설정
+- **MAP ROTATE BLOCK** — 축(X/Y), 각도(degrees), pivotY 지정; 해당 블록 주황색 표시
+- **Gravity Flip Block** — 토글 시 청록색 표시
+- **선택 블록 패널** — start/goal/flipped goal 여부 및 특수 설정을 즉시 확인·편집 가능
+- **드래그&드롭 순서 변경** — 에디터 로비에서 커스텀·빌트인 스테이지 순서 직접 조정
 - **빌트인 스테이지 로드** — `level_custom_*.json`을 `import.meta.glob`으로 자동 탐색
 
 ## 스테이지 레지스트리

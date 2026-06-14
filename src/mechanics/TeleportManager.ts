@@ -78,7 +78,7 @@ export class TeleportManager {
     }
   }
 
-  /** 맵 회전 후 모든 링 XYZ 위치만 노드 새 월드 좌표로 업데이트 (애니메이션 유지) */
+  /** 맵 회전 후 모든 링 위치를 노드 새 월드 좌표 기준으로 업데이트 (parent 로컬 좌표로 변환) */
   repositionRings(nodes: PathNode[]): void {
     const wp = new THREE.Vector3();
     for (const node of nodes) {
@@ -87,7 +87,8 @@ export class TeleportManager {
       node.mesh.getWorldPosition(wp);
       const baseY = wp.y + node.halfHeight;
       rings.forEach((ring, i) => {
-        ring.position.set(wp.x, baseY + 0.25 + i * 0.18, wp.z);
+        const worldPos = new THREE.Vector3(wp.x, baseY + 0.25 + i * 0.18, wp.z);
+        ring.position.copy(this.parent.worldToLocal(worldPos));
       });
     }
   }

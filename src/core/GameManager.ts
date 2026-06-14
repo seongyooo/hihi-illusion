@@ -538,6 +538,8 @@ export class GameManager {
               const newConns = this._buildIllusionConnsWorldSpace(this._levelData);
               this.illusionMgr.setConnections(newConns, this.graph);
             }
+            // goalGlow / goalMarker / midpointMarker / 텔레포터 링 위치 갱신
+            this._refreshWorldElements();
           },
         },
       );
@@ -603,6 +605,8 @@ export class GameManager {
             this.orbit.maxPolarAngle = newFlipped ? Math.PI * 5 / 6       : Math.PI / 2 - 0.0873;
             this.orbit.rotateSpeed   = newFlipped ? -Math.abs(GraphicsSettings.rotateSpeed) : GraphicsSettings.rotateSpeed;
             this.orbit.update();
+            // 착시 매니저에 flip 상태 전달 (고도각 부호 반전 → 아래에서 보는 시점에서도 착시 활성화)
+            this.illusionMgr?.setFlipped(newFlipped);
           }
 
           // 스위치 / 엘리베이터 트리거
@@ -1103,6 +1107,65 @@ export class GameManager {
    * switch-move 블록의 경우 원래 위치와 이동 후 위치(moveTarget) 두 가지 모두에 대해
    * 각도를 계산하여 등록한다.
    */
+  /**
+   * mapRotateBlocks 회전 완료 후 goal/midpoint 마커, 텔레포터 링 위치를
+   * 새 월드 좌표 기준으로 갱신한다.
+   * 회전으로 인해 levelGroup 로컬 좌표계가 바뀌므로 worldToLocal() 로 변환.
+   */
+  private _refreshWorldElements(): void {
+    if (!this.level) return;
+    const group = this.level.getGroup();
+    const wp    = new THREE.Vector3();
+
+    const toLocal = (wx: number, wy: number, wz: number) =>
+      group.worldToLocal(new THREE.Vector3(wx, wy, wz));
+
+    // goalGlow 재배치
+    const goalMesh = this.level.blocks.get(this.goalBlockId)?.mesh;
+    if (goalMesh && this.goalGlow) {
+      goalMesh.getWorldPosition(wp);
+      const glowOffsetY = this._goalFlipped ? -1.5 : 1.5;
+      this.goalGlow.position.copy(toLocal(wp.x, wp.y + glowOffsetY, wp.z));
+    }
+
+    // goalMarker 재배치 (GSAP 재시작)
+    if (goalMesh && this.goalMarker) {
+      goalMesh.getWorldPosition(wp);
+      const offsetY    = this._goalFlipped ? -0.55 : 0.55;
+      const floatDeltaY = 0.3;
+      const localStart = toLocal(wp.x, wp.y + offsetY,            wp.z);
+      const localFloat = toLocal(wp.x, wp.y + offsetY + floatDeltaY, wp.z);
+      gsap.killTweensOf(this.goalMarker.position);
+      this.goalMarker.position.copy(localStart);
+      gsap.to(this.goalMarker.position, {
+        x: localFloat.x, y: localFloat.y, z: localFloat.z,
+        duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      });
+    }
+
+    // midpointMarker 재배치
+    if (this.midpointBlockId && this.midpointMarker) {
+      const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
+      if (midMesh) {
+        midMesh.getWorldPosition(wp);
+        const localStart = toLocal(wp.x, wp.y + 0.55, wp.z);
+        const localFloat = toLocal(wp.x, wp.y + 0.85, wp.z);
+        gsap.killTweensOf(this.midpointMarker.position);
+        this.midpointMarker.position.copy(localStart);
+        gsap.to(this.midpointMarker.position, {
+          x: localFloat.x, y: localFloat.y, z: localFloat.z,
+          duration: 1.3, yoyo: true, repeat: -1, ease: 'sine.inOut',
+        });
+      }
+    }
+
+    // 텔레포터 링 재배치
+    if (this._teleportPadNodes.length > 0) {
+      const allNodes = this._teleportPadNodes.flatMap(([a, b]) => [a, b]);
+      this.teleportMgr?.repositionRings(allNodes);
+    }
+  }
+
   /**
    * mapRotateBlocks 회전 후 착시 연결 재계산.
    * flipPivot.matrixWorld 를 각 블록의 위치/크기에 적용한 뒤

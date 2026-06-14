@@ -27,6 +27,7 @@ export class IllusionManager {
   private orbitTarget: THREE.Vector3;
   private connections: IllusionConnectionState[];
   private callbacks:   IllusionCallbacks;
+  private _flipped = false;
 
   constructor(
     camera:      THREE.Camera,
@@ -57,17 +58,26 @@ export class IllusionManager {
     return Math.atan2(dx, dz) * (180 / Math.PI);
   }
 
-  /** 수평면 기준 고도각 (도). 0° = 수평, 90° = 바로 위 */
+  /** 수평면 기준 고도각 (도). 0° = 수평, 90° = 바로 위. 중력 반전 시 부호 반전. */
   get currentElevation(): number {
     const dx = this.camera.position.x - this.orbitTarget.x;
     const dy = this.camera.position.y - this.orbitTarget.y;
     const dz = this.camera.position.z - this.orbitTarget.z;
     const horizDist = Math.sqrt(dx * dx + dz * dz);
-    return Math.atan2(dy, horizDist) * (180 / Math.PI);
+    const raw = Math.atan2(dy, horizDist) * (180 / Math.PI);
+    return this._flipped ? -raw : raw;
   }
 
   get anyActive(): boolean {
     return this.connections.some(c => c.wasActive);
+  }
+
+  /**
+   * 중력 반전 여부를 설정한다.
+   * flipped=true 시 카메라 고도각 부호를 반전해 아래에서 바라보는 시점에서도 착시가 작동한다.
+   */
+  setFlipped(flipped: boolean): void {
+    this._flipped = flipped;
   }
 
   /** 중력 반전 후 새 블록 위치 기준으로 연결 목록을 교체한다. 기존 활성 엣지는 그래프에서 초기화된다. */

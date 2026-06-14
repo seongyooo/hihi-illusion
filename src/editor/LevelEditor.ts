@@ -187,6 +187,17 @@ export class LevelEditor {
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
+  // Selected block status labels
+  private selStartLabel!: HTMLElement;
+  private selGoalLabel!:  HTMLElement;
+  // Gravity flip
+  private flipBtn!: HTMLButtonElement;
+  // Map rotate
+  private mrAxisSel!:    HTMLSelectElement;
+  private mrAngleInput!: HTMLInputElement;
+  private mrPivotInput!: HTMLInputElement;
+  private mrSetBtn!:     HTMLButtonElement;
+  private mrRemoveBtn!:  HTMLButtonElement;
   private toolBtns: Partial<Record<Tool, HTMLButtonElement>> = {};
   private axisLabelEls: HTMLElement[] = [];
   private axisArrows:   THREE.ArrowHelper[] = [];
@@ -553,17 +564,24 @@ export class LevelEditor {
       spikeTypeRow.appendChild(this.spikeTypeSelect);
       sec.appendChild(spikeTypeRow);
 
-      const startBtn = document.createElement('button');
-      startBtn.className = 'editor-btn';
-      startBtn.textContent = 'Set as Start';
-      startBtn.style.marginBottom = '4px';
-      startBtn.addEventListener('click', () => {
-        if (this.selectedBlock) {
-          this.startNodeId = this.selectedBlock.id;
-          this.updateMarkers();
-        }
-      });
-      sec.appendChild(startBtn);
+      // ── Start / Goal buttons with status labels ──
+      {
+        const startRow = document.createElement('div');
+        startRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:4px;';
+        const startBtn = document.createElement('button');
+        startBtn.className = 'editor-btn';
+        startBtn.textContent = 'Set as Start';
+        startBtn.style.flex = '1';
+        startBtn.addEventListener('click', () => {
+          if (this.selectedBlock) { this.startNodeId = this.selectedBlock.id; this.updateMarkers(); this.updateSelectedPanel(); }
+        });
+        this.selStartLabel = document.createElement('span');
+        this.selStartLabel.style.cssText = 'font-size:10px;color:#44cc66;display:none;white-space:nowrap;';
+        this.selStartLabel.textContent = '✓ START';
+        startRow.appendChild(startBtn);
+        startRow.appendChild(this.selStartLabel);
+        sec.appendChild(startRow);
+      }
 
       const midBtn = document.createElement('button');
       midBtn.className = 'editor-btn';
@@ -588,35 +606,43 @@ export class LevelEditor {
       });
       sec.appendChild(clearMidBtn);
 
-      const goalBtn = document.createElement('button');
-      goalBtn.className = 'editor-btn';
-      goalBtn.textContent = 'Set as Goal';
-      goalBtn.addEventListener('click', () => {
-        if (!this.selectedBlock) return;
-        this.goalBlockId  = this.selectedBlock.id;
-        this.goalFlipped  = false;
-        this.updateMarkers();
-      });
-      sec.appendChild(goalBtn);
+      {
+        const goalRow = document.createElement('div');
+        goalRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:2px;';
+        const goalBtn = document.createElement('button');
+        goalBtn.className = 'editor-btn';
+        goalBtn.textContent = 'Set as Goal';
+        goalBtn.style.flex = '1';
+        goalBtn.addEventListener('click', () => {
+          if (!this.selectedBlock) return;
+          this.goalBlockId = this.selectedBlock.id;
+          this.goalFlipped = false;
+          this.updateMarkers(); this.updateSelectedPanel();
+        });
+        const flippedGoalBtn = document.createElement('button');
+        flippedGoalBtn.className = 'editor-btn';
+        flippedGoalBtn.textContent = 'Set as Flipped Goal';
+        flippedGoalBtn.style.cssText = 'flex:1;background:#224466;';
+        flippedGoalBtn.addEventListener('click', () => {
+          if (!this.selectedBlock) return;
+          this.goalBlockId = this.selectedBlock.id;
+          this.goalFlipped = true;
+          this.updateMarkers(); this.updateSelectedPanel();
+        });
+        this.selGoalLabel = document.createElement('span');
+        this.selGoalLabel.style.cssText = 'font-size:10px;color:#FFD700;display:none;white-space:nowrap;';
+        goalRow.appendChild(goalBtn);
+        goalRow.appendChild(flippedGoalBtn);
+        goalRow.appendChild(this.selGoalLabel);
+        sec.appendChild(goalRow);
+      }
 
-      const flippedGoalBtn = document.createElement('button');
-      flippedGoalBtn.className = 'editor-btn';
-      flippedGoalBtn.textContent = 'Set as Flipped Goal';
-      flippedGoalBtn.style.background = '#224466';
-      flippedGoalBtn.addEventListener('click', () => {
-        if (!this.selectedBlock) return;
-        this.goalBlockId  = this.selectedBlock.id;
-        this.goalFlipped  = true;
-        this.updateMarkers();
-      });
-      sec.appendChild(flippedGoalBtn);
-
-      const flipBtn = document.createElement('button');
-      flipBtn.className = 'editor-btn';
-      flipBtn.textContent = 'Toggle Gravity Flip Block';
-      flipBtn.style.marginTop = '4px';
-      flipBtn.style.background = '#005544';
-      flipBtn.addEventListener('click', () => {
+      // ── Gravity Flip ──
+      this.flipBtn = document.createElement('button');
+      this.flipBtn.className = 'editor-btn';
+      this.flipBtn.textContent = 'Add Gravity Flip Block';
+      this.flipBtn.style.cssText = 'margin-top:4px;background:#005544;';
+      this.flipBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
         const id = this.selectedBlock.id;
         const idx = this.gravityFlipNodeIds.indexOf(id);
@@ -625,12 +651,11 @@ export class LevelEditor {
           recolorBlockGroup(this.selectedBlock.mesh, 0x00CCAA, 'default');
         } else {
           this.gravityFlipNodeIds.splice(idx, 1);
-          // 원래 블록 색으로 복원
           recolorBlockGroup(this.selectedBlock.mesh, parseInt(this.selectedBlock.color.replace('#', ''), 16), 'default');
         }
-        this.updateMarkers();
+        this.updateMarkers(); this.updateSelectedPanel();
       });
-      sec.appendChild(flipBtn);
+      sec.appendChild(this.flipBtn);
 
       // ── Map Rotate Block ──
       const mrLabel = document.createElement('div');
@@ -641,51 +666,71 @@ export class LevelEditor {
       const mrRow = document.createElement('div');
       mrRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-top:2px;';
 
-      const mrAxisSel = document.createElement('select');
-      mrAxisSel.style.cssText = 'background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      this.mrAxisSel = document.createElement('select');
+      this.mrAxisSel.style.cssText = 'background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
       for (const v of ['x','y']) {
-        const o = document.createElement('option'); o.value = v; o.textContent = `${v.toUpperCase()}-axis`; mrAxisSel.appendChild(o);
+        const o = document.createElement('option'); o.value = v; o.textContent = `${v.toUpperCase()}-axis`; this.mrAxisSel.appendChild(o);
       }
 
-      const mrAngleInput = document.createElement('input');
-      mrAngleInput.type = 'number'; mrAngleInput.value = '180'; mrAngleInput.step = '90'; mrAngleInput.min = '90'; mrAngleInput.max = '360';
-      mrAngleInput.style.cssText = 'width:54px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
-      mrAngleInput.title = '회전 각도 (degrees)';
+      this.mrAngleInput = document.createElement('input');
+      this.mrAngleInput.type = 'number'; this.mrAngleInput.value = '180'; this.mrAngleInput.step = '90'; this.mrAngleInput.min = '90'; this.mrAngleInput.max = '360';
+      this.mrAngleInput.style.cssText = 'width:54px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      this.mrAngleInput.title = '회전 각도 (degrees)';
 
-      const mrPivotInput = document.createElement('input');
-      mrPivotInput.type = 'number'; mrPivotInput.placeholder = 'pivotY'; mrPivotInput.step = '0.5';
-      mrPivotInput.style.cssText = 'width:52px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
-      mrPivotInput.title = 'X축 회전 전용 pivotY (비워두면 맵 중심)';
+      this.mrPivotInput = document.createElement('input');
+      this.mrPivotInput.type = 'number'; this.mrPivotInput.placeholder = 'pivotY'; this.mrPivotInput.step = '0.5';
+      this.mrPivotInput.style.cssText = 'width:52px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
+      this.mrPivotInput.title = 'X축 회전 전용 pivotY (비워두면 맵 중심)';
 
-      mrRow.appendChild(mrAxisSel);
-      mrRow.appendChild(mrAngleInput);
-      mrRow.appendChild(mrPivotInput);
+      mrRow.appendChild(this.mrAxisSel);
+      mrRow.appendChild(this.mrAngleInput);
+      mrRow.appendChild(this.mrPivotInput);
       sec.appendChild(mrRow);
 
-      const mrToggleBtn = document.createElement('button');
-      mrToggleBtn.className = 'editor-btn';
-      mrToggleBtn.textContent = 'Toggle Map Rotate Block';
-      mrToggleBtn.style.cssText = 'margin-top:2px;background:#664400;';
-      mrToggleBtn.addEventListener('click', () => {
+      const mrBtnRow = document.createElement('div');
+      mrBtnRow.style.cssText = 'display:flex;gap:4px;margin-top:2px;';
+
+      this.mrSetBtn = document.createElement('button');
+      this.mrSetBtn.className = 'editor-btn';
+      this.mrSetBtn.textContent = 'Add Map Rotate Block';
+      this.mrSetBtn.style.cssText = 'flex:1;background:#664400;';
+      this.mrSetBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
         const id  = this.selectedBlock.id;
         const idx = this.mapRotateEntries.findIndex(e => e.nodeId === id);
+        const entry = {
+          nodeId: id,
+          axis:   this.mrAxisSel.value as 'x'|'y',
+          angle:  parseFloat(this.mrAngleInput.value) || 180,
+          ...(this.mrPivotInput.value !== '' ? { pivotY: parseFloat(this.mrPivotInput.value) } : {}),
+        };
         if (idx === -1) {
-          const entry = {
-            nodeId: id,
-            axis:   mrAxisSel.value as 'x'|'y',
-            angle:  parseFloat(mrAngleInput.value) || 180,
-            ...(mrPivotInput.value !== '' ? { pivotY: parseFloat(mrPivotInput.value) } : {}),
-          };
           this.mapRotateEntries.push(entry);
           recolorBlockGroup(this.selectedBlock.mesh, 0xFF8800, 'default');
         } else {
+          this.mapRotateEntries[idx] = entry; // update in place
+        }
+        this.updateSelectedPanel();
+      });
+
+      this.mrRemoveBtn = document.createElement('button');
+      this.mrRemoveBtn.className = 'editor-btn';
+      this.mrRemoveBtn.textContent = 'Remove';
+      this.mrRemoveBtn.style.cssText = 'background:#882200;display:none;';
+      this.mrRemoveBtn.addEventListener('click', () => {
+        if (!this.selectedBlock) return;
+        const id  = this.selectedBlock.id;
+        const idx = this.mapRotateEntries.findIndex(e => e.nodeId === id);
+        if (idx !== -1) {
           this.mapRotateEntries.splice(idx, 1);
           recolorBlockGroup(this.selectedBlock.mesh, parseInt(this.selectedBlock.color.replace('#', ''), 16), 'default');
         }
-        this.updateMarkers();
+        this.updateSelectedPanel();
       });
-      sec.appendChild(mrToggleBtn);
+
+      mrBtnRow.appendChild(this.mrSetBtn);
+      mrBtnRow.appendChild(this.mrRemoveBtn);
+      sec.appendChild(mrBtnRow);
     });
     p.appendChild(this.selectedSection);
 
@@ -2084,9 +2129,52 @@ export class LevelEditor {
       this.walkableInput.checked = b.walkable;
       this.spikeInput.checked    = b.isSpike;
       this.spikeTypeSelect.value = b.spikeType;
+
+      // Start / Goal 상태 레이블
+      const isStart = b.id === this.startNodeId;
+      this.selStartLabel.style.display = isStart ? 'inline' : 'none';
+
+      const isGoal = b.id === this.goalBlockId;
+      if (isGoal) {
+        this.selGoalLabel.textContent  = this.goalFlipped ? '✓ FLIPPED GOAL' : '✓ GOAL';
+        this.selGoalLabel.style.color  = this.goalFlipped ? '#44CCFF' : '#FFD700';
+        this.selGoalLabel.style.display = 'inline';
+      } else {
+        this.selGoalLabel.style.display = 'none';
+      }
+
+      // Gravity Flip 상태
+      const isFlip = this.gravityFlipNodeIds.includes(b.id);
+      this.flipBtn.textContent = isFlip ? '✓ Gravity Flip [ON] — Remove' : 'Add Gravity Flip Block';
+      this.flipBtn.style.background = isFlip ? '#007755' : '#005544';
+
+      // Map Rotate 상태
+      const mrEntry = this.mapRotateEntries.find(e => e.nodeId === b.id);
+      if (mrEntry) {
+        this.mrAxisSel.value    = mrEntry.axis;
+        this.mrAngleInput.value = String(mrEntry.angle);
+        this.mrPivotInput.value = mrEntry.pivotY !== undefined ? String(mrEntry.pivotY) : '';
+        this.mrSetBtn.textContent      = 'Update Map Rotate Block';
+        this.mrSetBtn.style.background = '#885500';
+        this.mrRemoveBtn.style.display = 'inline-block';
+      } else {
+        this.mrAxisSel.value    = 'x';
+        this.mrAngleInput.value = '180';
+        this.mrPivotInput.value = '';
+        this.mrSetBtn.textContent      = 'Add Map Rotate Block';
+        this.mrSetBtn.style.background = '#664400';
+        this.mrRemoveBtn.style.display = 'none';
+      }
     } else {
       this.selIdEl.textContent = '—';
       this.selFloorEl.textContent = '—';
+      this.selStartLabel.style.display = 'none';
+      this.selGoalLabel.style.display  = 'none';
+      this.flipBtn.textContent = 'Add Gravity Flip Block';
+      this.flipBtn.style.background = '#005544';
+      this.mrSetBtn.textContent      = 'Add Map Rotate Block';
+      this.mrSetBtn.style.background = '#664400';
+      this.mrRemoveBtn.style.display = 'none';
     }
   }
 
@@ -2724,6 +2812,17 @@ export class LevelEditor {
     this.goalFlipped          = data.goal.flipped ?? false;
     this.gravityFlipNodeIds   = (data.gravityFlipBlocks ?? []).map(g => g.nodeId);
     this.mapRotateEntries     = (data.mapRotateBlocks   ?? []).map(d => ({ ...d }));
+
+    // 특수 블록 색상 복원 (로드 시 메시 재색칠)
+    for (const nodeId of this.gravityFlipNodeIds) {
+      const b = this.blocks.find(bl => bl.id === nodeId);
+      if (b) recolorBlockGroup(b.mesh, 0x00CCAA, 'default');
+    }
+    for (const entry of this.mapRotateEntries) {
+      const b = this.blocks.find(bl => bl.id === entry.nodeId);
+      if (b) recolorBlockGroup(b.mesh, 0xFF8800, 'default');
+    }
+
     // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
     // 각 타깃은 자신의 moveTarget을 개별 보유
     {
