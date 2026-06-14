@@ -60,49 +60,50 @@ export class InputManager {
 
     const ray = this.raycaster.ray;
 
-    // ── Primary: ray-to-top-plane intersection ──────────────────────────
-    // For each block, compute where the camera ray hits the HORIZONTAL PLANE
-    // at that block's top surface (Y = blockTopY), then check whether the
-    // intersection point falls inside the block's XZ footprint.
-    // Blocks are processed highest-first, so the first match is always the
-    // topmost block under the cursor — eliminating the classic staircase bug
-    // where a lower block's geometry is geometrically closer to the camera
-    // than a taller block's side face.
+    // ── Primary: camera-relative top-surface plane intersection ─────────
+    // For each block, compute the world-space AABB dynamically (box.max.y is
+    // the current world-space top — correct even after map rotation).
+    // Collect ALL blocks whose top-plane footprint the ray passes through,
+    // then pick the one with the smallest t (closest to the camera).
+    // This replaces the old "sort by userData.blockTopY → return first match"
+    // approach, which broke after rotation because blockTopY was stale and
+    // first-match ≠ nearest-to-camera.
 
-    type Candidate = { blockId: string; sectionId: string | null; topY: number; target: THREE.Object3D };
-    const seen       = new Set<string>();
-    const candidates: Candidate[] = [];
+    type PlaneHit = { blockId: string; sectionId: string | null; t: number };
+    const planeHits: PlaneHit[] = [];
 
-    for (const target of this.targets) {
-      const blockId = target.userData.blockId as string | undefined;
-      if (!blockId || seen.has(blockId)) continue;
-      seen.add(blockId);
-      const topY      = (target.userData.blockTopY as number) ?? 0;
-      const sectionId = (target.userData.sectionId as string) ?? null;
-      candidates.push({ blockId, sectionId, topY, target });
-    }
+    if (Math.abs(ray.direction.y) >= 1e-6) {
+      const seen = new Set<string>();
+      const pt   = new THREE.Vector3();
+      const box  = new THREE.Box3();
 
-    // Highest top surface first
-    candidates.sort((a, b) => b.topY - a.topY);
+      for (const target of this.targets) {
+        const blockId = target.userData.blockId as string | undefined;
+        if (!blockId || seen.has(blockId)) continue;
+        seen.add(blockId);
 
-    const pt  = new THREE.Vector3();
-    const box = new THREE.Box3();
+        // World-space AABB — accounts for RotatingSection and mapRotate pivots
+        box.setFromObject(target);
+        const topY = box.max.y;
+        const t    = (topY - ray.origin.y) / ray.direction.y;
+        if (t <= 0) continue; // plane is behind camera
 
-    for (const { blockId, sectionId, topY, target } of candidates) {
-      if (Math.abs(ray.direction.y) < 1e-6) continue; // ray is horizontal — skip
+        ray.at(t, pt);
+        if (pt.x >= box.min.x && pt.x <= box.max.x &&
+            pt.z >= box.min.z && pt.z <= box.max.z) {
+          planeHits.push({
+            blockId,
+            sectionId: (target.userData.sectionId as string) ?? null,
+            t,
+          });
+        }
+      }
 
-      const t = (topY - ray.origin.y) / ray.direction.y;
-      if (t <= 0) continue; // plane is behind camera
-
-      ray.at(t, pt);
-
-      // World-space AABB of this block (accounts for RotatingSection pivots)
-      box.setFromObject(target);
-
-      if (pt.x >= box.min.x && pt.x <= box.max.x &&
-          pt.z >= box.min.z && pt.z <= box.max.z) {
-        this.hitBlockId   = blockId;
-        this.hitSectionId = sectionId;
+      if (planeHits.length > 0) {
+        // Smallest t = closest block to camera = visually "in front"
+        planeHits.sort((a, b) => a.t - b.t);
+        this.hitBlockId   = planeHits[0].blockId;
+        this.hitSectionId = planeHits[0].sectionId;
         return;
       }
     }
