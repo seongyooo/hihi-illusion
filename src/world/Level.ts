@@ -154,8 +154,6 @@ export interface LevelData {
   }>;
   gravityFlips?: Array<{
     triggerNodeId: string;
-    landingNodeId: string;
-    blockIds:      string[];
     pivotY:        number;
   }>;
   stars?: Array<{ nodeId: string }>;
@@ -174,6 +172,8 @@ export interface LevelData {
 export class Level {
   public blocks: Map<string, Block> = new Map();
   public sections: RotatingSection[] = [];
+  /** 회전 피벗 오브젝트 — GravityFlipManager가 이걸 X축으로 회전시켜 전체 레벨을 뒤집는다 */
+  private flipPivot: THREE.Object3D = new THREE.Object3D();
   private group: THREE.Group = new THREE.Group();
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
@@ -207,7 +207,8 @@ export class Level {
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
     this.blinkIsActive = false;
-    this.scene.remove(this.group);
+    this.scene.remove(this.flipPivot);
+    this.flipPivot = new THREE.Object3D();
     this.group = new THREE.Group();
 
     // Apply level background color
@@ -268,10 +269,13 @@ export class Level {
       this.sections.push(section);
     }
 
-    this.scene.add(this.group);
+    this.flipPivot.add(this.group);
+    this.scene.add(this.flipPivot);
   }
 
   getGroup(): THREE.Group               { return this.group; }
+  /** GravityFlipManager가 X축 회전에 사용하는 피벗 오브젝트 */
+  getFlipPivot(): THREE.Object3D        { return this.flipPivot; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
   getSpikeNodeIds(): Set<string>                     { return this.spikeNodeIds; }
@@ -362,7 +366,8 @@ export class Level {
         else (child.material as THREE.Material).dispose();
       }
     });
-    this.scene.remove(this.group);
+    this.scene.remove(this.flipPivot);
+    this.flipPivot = new THREE.Object3D();
     this.blocks.clear();
     this.sections       = [];
     this.walkableMeshes = [];

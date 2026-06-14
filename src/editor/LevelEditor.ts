@@ -122,7 +122,7 @@ export class LevelEditor {
   private gravityFlipConns:     GravityFlipDef[] = [];
   private gravityFlipListEl!:   HTMLElement;
   private gravityPreviewFlipped = false;
-  private _gravityOrigins:      Map<string, number> = new Map();
+  private _gravityOrigins:      Map<string, {y: number, z: number}> = new Map();
   private gravityTabBarEl:      HTMLElement | null = null;
   private gravityNormalTab:     HTMLButtonElement | null = null;
   private gravityFlippedTab:    HTMLButtonElement | null = null;
@@ -1304,8 +1304,6 @@ export class LevelEditor {
       form.className = 'editor-add-form';
 
       let gfTrigger = '';
-      let gfLanding = '';
-      let gfBlockIds: string[] = [];
       let gfPivotY = 1.5;
 
       // Trigger
@@ -1321,57 +1319,9 @@ export class LevelEditor {
       trigPickBtn.addEventListener('click', () => this.startPick(b => {
         gfTrigger = b.id;
         trigDisplay.value = b.id;
-        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
       }));
       trigRow.append(trigLabel, trigDisplay, trigPickBtn);
       form.appendChild(trigRow);
-
-      // Landing
-      const landRow = document.createElement('div');
-      landRow.className = 'editor-row';
-      const landLabel = document.createElement('label');
-      landLabel.textContent = 'Landing:';
-      const landDisplay = document.createElement('input');
-      landDisplay.className = 'editor-input'; landDisplay.readOnly = true;
-      landDisplay.placeholder = '↗ 클릭'; landDisplay.style.flex = '1';
-      const landPickBtn = document.createElement('button');
-      landPickBtn.className = 'editor-btn'; landPickBtn.textContent = '↗';
-      landPickBtn.addEventListener('click', () => this.startPick(b => {
-        gfLanding = b.id;
-        landDisplay.value = b.id;
-        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
-      }));
-      landRow.append(landLabel, landDisplay, landPickBtn);
-      form.appendChild(landRow);
-
-      // Block IDs list
-      const blockListLabel = document.createElement('div');
-      blockListLabel.style.cssText = 'font-size:10px;color:#aaa;margin-top:4px;';
-      blockListLabel.textContent = 'Flip Blocks:';
-      form.appendChild(blockListLabel);
-
-      const blockListEl = document.createElement('div');
-      blockListEl.style.cssText = 'font-size:10px;background:#111;padding:4px;border-radius:3px;min-height:20px;margin-bottom:4px;word-break:break-all;';
-      form.appendChild(blockListEl);
-
-      const updateBlockList = () => {
-        blockListEl.textContent = gfBlockIds.length ? gfBlockIds.join(', ') : '(없음)';
-      };
-      updateBlockList();
-
-      const addBlockRow = document.createElement('div');
-      addBlockRow.className = 'editor-row';
-      const addBlockBtn = document.createElement('button');
-      addBlockBtn.className = 'editor-btn'; addBlockBtn.textContent = '↗ Add Block';
-      addBlockBtn.style.flex = '1';
-      addBlockBtn.addEventListener('click', () => this.startPick(b => {
-        if (!gfBlockIds.includes(b.id)) { gfBlockIds.push(b.id); updateBlockList(); }
-      }));
-      const clearBlockBtn = document.createElement('button');
-      clearBlockBtn.className = 'editor-btn'; clearBlockBtn.textContent = '× Clear';
-      clearBlockBtn.addEventListener('click', () => { gfBlockIds = []; updateBlockList(); });
-      addBlockRow.append(addBlockBtn, clearBlockBtn);
-      form.appendChild(addBlockRow);
 
       // Pivot Y
       const pivotRow = document.createElement('div');
@@ -1391,14 +1341,13 @@ export class LevelEditor {
       confirmBtn.textContent = '✓ Add';
       confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
       confirmBtn.addEventListener('click', () => {
-        if (!gfTrigger || !gfLanding || gfBlockIds.length === 0) {
-          alert('Trigger, Landing, Blocks를 모두 설정하세요.'); return;
+        if (!gfTrigger) {
+          alert('Trigger 블록을 선택하세요.'); return;
         }
-        this.gravityFlipConns.push({ triggerNodeId: gfTrigger, landingNodeId: gfLanding, blockIds: [...gfBlockIds], pivotY: gfPivotY });
+        this.gravityFlipConns.push({ triggerNodeId: gfTrigger, pivotY: gfPivotY });
         this.rebuildGravityFlipList();
-        gfTrigger = ''; gfLanding = ''; gfBlockIds = []; gfPivotY = 1.5;
-        trigDisplay.value = ''; landDisplay.value = ''; pivotInput.value = '1.5';
-        updateBlockList();
+        gfTrigger = ''; gfPivotY = 1.5;
+        trigDisplay.value = ''; pivotInput.value = '1.5';
         form.classList.remove('open');
       });
       form.appendChild(confirmBtn);
@@ -1983,7 +1932,7 @@ export class LevelEditor {
       row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;';
       const info = document.createElement('span');
       info.style.flex = '1';
-      info.textContent = `T:${gf.triggerNodeId} → L:${gf.landingNodeId}  pivotY=${gf.pivotY}  (${gf.blockIds.length} blocks)`;
+      info.textContent = `T:${gf.triggerNodeId}  pivotY=${gf.pivotY}`;
       const del = document.createElement('button');
       del.className = 'editor-btn';
       del.textContent = '✕';
@@ -2000,29 +1949,34 @@ export class LevelEditor {
 
   /**
    * 에디터의 블록 메시를 중력 반전 프리뷰 상태에 맞게 이동시킨다.
-   * flipped=true → gravityFlipConns의 blockIds를 pivotY 기준 Y 대칭 위치로 이동
+   * flipped=true → 전체 맵을 pivotY/pivotZ 기준으로 Y·Z 대칭 위치로 이동 (실제 GravityFlipManager의 X축 180° 회전과 동일 효과)
    * flipped=false → 원래 위치로 복원
    */
   private _setGravityPreview(flipped: boolean): void {
     if (flipped === this.gravityPreviewFlipped) return;
 
-    if (flipped) {
+    if (flipped && this.gravityFlipConns.length > 0) {
+      const gf = this.gravityFlipConns[0];
+      const pivotY = gf.pivotY;
+      // pivotZ는 모든 블록의 Z 중심으로 계산
+      const zVals = this.blocks.map(b => b.mesh.position.z);
+      const pivotZ = zVals.length ? (Math.min(...zVals) + Math.max(...zVals)) / 2 : 0;
+
       this._gravityOrigins.clear();
-      for (const gf of this.gravityFlipConns) {
-        for (const blockId of gf.blockIds) {
-          const block = this.blocks.find(b => b.id === blockId);
-          if (!block) continue;
-          const originY = block.mesh.position.y;
-          if (!this._gravityOrigins.has(blockId)) {
-            this._gravityOrigins.set(blockId, originY);
-          }
-          block.mesh.position.y = 2 * gf.pivotY - originY;
-        }
+      for (const block of this.blocks) {
+        const originY = block.mesh.position.y;
+        const originZ = block.mesh.position.z;
+        this._gravityOrigins.set(block.id, { y: originY, z: originZ });
+        block.mesh.position.y = 2 * pivotY - originY;
+        block.mesh.position.z = 2 * pivotZ - originZ;
       }
     } else {
-      for (const [blockId, originY] of this._gravityOrigins) {
+      for (const [blockId, origin] of this._gravityOrigins) {
         const block = this.blocks.find(b => b.id === blockId);
-        if (block) block.mesh.position.y = originY;
+        if (block) {
+          block.mesh.position.y = origin.y;
+          block.mesh.position.z = origin.z;
+        }
       }
       this._gravityOrigins.clear();
     }
@@ -2361,13 +2315,17 @@ export class LevelEditor {
   // ── Markers ───────────────────────────────────────────────────────────────
 
   private updateMarkers(): void {
-    // 중력 프리뷰 상태에서는 mesh.position.y (실제 이동된 위치)를 사용
-    const blockTopY = (b: EditorBlock) => b.mesh.position.y + 0.25; // center + halfHeight(0.25)
+    // 중력 프리뷰 상태에서는 mesh.position (실제 이동된 위치)을 사용
+    const markerPos = (b: EditorBlock) => ({
+      x: b.mesh.position.x,
+      y: b.mesh.position.y + 0.25, // center + halfHeight(0.25)
+      z: b.mesh.position.z,
+    });
 
     const startBlock = this.blocks.find(b => b.id === this.startNodeId);
     if (startBlock) {
-      const p = blockWorldPos(startBlock.gridX, startBlock.floor, startBlock.gridZ);
-      this.startMarker.position.set(p.x, blockTopY(startBlock) + 0.2, p.z);
+      const p = markerPos(startBlock);
+      this.startMarker.position.set(p.x, p.y + 0.2, p.z);
       this.startMarker.visible = true;
     } else {
       this.startMarker.visible = false;
@@ -2375,8 +2333,8 @@ export class LevelEditor {
 
     const midBlock = this.blocks.find(b => b.id === this.midpointBlockId);
     if (midBlock) {
-      const p = blockWorldPos(midBlock.gridX, midBlock.floor, midBlock.gridZ);
-      this.midpointMarker.position.set(p.x, blockTopY(midBlock) + 0.2, p.z);
+      const p = markerPos(midBlock);
+      this.midpointMarker.position.set(p.x, p.y + 0.2, p.z);
       this.midpointMarker.visible = true;
     } else {
       this.midpointMarker.visible = false;
@@ -2384,8 +2342,8 @@ export class LevelEditor {
 
     const goalBlock = this.blocks.find(b => b.id === this.goalBlockId);
     if (goalBlock) {
-      const p = blockWorldPos(goalBlock.gridX, goalBlock.floor, goalBlock.gridZ);
-      this.goalMarker.position.set(p.x, blockTopY(goalBlock) + 0.2, p.z);
+      const p = markerPos(goalBlock);
+      this.goalMarker.position.set(p.x, p.y + 0.2, p.z);
       this.goalMarker.visible = true;
     } else {
       this.goalMarker.visible = false;
@@ -2710,7 +2668,7 @@ export class LevelEditor {
         }))
       ) : undefined,
       patrols: this.patrolConns.length > 0 ? this.patrolConns.map(p => ({ ...p })) : undefined,
-      gravityFlips: this.gravityFlipConns.length > 0 ? this.gravityFlipConns.map(g => ({ ...g, blockIds: [...g.blockIds] })) : undefined,
+      gravityFlips: this.gravityFlipConns.length > 0 ? this.gravityFlipConns.map(g => ({ ...g })) : undefined,
       illusionConnections: this.illusionConns.map(c => ({
         nodeA: c.nodeA,
         nodeB: c.nodeB,
@@ -2853,7 +2811,7 @@ export class LevelEditor {
     this._gravityOrigins.clear();
     if (this.gravityNormalTab)  { this.gravityNormalTab.style.background = '#2d4a7a'; this.gravityNormalTab.style.color = '#fff'; }
     if (this.gravityFlippedTab) { this.gravityFlippedTab.style.background = '#1e1e1e'; this.gravityFlippedTab.style.color = '#888'; }
-    this.gravityFlipConns = (data.gravityFlips ?? []).map(g => ({ ...g, blockIds: [...g.blockIds] }));
+    this.gravityFlipConns = (data.gravityFlips ?? []).map(g => ({ triggerNodeId: g.triggerNodeId, pivotY: g.pivotY }));
     this.rebuildGravityFlipList();
 
     // Zones 복원
