@@ -51,5 +51,6 @@ export class ProgressStore {
 
   static clearDeveloperMode(): void {
     localStorage.removeItem(KEY_DEV_MODE);
+    localStorage.removeItem(KEY_UNLOCKED); // 잠금 상태 초기화
   }
 }

@@ -714,10 +714,7 @@ export class SettingsScreen {
       labelEl.textContent = '🔓 ALL UNLOCKED';
       labelEl.style.color = '#FFD700';
     }
-    setTimeout(() => {
-      labelEl.textContent = 'PREVIEW';
-      labelEl.style.color = '';
-    }, 1500);
+    setTimeout(() => { location.reload(); }, 1500);
   }
 
   private onGraphicsTap(labelEl: HTMLElement): void {
@@ -750,10 +747,7 @@ export class SettingsScreen {
       labelEl.textContent = '🔓 DEV MODE ON';
       labelEl.style.color = '#FFD700';
     }
-    setTimeout(() => {
-      labelEl.textContent = 'GRAPHICS';
-      labelEl.style.color = '';
-    }, 1500);
+    setTimeout(() => { location.reload(); }, 1500);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
