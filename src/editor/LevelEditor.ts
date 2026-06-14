@@ -113,7 +113,10 @@ export class LevelEditor {
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private conditionalLadderConns: Array<{ switchNodeId: string; nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
-  private starNodeIds:     string[] = [];
+  private starNodeIds:         string[] = [];
+  private flippedGoalBlockId:  string | null = null;
+  private flippedStarNodeIds:  string[] = [];
+  private flippedMidpointBlockId: string | null = null;
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private patrolConns:        PatrolDef[] = [];
@@ -606,38 +609,57 @@ export class LevelEditor {
 
       const midBtn = document.createElement('button');
       midBtn.className = 'editor-btn';
-      midBtn.textContent = 'Set as Midpoint';
       midBtn.style.marginBottom = '4px';
       midBtn.style.color = '#44DDBB';
       midBtn.addEventListener('click', () => {
-        if (this.selectedBlock) {
+        if (!this.selectedBlock) return;
+        if (this.gravityPreviewFlipped) {
+          this.flippedMidpointBlockId = this.selectedBlock.id;
+        } else {
           this.midpointBlockId = this.selectedBlock.id;
-          this.updateMarkers();
         }
+        this.updateMarkers();
       });
       sec.appendChild(midBtn);
 
       const clearMidBtn = document.createElement('button');
       clearMidBtn.className = 'editor-btn';
-      clearMidBtn.textContent = 'Clear Midpoint';
       clearMidBtn.style.marginBottom = '4px';
       clearMidBtn.style.fontSize = '10px';
       clearMidBtn.addEventListener('click', () => {
-        this.midpointBlockId = null;
+        if (this.gravityPreviewFlipped) {
+          this.flippedMidpointBlockId = null;
+        } else {
+          this.midpointBlockId = null;
+        }
         this.updateMarkers();
       });
       sec.appendChild(clearMidBtn);
 
       const goalBtn = document.createElement('button');
       goalBtn.className = 'editor-btn';
-      goalBtn.textContent = 'Set as Goal';
       goalBtn.addEventListener('click', () => {
-        if (this.selectedBlock) {
+        if (!this.selectedBlock) return;
+        if (this.gravityPreviewFlipped) {
+          this.flippedGoalBlockId = this.selectedBlock.id;
+        } else {
           this.goalBlockId = this.selectedBlock.id;
-          this.updateMarkers();
         }
+        this.updateMarkers();
       });
       sec.appendChild(goalBtn);
+
+      // 버튼 텍스트를 중력 상태에 맞게 갱신하는 헬퍼 (탭 전환 시 호출)
+      const _updateSelBtnLabels = () => {
+        const suffix = this.gravityPreviewFlipped ? ' (Flipped)' : '';
+        midBtn.textContent    = `Set as Midpoint${suffix}`;
+        clearMidBtn.textContent = `Clear Midpoint${suffix}`;
+        goalBtn.textContent   = `Set as Goal${suffix}`;
+      };
+      _updateSelBtnLabels();
+      // gravityNormalTab / gravityFlippedTab 클릭 시 라벨도 갱신
+      if (this.gravityNormalTab)  this.gravityNormalTab.addEventListener('click',  _updateSelBtnLabels);
+      if (this.gravityFlippedTab) this.gravityFlippedTab.addEventListener('click', _updateSelBtnLabels);
     });
     p.appendChild(this.selectedSection);
 
@@ -898,7 +920,7 @@ export class LevelEditor {
       });
     }));
 
-    // Stars
+    // Stars (gravity-state-aware)
     p.appendChild(this.buildSection('STARS', (sec) => {
       this.starListEl = document.createElement('div');
       sec.appendChild(this.starListEl);
@@ -929,8 +951,9 @@ export class LevelEditor {
       starAddBtn.style.marginTop = '6px';
       starAddBtn.addEventListener('click', () => {
         const nodeId = (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value.trim();
-        if (nodeId && !this.starNodeIds.includes(nodeId)) {
-          this.starNodeIds.push(nodeId);
+        const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
+        if (nodeId && !list.includes(nodeId)) {
+          list.push(nodeId);
           this.rebuildStarList();
           (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = '';
         }
@@ -944,8 +967,9 @@ export class LevelEditor {
       starAddSelectedBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
         const id = this.selectedBlock.id;
-        if (!this.starNodeIds.includes(id)) {
-          this.starNodeIds.push(id);
+        const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
+        if (!list.includes(id)) {
+          list.push(id);
           this.rebuildStarList();
         }
       });
@@ -956,6 +980,10 @@ export class LevelEditor {
       addBtn.addEventListener('click', () => {
         this.starFormEl.classList.toggle('open');
       });
+
+      // 탭 전환 시 리스트 다시 그리기
+      if (this.gravityNormalTab)  this.gravityNormalTab.addEventListener('click',  () => this.rebuildStarList());
+      if (this.gravityFlippedTab) this.gravityFlippedTab.addEventListener('click', () => this.rebuildStarList());
     }));
 
     // Switches
@@ -1774,16 +1802,24 @@ export class LevelEditor {
 
   private rebuildStarList(): void {
     this.starListEl.innerHTML = '';
-    this.starNodeIds.forEach((nodeId, i) => {
+    const list = this.gravityPreviewFlipped ? this.flippedStarNodeIds : this.starNodeIds;
+    const color = this.gravityPreviewFlipped ? '#AA44FF' : '#FFD700';
+    if (list.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = this.gravityPreviewFlipped ? '(뒤집힌 상태 별 없음)' : '(별 없음)';
+      this.starListEl.appendChild(empty);
+    }
+    list.forEach((nodeId, i) => {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
-      item.innerHTML = `<span style="color:#FFD700">★</span> <span>${nodeId}</span>`;
+      item.innerHTML = `<span style="color:${color}">★</span> <span>${nodeId}</span>`;
 
       const edit = document.createElement('button');
       edit.textContent = '✎';
       edit.title = '편집';
       edit.addEventListener('click', () => {
-        this.starNodeIds.splice(i, 1);
+        list.splice(i, 1);
         this.starFormEl.classList.add('open');
         (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = nodeId;
         this.rebuildStarList();
@@ -1792,7 +1828,7 @@ export class LevelEditor {
       const del = document.createElement('button');
       del.textContent = '×';
       del.addEventListener('click', () => {
-        this.starNodeIds.splice(i, 1);
+        list.splice(i, 1);
         this.rebuildStarList();
       });
       item.appendChild(edit);
@@ -2250,7 +2286,10 @@ export class LevelEditor {
     if (this.startNodeId    === block.id) this.startNodeId    = this.blocks[0]?.id ?? null;
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
     if (this.goalBlockId    === block.id) this.goalBlockId    = this.blocks[this.blocks.length - 1]?.id ?? null;
-    this.starNodeIds  = this.starNodeIds.filter(id => id !== block.id);
+    if (this.flippedMidpointBlockId === block.id) this.flippedMidpointBlockId = null;
+    if (this.flippedGoalBlockId     === block.id) this.flippedGoalBlockId     = null;
+    this.starNodeIds        = this.starNodeIds.filter(id => id !== block.id);
+    this.flippedStarNodeIds = this.flippedStarNodeIds.filter(id => id !== block.id);
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
@@ -2322,6 +2361,7 @@ export class LevelEditor {
       z: b.mesh.position.z,
     });
 
+    // Start
     const startBlock = this.blocks.find(b => b.id === this.startNodeId);
     if (startBlock) {
       const p = markerPos(startBlock);
@@ -2331,7 +2371,9 @@ export class LevelEditor {
       this.startMarker.visible = false;
     }
 
-    const midBlock = this.blocks.find(b => b.id === this.midpointBlockId);
+    // Midpoint — 현재 탭의 midpoint만 표시
+    const activeMidId = this.gravityPreviewFlipped ? this.flippedMidpointBlockId : this.midpointBlockId;
+    const midBlock = this.blocks.find(b => b.id === activeMidId);
     if (midBlock) {
       const p = markerPos(midBlock);
       this.midpointMarker.position.set(p.x, p.y + 0.2, p.z);
@@ -2340,10 +2382,16 @@ export class LevelEditor {
       this.midpointMarker.visible = false;
     }
 
-    const goalBlock = this.blocks.find(b => b.id === this.goalBlockId);
+    // Goal — 현재 탭의 goal만 표시 (normal=금색, flipped=보라색)
+    const activeGoalId = this.gravityPreviewFlipped ? this.flippedGoalBlockId : this.goalBlockId;
+    const goalBlock = this.blocks.find(b => b.id === activeGoalId);
     if (goalBlock) {
       const p = markerPos(goalBlock);
       this.goalMarker.position.set(p.x, p.y + 0.2, p.z);
+      // flipped 상태에서는 보라색으로 구분
+      (this.goalMarker.material as THREE.MeshLambertMaterial).color.setHex(
+        this.gravityPreviewFlipped ? 0xAA44FF : 0xFFD700,
+      );
       this.goalMarker.visible = true;
     } else {
       this.goalMarker.visible = false;
@@ -2657,6 +2705,9 @@ export class LevelEditor {
       })(),
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starNodeIds.length > 0 ? this.starNodeIds.map(id => ({ nodeId: id })) : undefined,
+      flippedGoal:    this.flippedGoalBlockId ? { blockId: this.flippedGoalBlockId } : undefined,
+      flippedStars:   this.flippedStarNodeIds.length > 0 ? this.flippedStarNodeIds.map(id => ({ nodeId: id })) : undefined,
+      flippedMidpoint: this.flippedMidpointBlockId ? { blockId: this.flippedMidpointBlockId } : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
         sw.targets.map(t => ({
@@ -2708,7 +2759,10 @@ export class LevelEditor {
     this.ladderConns             = [];
     this.conditionalLadderConns  = [];
     this.teleporterConns = [];
-    this.starNodeIds     = [];
+    this.starNodeIds            = [];
+    this.flippedStarNodeIds     = [];
+    this.flippedGoalBlockId     = null;
+    this.flippedMidpointBlockId = null;
     this.switchConns     = [];
     this.patrolConns     = [];
     for (const arr of this.patrolArrows) this.scene.remove(arr);
@@ -2784,7 +2838,10 @@ export class LevelEditor {
       cl.pairs.map(p => ({ switchNodeId: cl.switchNodeId, nodeA: p.nodeA, nodeB: p.nodeB }))
     );
     this.teleporterConns = data.teleporters ?? [];
-    this.starNodeIds     = (data.stars ?? []).map(s => s.nodeId);
+    this.starNodeIds          = (data.stars ?? []).map(s => s.nodeId);
+    this.flippedStarNodeIds   = (data.flippedStars ?? []).map(s => s.nodeId);
+    this.flippedGoalBlockId   = data.flippedGoal?.blockId ?? null;
+    this.flippedMidpointBlockId = data.flippedMidpoint?.blockId ?? null;
     // 같은 (switchNodeId + mode + type) 조합을 그룹핑해 targets 배열로 합침
     // 각 타깃은 자신의 moveTarget을 개별 보유
     {

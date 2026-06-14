@@ -62,6 +62,7 @@ export class GameManager {
   private illusionMgr:      IllusionManager | null = null;
   private teleportMgr:      TeleportManager | null = null;
   private starMgr:          StarManager      | null = null;
+  private flippedStarMgr:   StarManager      | null = null;
   private switchMgr:        SwitchManager   | null = null;
   private elevatorMgr:      ElevatorManager | null = null;
   private patrolMgr:        PatrolManager      | null = null;
@@ -71,9 +72,13 @@ export class GameManager {
   private goalGlow:         THREE.PointLight | null = null;
   private goalMarker:       THREE.Mesh | null = null;
   private midpointMarker:   THREE.Mesh | null = null;
-  private goalBlockId       = '';
-  private midpointBlockId   = '';
-  private midpointReached   = false;
+  private goalBlockId         = '';
+  private normalGoalBlockId   = '';
+  private flippedGoalBlockId  = '';
+  private midpointBlockId     = '';
+  private normalMidpointBlockId  = '';
+  private flippedMidpointBlockId = '';
+  private midpointReached     = false;
   private goalReached       = false;
 
   // ── Tutorial state ────────────────────────────────────────────────────
@@ -411,9 +416,13 @@ export class GameManager {
       }
     );
 
-    // Goal / midpoint setup
-    this.goalBlockId     = data.goal.blockId;
-    this.midpointBlockId = data.midpoint?.blockId ?? '';
+    // Goal / midpoint setup (normal + optional flipped variants)
+    this.normalGoalBlockId      = data.goal.blockId;
+    this.flippedGoalBlockId     = data.flippedGoal?.blockId ?? '';
+    this.normalMidpointBlockId  = data.midpoint?.blockId ?? '';
+    this.flippedMidpointBlockId = data.flippedMidpoint?.blockId ?? '';
+    this.goalBlockId     = this.normalGoalBlockId;
+    this.midpointBlockId = this.normalMidpointBlockId;
     this.midpointReached = false;
     this.goalGlow        = new THREE.PointLight(0xFFD700, 1.5, 3.5);
     const goalMesh       = this.level.blocks.get(this.goalBlockId)?.mesh;
@@ -450,11 +459,17 @@ export class GameManager {
       );
     if (padNodePairs.length > 0) this.teleportMgr.setupPads(padNodePairs);
 
-    // StarManager
+    // StarManager (normal + optional flipped)
     this.starMgr = new StarManager(this.renderer.scene, this.particles);
     if ((data.stars ?? []).length > 0) {
       this.starMgr.setup(data.stars!, (id) => this.graph!.getNode(id));
       this.hud.showStarCounter(0, this.starMgr.getTotal());
+    }
+    this.flippedStarMgr = null;
+    if ((data.flippedStars ?? []).length > 0) {
+      this.flippedStarMgr = new StarManager(this.renderer.scene, this.particles);
+      this.flippedStarMgr.setup(data.flippedStars!, (id) => this.graph!.getNode(id));
+      this.flippedStarMgr.setAllVisible(false); // 초기에는 숨김
     }
 
     // SwitchManager
@@ -512,8 +527,9 @@ export class GameManager {
         this.level.getGroup(),
         this.level.getFlipPivot(),
         {
-          beforeFlip: () => this.controller?.stop(),
-          onFlipComplete: () => this._repositionGoalMarkers(),
+          beforeFlip:     () => this.controller?.stop(),
+          onFlipUpdate:   () => this._repositionGoalMarkers(),
+          onFlipComplete: () => this._onGravityFlipComplete(),
         },
       );
     }
@@ -573,9 +589,11 @@ export class GameManager {
           // 중력 반전 트리거
           this.gravityFlipMgr?.onArrival(nodeId);
 
-          // 별 수집
-          if (this.starMgr?.tryCollect(nodeId)) {
-            this.hud.updateStarCounter(this.starMgr.getCollected(), this.starMgr.getTotal());
+          // 별 수집 (현재 중력 상태에 맞는 매니저)
+          const _activeStarMgr = (this.gravityFlipMgr?.isFlipped() && this.flippedStarMgr)
+            ? this.flippedStarMgr : this.starMgr;
+          if (_activeStarMgr?.tryCollect(nodeId)) {
+            this.hud.updateStarCounter(_activeStarMgr.getCollected(), _activeStarMgr.getTotal());
             this.audio.playStarCollect();
           }
 
@@ -590,8 +608,10 @@ export class GameManager {
               // 텔레포트 후 남은 경로를 제거 — 목적지 너머를 클릭했을 때 자동 이동 방지
               this.controller!.stop();
               // QA-07: 텔레포트 목적지 노드의 별 수집 판정
-              if (this.starMgr?.tryCollect(teleportDest)) {
-                this.hud.updateStarCounter(this.starMgr.getCollected(), this.starMgr.getTotal());
+              const _tpStarMgr = (this.gravityFlipMgr?.isFlipped() && this.flippedStarMgr)
+                ? this.flippedStarMgr : this.starMgr;
+              if (_tpStarMgr?.tryCollect(teleportDest)) {
+                this.hud.updateStarCounter(_tpStarMgr.getCollected(), _tpStarMgr.getTotal());
                 this.audio.playStarCollect();
               }
               // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
@@ -660,6 +680,7 @@ export class GameManager {
               this.graph!.refresh();
               // QA-08: 섹션 회전 후 별 메시 위치 갱신
               this.starMgr?.refreshPositions((id) => this.graph!.getNode(id));
+              this.flippedStarMgr?.refreshPositions((id) => this.graph!.getNode(id));
               this.cameraCtrl.pulse(0.3);
             });
           }
@@ -678,8 +699,9 @@ export class GameManager {
       if (sw.type === 'spawn') {
         const meshes: THREE.Object3D[] = [];
 
-        // 별
-        const starMesh = this.starMgr?.getStarMesh(sw.targetNodeId);
+        // 별 (normal + flipped 모두 체크)
+        const starMesh = this.starMgr?.getStarMesh(sw.targetNodeId)
+          ?? this.flippedStarMgr?.getStarMesh(sw.targetNodeId);
         if (starMesh) meshes.push(starMesh);
 
         // 텔레포트 패드 링
@@ -919,7 +941,7 @@ export class GameManager {
       });
   }
 
-  /** 중력 반전 후 goal/midpoint 마커를 새 블록 위치로 재배치 */
+  /** 플립 애니메이션 중 매 프레임 — goal/midpoint 마커를 블록 월드 위치로 추적 */
   private _repositionGoalMarkers(): void {
     const _wp = new THREE.Vector3();
     const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh;
@@ -935,6 +957,72 @@ export class GameManager {
         if (this.midpointMarker) this.midpointMarker.position.set(_wp.x, _wp.y + 0.55, _wp.z);
       }
     }
+  }
+
+  /** 플립 애니메이션 완료 — goal/star/midpoint를 flipped 버전으로 전환 */
+  private _onGravityFlipComplete(): void {
+    const isFlipped = this.gravityFlipMgr?.isFlipped() ?? false;
+
+    // ── goal 전환 ──────────────────────────────────────────────────────────
+    const newGoalId = (isFlipped && this.flippedGoalBlockId)
+      ? this.flippedGoalBlockId
+      : this.normalGoalBlockId;
+    if (newGoalId !== this.goalBlockId) {
+      // 현재 goalMarker / goalGlow 제거
+      if (this.goalMarker) {
+        gsap.killTweensOf(this.goalMarker.position);
+        gsap.killTweensOf(this.goalMarker.scale);
+        this.renderer.scene.remove(this.goalMarker);
+        this.goalMarker.geometry.dispose();
+        (this.goalMarker.material as THREE.Material).dispose();
+        this.goalMarker = null;
+      }
+      if (this.goalGlow) {
+        gsap.killTweensOf(this.goalGlow);
+        this.renderer.scene.remove(this.goalGlow);
+        this.goalGlow = new THREE.PointLight(0xFFD700, 1.5, 3.5);
+        this.renderer.scene.add(this.goalGlow);
+      }
+      this.goalBlockId = newGoalId;
+      const newGoalMesh = this.level?.blocks.get(newGoalId)?.mesh;
+      if (newGoalMesh) {
+        this.setupGoalMarker(newGoalMesh);
+        gsap.to(this.goalGlow!, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+      }
+    }
+
+    // ── midpoint 전환 ───────────────────────────────────────────────────────
+    const newMidId = (isFlipped && this.flippedMidpointBlockId)
+      ? this.flippedMidpointBlockId
+      : this.normalMidpointBlockId;
+    if (newMidId !== this.midpointBlockId && !this.midpointReached) {
+      if (this.midpointMarker) {
+        gsap.killTweensOf(this.midpointMarker.position);
+        this.renderer.scene.remove(this.midpointMarker);
+        this.midpointMarker.geometry.dispose();
+        (this.midpointMarker.material as THREE.Material).dispose();
+        this.midpointMarker = null;
+      }
+      this.midpointBlockId = newMidId;
+      if (newMidId) {
+        const newMidMesh = this.level?.blocks.get(newMidId)?.mesh;
+        if (newMidMesh) this.setupMidpointMarker(newMidMesh);
+      }
+    }
+
+    // ── star 전환 ──────────────────────────────────────────────────────────
+    const activeStarMgr   = isFlipped ? (this.flippedStarMgr ?? this.starMgr) : this.starMgr;
+    const inactiveStarMgr = isFlipped ? this.starMgr : this.flippedStarMgr;
+    inactiveStarMgr?.setAllVisible(false);
+    activeStarMgr?.setAllVisible(true);
+    if (activeStarMgr && activeStarMgr.getTotal() > 0) {
+      this.hud.showStarCounter(activeStarMgr.getCollected(), activeStarMgr.getTotal());
+    } else {
+      this.hud.reset(); // 별 없는 중력 상태엔 카운터 숨김
+    }
+
+    // 마커 최종 위치 확정
+    this._repositionGoalMarkers();
   }
 
   private unloadCurrent(): void {
@@ -1002,8 +1090,12 @@ export class GameManager {
       (this.midpointMarker.material as THREE.Material).dispose();
       this.midpointMarker = null;
     }
-    this.midpointBlockId = '';
-    this.midpointReached = false;
+    this.midpointBlockId          = '';
+    this.normalMidpointBlockId    = '';
+    this.flippedMidpointBlockId   = '';
+    this.normalGoalBlockId        = '';
+    this.flippedGoalBlockId       = '';
+    this.midpointReached          = false;
 
     this.particles.dispose();
     this.particles.reset();
@@ -1026,6 +1118,8 @@ export class GameManager {
     // level.dispose()의 traverse보다 먼저 제거해야 double-dispose 방지
     this.starMgr?.dispose();
     this.starMgr = null;
+    this.flippedStarMgr?.dispose();
+    this.flippedStarMgr = null;
 
     this.level.dispose();
     this.level = null;

@@ -146,6 +146,13 @@ export class StarManager {
   /** 별이 없는 레벨(total=0)은 항상 true */
   allCollected(): boolean { return this.collectedIds.size >= this.total; }
 
+  /** 모든 미수집 별 메시의 가시성을 일괄 설정 (중력 반전 전환 시 사용) */
+  setAllVisible(visible: boolean): void {
+    for (const mesh of this.starMeshes.values()) {
+      mesh.visible = visible;
+    }
+  }
+
   /**
    * 미수집 별 메시를 모두 현재 노드 위치로 재배치한다.
    * QA-08: RotatingSection 스냅 완료 후 호출.

@@ -112,6 +112,32 @@ export interface ZoneDef {
   depth: number;   // Z 방향 칸 수
 }
 
+// ---------- 중력 반전 트리거 블록 시각 표시 ----------
+export function buildGravityFlipMarker(blockPos: [number, number, number], blockHalfH: number): THREE.Group {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: 0xAA44FF, emissive: 0x660099, emissiveIntensity: 0.4 });
+  const coneR = 0.09;
+  const coneH = 0.20;
+
+  // 위 화살표 (↑)
+  const upCone = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 6), mat.clone());
+  upCone.position.y = coneH / 2 + 0.06;
+  group.add(upCone);
+
+  // 아래 화살표 (↓)
+  const downCone = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 6), mat.clone());
+  downCone.rotation.z = Math.PI;
+  downCone.position.y = -(coneH / 2 + 0.06);
+  group.add(downCone);
+
+  // 연결 막대
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 6), mat.clone());
+  group.add(cyl);
+
+  group.position.set(blockPos[0], blockPos[1] + blockHalfH + 0.50, blockPos[2]);
+  return group;
+}
+
 export interface LevelData {
   id: string;
   name: string;
@@ -157,6 +183,9 @@ export interface LevelData {
     pivotY:        number;
   }>;
   stars?: Array<{ nodeId: string }>;
+  flippedGoal?: { blockId: string };
+  flippedStars?: Array<{ nodeId: string }>;
+  flippedMidpoint?: { blockId: string };
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string };
@@ -181,6 +210,7 @@ export class Level {
   private blinkingNodeIds: Set<string> = new Set();
   private blinkingSpikeGroups: Map<string, THREE.Group> = new Map();
   private blinkIsActive  = false; // 현재 사이클에서 가시가 위험 상태인가
+  private gravityFlipSpinners: THREE.Group[] = [];
   private scene: THREE.Scene;
 
   // blinking 속도 설정 (dev에서 조절 가능)
@@ -207,6 +237,7 @@ export class Level {
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
     this.blinkIsActive = false;
+    this.gravityFlipSpinners = [];
     this.scene.remove(this.flipPivot);
     this.flipPivot = new THREE.Object3D();
     this.group = new THREE.Group();
@@ -269,6 +300,19 @@ export class Level {
       this.sections.push(section);
     }
 
+    // 중력 반전 트리거 블록 시각 표시 (보라색 + ↕ 화살표)
+    for (const gf of data.gravityFlips ?? []) {
+      const bd = data.blocks.find(b => b.id === gf.triggerNodeId);
+      const block = this.blocks.get(gf.triggerNodeId);
+      if (bd && block) {
+        block.recolor(0x8B00FF); // 보라색 tint
+        const halfH = bd.size[1] / 2;
+        const spinner = buildGravityFlipMarker(bd.position, halfH);
+        this.group.add(spinner);
+        this.gravityFlipSpinners.push(spinner);
+      }
+    }
+
     this.flipPivot.add(this.group);
     this.scene.add(this.flipPivot);
   }
@@ -297,8 +341,14 @@ export class Level {
     this.blinkOffDuration = offDuration;
   }
 
-  /** 매 프레임 호출 — blinking 가시 슬라이드 애니메이션 */
+  /** 매 프레임 호출 — blinking 가시 슬라이드 애니메이션 + 중력 반전 트리거 스피너 회전 */
   update(): void {
+    // 중력 반전 트리거 화살표 Y축 회전
+    const dt = performance.now() / 1000;
+    for (const spinner of this.gravityFlipSpinners) {
+      spinner.rotation.y = dt * 1.8; // ~0.3 rps
+    }
+
     if (this.blinkingSpikeGroups.size === 0) return;
 
     const E = Level.EMERGE_DURATION;
@@ -375,6 +425,7 @@ export class Level {
     this.spikeNodeIds.clear();
     this.blinkingNodeIds.clear();
     this.blinkingSpikeGroups.clear();
+    this.gravityFlipSpinners = [];
     this.onSpikeActivated = null;
   }
 }

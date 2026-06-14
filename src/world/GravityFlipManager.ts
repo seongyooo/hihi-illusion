@@ -23,6 +23,7 @@ export class GravityFlipManager {
   private graph:          PathGraph | null     = null;
   private flipPivot:      THREE.Object3D | null = null;
   private beforeFlip:     (() => void)   | null = null;
+  private onFlipUpdate:   (() => void)   | null = null;
   private onFlipComplete: (() => void)   | null = null;
 
   /**
@@ -40,12 +41,14 @@ export class GravityFlipManager {
     flipPivot: THREE.Object3D,
     callbacks: {
       beforeFlip?:     () => void;
+      onFlipUpdate?:   () => void;
       onFlipComplete?: () => void;
     } = {},
   ): void {
     this.graph          = graph;
     this.flipPivot      = flipPivot;
     this.beforeFlip     = callbacks.beforeFlip    ?? null;
+    this.onFlipUpdate   = callbacks.onFlipUpdate  ?? null;
     this.onFlipComplete = callbacks.onFlipComplete ?? null;
 
     for (const def of defs) {
@@ -90,6 +93,7 @@ export class GravityFlipManager {
       x:        targetX,
       duration: FLIP_DURATION,
       ease:     'power2.inOut',
+      onUpdate: () => { this.onFlipUpdate?.(); },
       onComplete: () => {
         state.isFlipped   = going;
         state.isAnimating = false;
@@ -110,6 +114,7 @@ export class GravityFlipManager {
     this.graph          = null;
     this.flipPivot      = null;
     this.beforeFlip     = null;
+    this.onFlipUpdate   = null;
     this.onFlipComplete = null;
   }
 }
