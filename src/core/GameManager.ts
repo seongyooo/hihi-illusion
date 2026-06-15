@@ -75,6 +75,7 @@ export class GameManager {
   private goalBlockId              = '';
   private _goalFlipped             = false;
   private midpointBlockId          = '';
+  private _midpointFlipped         = false;
   private midpointReached          = false;
   private goalReached       = false;
 
@@ -231,7 +232,7 @@ export class GameManager {
 
     this.settingsScreen.onRotateSpeedChange = (val) => {
       GraphicsSettings.rotateSpeed = val;
-      this.orbit.rotateSpeed = this.controller?.isFlipped() ? -Math.abs(val) : val;
+      this.orbit.rotateSpeed = val;
     };
 
     this.settingsScreen.onDampingFactorChange = (val) => {
@@ -419,6 +420,7 @@ export class GameManager {
     this.goalBlockId        = data.goal.blockId;
     this._goalFlipped       = data.goal.flipped ?? false;
     this.midpointBlockId    = data.midpoint?.blockId ?? '';
+    this._midpointFlipped   = data.midpoint?.flipped ?? false;
     this.midpointReached    = false;
     this.goalGlow        = new THREE.PointLight(0xFFD700, 1.5, 3.5);
     const goalMesh       = this.level.blocks.get(this.goalBlockId)?.mesh;
@@ -433,7 +435,7 @@ export class GameManager {
     if (this.midpointBlockId) {
       this.goalGlow.intensity = 0;
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
-      if (midMesh) this.setupMidpointMarker(midMesh);
+      if (midMesh) this.setupMidpointMarker(midMesh, this._midpointFlipped);
     } else if (this.isTutorial) {
       // 튜토리얼: 경로 블록이 올라온 뒤 _revealTutorialGoal()에서 활성화
       this.goalGlow.intensity = 0;
@@ -596,25 +598,12 @@ export class GameManager {
           // 맵 전체 회전 블록
           this.worldRotateMgr?.onArrival(nodeId);
 
-          // 중력 반전 블록 — 플레이어 flip + camera.up 반전 + 마우스 반전
-          if (this.level!.getGravityFlipNodeIds().has(nodeId)) {
-            const newFlipped = !this.controller!.isFlipped();
-            this.controller!.setFlipped(newFlipped);
-            this.renderer.camera.up.set(0, newFlipped ? -1 : 1, 0);
-            this.orbit.minPolarAngle = newFlipped ? Math.PI / 2 + 0.0873 : Math.PI / 6;
-            this.orbit.maxPolarAngle = newFlipped ? Math.PI * 5 / 6       : Math.PI / 2 - 0.0873;
-            this.orbit.rotateSpeed   = newFlipped ? -Math.abs(GraphicsSettings.rotateSpeed) : GraphicsSettings.rotateSpeed;
-            this.orbit.update();
-            // 착시 매니저에 flip 상태 전달 (고도각 부호 반전 → 아래에서 보는 시점에서도 착시 활성화)
-            this.illusionMgr?.setFlipped(newFlipped);
-          }
-
           // 스위치 / 엘리베이터 트리거
           this.switchMgr?.onCharacterArrive(nodeId, this.graph!);
           this.elevatorMgr?.onCharacterArrive(nodeId, this.graph!);
 
-          // 유효 flip 상태: 플레이어 flip XOR 맵 Y축 180° 회전 flip
-          const effectiveFlipped = this.controller!.isFlipped() !== (this.worldRotateMgr?.isMapFlipped() ?? false);
+          // 유효 flip 상태: 맵 Y축 180° 회전 여부
+          const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
 
           // 별 수집
           const _collected = this.starMgr?.tryCollect(nodeId, effectiveFlipped);
@@ -644,7 +633,7 @@ export class GameManager {
                 this.audio.playStarCollect();
               }
               // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
-              if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId) {
+              if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId && effectiveFlipped === this._midpointFlipped) {
                 this.onMidpointReached();
               }
               if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
@@ -654,7 +643,7 @@ export class GameManager {
             }
           }
 
-          if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId) {
+          if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId && effectiveFlipped === this._midpointFlipped) {
             this.onMidpointReached();
           }
           if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
@@ -1034,11 +1023,10 @@ export class GameManager {
       this.midpointMarker = null;
     }
     this.midpointBlockId          = '';
+    this._midpointFlipped         = false;
     this.goalBlockId              = '';
     this._goalFlipped             = false;
     this.midpointReached          = false;
-    this.controller?.setFlipped(false);
-    this.renderer.camera.up.set(0, 1, 0);
     this.orbit.rotateSpeed = GraphicsSettings.rotateSpeed;
 
     this.particles.dispose();
@@ -1123,21 +1111,24 @@ export class GameManager {
     const toLocal = (wx: number, wy: number, wz: number) =>
       group.worldToLocal(new THREE.Vector3(wx, wy, wz));
 
+    // X축 회전으로 맵이 뒤집힌 상태이면 flipped 요소의 월드 Y 방향도 반전
+    const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
+
     // goalGlow 재배치
     const goalMesh = this.level.blocks.get(this.goalBlockId)?.mesh;
     if (goalMesh && this.goalGlow) {
       goalMesh.getWorldPosition(wp);
-      const glowOffsetY = this._goalFlipped ? -1.5 : 1.5;
+      const glowOffsetY = (this._goalFlipped !== effectiveFlipped) ? -1.5 : 1.5;
       this.goalGlow.position.copy(toLocal(wp.x, wp.y + glowOffsetY, wp.z));
     }
 
     // goalMarker 재배치 (GSAP 재시작)
     if (goalMesh && this.goalMarker) {
       goalMesh.getWorldPosition(wp);
-      const offsetY    = this._goalFlipped ? -0.55 : 0.55;
-      const floatDeltaY = 0.3;
-      const localStart = toLocal(wp.x, wp.y + offsetY,            wp.z);
-      const localFloat = toLocal(wp.x, wp.y + offsetY + floatDeltaY, wp.z);
+      const offsetY     = (this._goalFlipped !== effectiveFlipped) ? -0.55 : 0.55;
+      const floatDeltaY = (this._goalFlipped !== effectiveFlipped) ? -0.3  : 0.3;
+      const localStart  = toLocal(wp.x, wp.y + offsetY,            wp.z);
+      const localFloat  = toLocal(wp.x, wp.y + offsetY + floatDeltaY, wp.z);
       gsap.killTweensOf(this.goalMarker.position);
       this.goalMarker.position.copy(localStart);
       gsap.to(this.goalMarker.position, {
@@ -1151,8 +1142,10 @@ export class GameManager {
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) {
         midMesh.getWorldPosition(wp);
-        const localStart = toLocal(wp.x, wp.y + 0.55, wp.z);
-        const localFloat = toLocal(wp.x, wp.y + 0.85, wp.z);
+        const midOffsetY = (this._midpointFlipped !== effectiveFlipped) ? -0.55 : 0.55;
+        const midFloatDY = (this._midpointFlipped !== effectiveFlipped) ? -0.3  : 0.3;
+        const localStart = toLocal(wp.x, wp.y + midOffsetY,            wp.z);
+        const localFloat = toLocal(wp.x, wp.y + midOffsetY + midFloatDY, wp.z);
         gsap.killTweensOf(this.midpointMarker.position);
         this.midpointMarker.position.copy(localStart);
         gsap.to(this.midpointMarker.position, {
@@ -1362,12 +1355,16 @@ export class GameManager {
     const wp = new THREE.Vector3();
     goalMesh.getWorldPosition(wp);
 
+    // 현재 flip 상태를 반영 — XOR: 뒤집힌 상태에서 flipped 골은 위에 위치
+    const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
+    const below  = this._goalFlipped !== effectiveFlipped;
+
     const geo = new THREE.TorusGeometry(0.28, 0.055, 8, 24);
     const mat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
     this.goalMarker = new THREE.Mesh(geo, mat);
     this.goalMarker.rotation.x = Math.PI / 2;
-    const offsetY = this._goalFlipped ? -0.55 : 0.55;
-    const floatY  = this._goalFlipped ? wp.y - 0.85 : wp.y + 0.85;
+    const offsetY = below ? -0.55 : 0.55;
+    const floatY  = below ? wp.y - 0.85 : wp.y + 0.85;
     this.goalMarker.position.set(wp.x, wp.y + offsetY, wp.z);
     this.level!.getGroup().add(this.goalMarker);
 
@@ -1380,7 +1377,7 @@ export class GameManager {
     });
   }
 
-  private setupMidpointMarker(midMesh: THREE.Object3D): void {
+  private setupMidpointMarker(midMesh: THREE.Object3D, flipped = false): void {
     const wp = new THREE.Vector3();
     midMesh.getWorldPosition(wp);
 
@@ -1388,11 +1385,13 @@ export class GameManager {
     const mat = new THREE.MeshLambertMaterial({ color: 0x44DDBB });
     this.midpointMarker = new THREE.Mesh(geo, mat);
     this.midpointMarker.rotation.x = Math.PI / 2;
-    this.midpointMarker.position.set(wp.x, wp.y + 0.55, wp.z);
+    const offsetY = flipped ? -0.55 : 0.55;
+    const floatY  = flipped ? wp.y - 0.85 : wp.y + 0.85;
+    this.midpointMarker.position.set(wp.x, wp.y + offsetY, wp.z);
     this.level!.getGroup().add(this.midpointMarker);
 
     gsap.to(this.midpointMarker.position, {
-      y: wp.y + 0.85,
+      y: floatY,
       duration: 1.1,
       yoyo: true,
       repeat: -1,
@@ -1573,6 +1572,8 @@ export class GameManager {
         if (this.goalMarker) {
           const ring   = this.goalMarker;
           const floatY = ring.position.y;  // setupGoalMarker 이 설정한 시작 Y
+          const ef     = this.worldRotateMgr?.isMapFlipped() ?? false;
+          const floatDY = (this._goalFlipped !== ef) ? -0.3 : 0.3;
 
           // 이미 시작된 float 트윈을 멈추고 scale-in 후 재시작
           gsap.killTweensOf(ring.position);
@@ -1584,7 +1585,7 @@ export class GameManager {
             ease: 'back.out(2.5)',
             onComplete: () => {
               gsap.to(ring.position, {
-                y: floatY + 0.3,
+                y: floatY + floatDY,
                 duration: 1.1,
                 yoyo: true,
                 repeat: -1,

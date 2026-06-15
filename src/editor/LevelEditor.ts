@@ -113,7 +113,6 @@ export class LevelEditor {
   private conditionalLadderConns: Array<{ switchNodeId: string; nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
   private starEntries: Array<{ nodeId: string; flipped: boolean }> = [];
-  private gravityFlipNodeIds:  string[] = [];
   private mapRotateEntries: Array<{ nodeId: string; axis: 'x'|'y'; angle: number; pivotY?: number }> = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
@@ -190,8 +189,6 @@ export class LevelEditor {
   // Selected block status labels
   private selStartLabel!: HTMLElement;
   private selGoalLabel!:  HTMLElement;
-  // Gravity flip
-  private flipBtn!: HTMLButtonElement;
   // Map rotate
   private mrAxisSel!:    HTMLSelectElement;
   private mrAngleInput!: HTMLInputElement;
@@ -621,7 +618,7 @@ export class LevelEditor {
         });
         const flippedGoalBtn = document.createElement('button');
         flippedGoalBtn.className = 'editor-btn';
-        flippedGoalBtn.textContent = 'Set as Flipped Goal';
+        flippedGoalBtn.textContent = 'Set as Goal (하단)';
         flippedGoalBtn.style.cssText = 'flex:1;background:#224466;';
         flippedGoalBtn.addEventListener('click', () => {
           if (!this.selectedBlock) return;
@@ -636,26 +633,6 @@ export class LevelEditor {
         goalRow.appendChild(this.selGoalLabel);
         sec.appendChild(goalRow);
       }
-
-      // ── Gravity Flip ──
-      this.flipBtn = document.createElement('button');
-      this.flipBtn.className = 'editor-btn';
-      this.flipBtn.textContent = 'Add Gravity Flip Block';
-      this.flipBtn.style.cssText = 'margin-top:4px;background:#005544;';
-      this.flipBtn.addEventListener('click', () => {
-        if (!this.selectedBlock) return;
-        const id = this.selectedBlock.id;
-        const idx = this.gravityFlipNodeIds.indexOf(id);
-        if (idx === -1) {
-          this.gravityFlipNodeIds.push(id);
-          recolorBlockGroup(this.selectedBlock.mesh, 0x00CCAA, 'default');
-        } else {
-          this.gravityFlipNodeIds.splice(idx, 1);
-          recolorBlockGroup(this.selectedBlock.mesh, parseInt(this.selectedBlock.color.replace('#', ''), 16), 'default');
-        }
-        this.updateMarkers(); this.updateSelectedPanel();
-      });
-      sec.appendChild(this.flipBtn);
 
       // ── Map Rotate Block ──
       const mrLabel = document.createElement('div');
@@ -1012,9 +989,9 @@ export class LevelEditor {
           <button class="editor-btn" id="star-pick" title="블록 클릭으로 선택">↗</button>
         </div>
         <div class="editor-row" style="align-items:center;gap:6px;">
-          <label style="min-width:60px">Flipped:</label>
+          <label style="min-width:60px">하단 배치:</label>
           <input type="checkbox" id="star-flipped" style="width:16px;height:16px">
-          <span style="font-size:10px;color:#aaa">(블록 아랫면)</span>
+          <span style="font-size:10px;color:#aaa">(Y축 180° 회전 후 접근)</span>
         </div>
       `;
       (this.starFormEl.querySelector('#star-pick') as HTMLButtonElement)
@@ -1037,7 +1014,7 @@ export class LevelEditor {
       // 선택된 블록을 바로 추가하는 버튼 (일반 / 반전)
       const starAddSelectedBtn = document.createElement('button');
       starAddSelectedBtn.className = 'editor-btn';
-      starAddSelectedBtn.textContent = '★ Add Selected (Normal)';
+      starAddSelectedBtn.textContent = '★ Add Selected (상단)';
       starAddSelectedBtn.style.marginTop = '4px';
       starAddSelectedBtn.style.width = '100%';
       starAddSelectedBtn.addEventListener('click', () => {
@@ -1050,7 +1027,7 @@ export class LevelEditor {
       });
       const starAddFlippedBtn = document.createElement('button');
       starAddFlippedBtn.className = 'editor-btn';
-      starAddFlippedBtn.textContent = '★↓ Add Selected (Flipped)';
+      starAddFlippedBtn.textContent = '★↓ Add Selected (하단)';
       starAddFlippedBtn.style.marginTop = '2px';
       starAddFlippedBtn.style.width = '100%';
       starAddFlippedBtn.style.background = '#224466';
@@ -1827,7 +1804,7 @@ export class LevelEditor {
       const item = document.createElement('div');
       item.className = 'editor-conn-item';
       const icon  = entry.flipped ? `<span style="color:#44CCFF">★↓</span>` : `<span style="color:#FFD700">★</span>`;
-      const label = entry.flipped ? `${entry.nodeId} (F)` : entry.nodeId;
+      const label = entry.flipped ? `${entry.nodeId} (하단)` : entry.nodeId;
       item.innerHTML = `${icon} <span>${label}</span>`;
 
       const edit = document.createElement('button');
@@ -2136,17 +2113,12 @@ export class LevelEditor {
 
       const isGoal = b.id === this.goalBlockId;
       if (isGoal) {
-        this.selGoalLabel.textContent  = this.goalFlipped ? '✓ FLIPPED GOAL' : '✓ GOAL';
+        this.selGoalLabel.textContent  = this.goalFlipped ? '✓ GOAL (하단)' : '✓ GOAL';
         this.selGoalLabel.style.color  = this.goalFlipped ? '#44CCFF' : '#FFD700';
         this.selGoalLabel.style.display = 'inline';
       } else {
         this.selGoalLabel.style.display = 'none';
       }
-
-      // Gravity Flip 상태
-      const isFlip = this.gravityFlipNodeIds.includes(b.id);
-      this.flipBtn.textContent = isFlip ? '✓ Gravity Flip [ON] — Remove' : 'Add Gravity Flip Block';
-      this.flipBtn.style.background = isFlip ? '#007755' : '#005544';
 
       // Map Rotate 상태
       const mrEntry = this.mapRotateEntries.find(e => e.nodeId === b.id);
@@ -2170,8 +2142,6 @@ export class LevelEditor {
       this.selFloorEl.textContent = '—';
       this.selStartLabel.style.display = 'none';
       this.selGoalLabel.style.display  = 'none';
-      this.flipBtn.textContent = 'Add Gravity Flip Block';
-      this.flipBtn.style.background = '#005544';
       this.mrSetBtn.textContent      = 'Add Map Rotate Block';
       this.mrSetBtn.style.background = '#664400';
       this.mrRemoveBtn.style.display = 'none';
@@ -2263,7 +2233,6 @@ export class LevelEditor {
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
     if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; }
     this.starEntries        = this.starEntries.filter(e => e.nodeId !== block.id);
-    this.gravityFlipNodeIds = this.gravityFlipNodeIds.filter(id => id !== block.id);
     this.mapRotateEntries   = this.mapRotateEntries.filter(e => e.nodeId !== block.id);
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
@@ -2676,7 +2645,6 @@ export class LevelEditor {
       })(),
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
       stars: this.starEntries.length > 0 ? this.starEntries.map(e => ({ nodeId: e.nodeId, ...(e.flipped ? { flipped: true } : {}) })) : undefined,
-      gravityFlipBlocks: this.gravityFlipNodeIds.length > 0 ? this.gravityFlipNodeIds.map(id => ({ nodeId: id })) : undefined,
       mapRotateBlocks: this.mapRotateEntries.length > 0 ? this.mapRotateEntries : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
@@ -2729,7 +2697,6 @@ export class LevelEditor {
     this.conditionalLadderConns  = [];
     this.teleporterConns = [];
     this.starEntries            = [];
-    this.gravityFlipNodeIds     = [];
     this.mapRotateEntries       = [];
     this.goalFlipped            = false;
     this.switchConns     = [];
@@ -2810,14 +2777,9 @@ export class LevelEditor {
     this.teleporterConns = data.teleporters ?? [];
     this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false }));
     this.goalFlipped          = data.goal.flipped ?? false;
-    this.gravityFlipNodeIds   = (data.gravityFlipBlocks ?? []).map(g => g.nodeId);
     this.mapRotateEntries     = (data.mapRotateBlocks   ?? []).map(d => ({ ...d }));
 
     // 특수 블록 색상 복원 (로드 시 메시 재색칠)
-    for (const nodeId of this.gravityFlipNodeIds) {
-      const b = this.blocks.find(bl => bl.id === nodeId);
-      if (b) recolorBlockGroup(b.mesh, 0x00CCAA, 'default');
-    }
     for (const entry of this.mapRotateEntries) {
       const b = this.blocks.find(bl => bl.id === entry.nodeId);
       if (b) recolorBlockGroup(b.mesh, 0xFF8800, 'default');

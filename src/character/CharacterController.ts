@@ -23,7 +23,9 @@ export class CharacterController {
 
   // 남은 경로 (한 스텝씩 소비)
   private _movePath: PathNode[] = [];
-  private _flipped = false;
+  // 경로 commit 시점에 확정된 엣지 (prev.id|node.id) — illusion 엣지가 카메라 이동으로
+  // 도중에 비활성화돼도 해당 스텝을 취소하지 않기 위해 보존
+  private _committedEdges: Set<string> = new Set();
 
   constructor(
     character: Character,
@@ -56,25 +58,10 @@ export class CharacterController {
     this._startMove(target);
   }
 
-  setFlipped(v: boolean): void {
-    this._flipped = v;
-    this.character.setFlipped(v);
-  }
-
-  isFlipped(): boolean { return this._flipped; }
-
-  /** 뒤집힘 상태에 따른 블록 상단/하단 Y 반환 */
-  private _nodeY(node: PathNode): number {
-    return this._flipped
-      ? node.position.y - 2 * node.halfHeight  // 블록 바닥면
-      : node.position.y;                        // 블록 윗면 (기존)
-  }
-
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
     node.mesh.getWorldPosition(this._wp);
-    const yOff = this._flipped ? -node.halfHeight : node.halfHeight;
-    this.character.setPosition(this._wp.x, this._wp.y + yOff, this._wp.z);
+    this.character.setPosition(this._wp.x, this._wp.y + node.halfHeight, this._wp.z);
     this.currentNode = node;
   }
 
@@ -93,19 +80,19 @@ export class CharacterController {
    * 튜토리얼 장애물 연출처럼 외부에서 캐릭터를 멈춰야 할 때 사용.
    */
   stop(): void {
-    this._movePath      = [];
-    this.pendingTarget  = null;
-    this._currentTarget = null;
+    this._movePath        = [];
+    this.pendingTarget    = null;
+    this._currentTarget   = null;
+    this._committedEdges.clear();
     gsap.killTweensOf(this.character.mesh.position);
     gsap.killTweensOf(this.character.mesh.rotation);
     this.character.stopWalk();
     this.isMoving = false;
     // 현재 노드 위치로 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x,
-      this._wp.y + yOff,
+      this._wp.y + this.currentNode.halfHeight,
       this._wp.z,
     );
   }
@@ -124,10 +111,9 @@ export class CharacterController {
     this._movePath    = [];
     // 현재 노드 위치로 즉시 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     char.setPosition(
       this._wp.x,
-      this._wp.y + yOff,
+      this._wp.y + this.currentNode.halfHeight,
       this._wp.z,
     );
   }
@@ -139,6 +125,14 @@ export class CharacterController {
     this.isMoving  = true;
     this.character.startWalk();
     this._movePath = path.slice(1); // start 제외, 방문할 노드 목록
+
+    // 이 시점에 유효했던 엣지를 기록 — 착시 엣지가 이동 중 비활성화돼도 해당 스텝 보존
+    this._committedEdges.clear();
+    for (let i = 0; i < path.length - 1; i++) {
+      this._committedEdges.add(`${path[i].id}|${path[i + 1].id}`);
+      this._committedEdges.add(`${path[i + 1].id}|${path[i].id}`);
+    }
+
     this._advance();
   }
 
@@ -159,6 +153,7 @@ export class CharacterController {
       // 최종 목적지 도달
       this.isMoving       = false;
       this._currentTarget = null;
+      this._committedEdges.clear();
       this.character.stopWalk();
       this.onArrival?.(this.currentNode.id);
       if (this.pendingTarget && this.pendingTarget !== this.currentNode) {
@@ -174,13 +169,16 @@ export class CharacterController {
     const node = this._movePath.shift()!;
     const prev = this.currentNode;
 
-    // 이동 블록(패트롤 등) 위치 변화로 인접성이 사라진 경우 이동 취소
-    if (!prev.neighbors.includes(node)) {
+    // 이동 블록(패트롤 등) 위치 변화로 인접성이 사라진 경우 이동 취소.
+    // 단, commit 시점에 유효했던 엣지(착시 등)는 이동 중 비활성화돼도 취소하지 않음.
+    const edgeKey = `${prev.id}|${node.id}`;
+    if (!this._committedEdges.has(edgeKey) && !prev.neighbors.includes(node)) {
       this.stop();
       return;
     }
-    const dx   = node.position.x - prev.position.x;
-    const dz   = node.position.z - prev.position.z;
+
+    const dx = node.position.x - prev.position.x;
+    const dz = node.position.z - prev.position.z;
 
     this.onDepart?.(prev.id);
 
@@ -190,10 +188,9 @@ export class CharacterController {
         // 이동 블록(패트롤 등): 0.25s 애니메이션 동안 블록이 이동했을 수 있으므로
         // 트위닝이 끝난 직후 실제 현재 위치로 스냅해 update()의 한 프레임 지연 없앰
         node.mesh.getWorldPosition(this._wp);
-        const _yOff = this._flipped ? -node.halfHeight : node.halfHeight;
         this.character.setPosition(
           this._wp.x,
-          this._wp.y + _yOff,
+          this._wp.y + node.halfHeight,
           this._wp.z,
         );
         // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
@@ -212,11 +209,10 @@ export class CharacterController {
       });
     }
 
-    const targetY  = this._nodeY(node);
-    const arcDelta = this._flipped ? -0.08 : 0.08;
+    const targetY = node.position.y;
     tl.to(this.character.mesh.position, {
       x: node.position.x,
-      y: targetY + arcDelta,
+      y: targetY + 0.08,
       z: node.position.z,
       duration: 0.15,
       ease: 'power1.out',
@@ -231,10 +227,9 @@ export class CharacterController {
   update(): void {
     if (this.isMoving) return;
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const yOff = this._flipped ? -this.currentNode.halfHeight : this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x,
-      this._wp.y + yOff,
+      this._wp.y + this.currentNode.halfHeight,
       this._wp.z,
     );
   }

@@ -961,11 +961,6 @@
       "flipped": true
     }
   ],
-  "gravityFlipBlocks": [
-    {
-      "nodeId": "b009"
-    }
-  ],
   "mapRotateBlocks": [
     {
       "nodeId": "b062",

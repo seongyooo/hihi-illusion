@@ -154,7 +154,6 @@ export interface LevelData {
     duration: number;
   }>;
   stars?: Array<{ nodeId: string; flipped?: boolean }>;
-  gravityFlipBlocks?: Array<{ nodeId: string }>;
   mapRotateBlocks?: Array<{
     nodeId:  string;
     axis:    'x' | 'y';
@@ -163,7 +162,7 @@ export interface LevelData {
   }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
-  midpoint?: { blockId: string };
+  midpoint?: { blockId: string; flipped?: boolean };
   goal: { blockId: string; flipped?: boolean };
   initialCamera?: {
     azimuth:  number;   // Y축 회전 각도 (degrees, 0 = +Z 방향)
@@ -181,7 +180,6 @@ export class Level {
   private walkableMeshes: THREE.Object3D[] = [];
   private ladderMeshes: Map<string, THREE.Group[]> = new Map();
   private spikeNodeIds: Set<string> = new Set();
-  private gravityFlipNodeIds: Set<string> = new Set();
   private mapRotateNodeIds: Set<string> = new Set();
   private portalGroups: THREE.Group[] = [];
   private blinkingNodeIds: Set<string> = new Set();
@@ -210,7 +208,6 @@ export class Level {
     this.walkableMeshes = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
-    this.gravityFlipNodeIds.clear();
     this.mapRotateNodeIds.clear();
     this.portalGroups = [];
     this.blinkingNodeIds.clear();
@@ -277,16 +274,6 @@ export class Level {
       this.sections.push(section);
     }
 
-    // 중력 반전 블록 — 블록은 그대로 표시하고 위·아래 사각형 링 펄스 이펙트 추가
-    for (const gf of data.gravityFlipBlocks ?? []) {
-      const bd = data.blocks.find(b => b.id === gf.nodeId);
-      if (!bd) continue;
-      this.gravityFlipNodeIds.add(gf.nodeId);
-      const effectGroup = this._buildRingEffect(bd, 0x00DDBB);
-      this.group.add(effectGroup);
-      this.portalGroups.push(effectGroup);
-    }
-
     // 맵 회전 블록 — 주황 링 이펙트
     for (const mr of data.mapRotateBlocks ?? []) {
       const bd = data.blocks.find(b => b.id === mr.nodeId);
@@ -307,7 +294,6 @@ export class Level {
   getFlipPivot(): THREE.Group           { return this.flipPivot; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
-  getGravityFlipNodeIds(): Set<string>  { return this.gravityFlipNodeIds; }
   getMapRotateNodeIds(): Set<string>    { return this.mapRotateNodeIds; }
   getSpikeNodeIds(): Set<string>        { return this.spikeNodeIds; }
 
@@ -476,7 +462,6 @@ export class Level {
     this.walkableMeshes   = [];
     this.ladderMeshes.clear();
     this.spikeNodeIds.clear();
-    this.gravityFlipNodeIds.clear();
     this.mapRotateNodeIds.clear();
     this.portalGroups     = [];
     this.blinkingNodeIds.clear();

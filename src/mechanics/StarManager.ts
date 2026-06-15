@@ -25,16 +25,14 @@ export class StarManager {
     for (const { nodeId, flipped } of stars) {
       const node = getNode(nodeId);
       if (!node) continue;
-      const isFlipped = flipped ?? false;
-      if (isFlipped) this.flippedStarIds.add(nodeId);
-      this._createStarMesh(nodeId, node, isFlipped);
+      if (flipped) this.flippedStarIds.add(nodeId);
+      this._createStarMesh(nodeId, node, !!flipped);
     }
   }
 
-  private _createStarMesh(nodeId: string, node: PathNode, isFlipped: boolean): void {
-    // 블록 로컬 좌표 기준 — 부모화하면 블록(패트롤 포함)이 움직일 때 자동으로 따라감
-    // Normal stars: top of block; Flipped stars: bottom of block
-    const localY = isFlipped ? -(node.halfHeight + 0.38) : node.halfHeight + 0.38;
+  private _createStarMesh(nodeId: string, node: PathNode, flipped = false): void {
+    // flipped=true 별은 블록 아랫면에 배치 (X축 180° 회전 후 접근 가능)
+    const localY = flipped ? -(node.halfHeight + 0.38) : (node.halfHeight + 0.38);
 
     const geo = new THREE.OctahedronGeometry(0.17, 0);
     const mat = new THREE.MeshLambertMaterial({
@@ -54,10 +52,9 @@ export class StarManager {
       repeat:   -1,
       ease:     'none',
     });
-    // 둥실 떠오르기/내려가기 (로컬 Y 기준, 반전별은 아래로)
-    const floatY = isFlipped ? localY - 0.15 : localY + 0.15;
+    // 둥실 떠오르기/내려가기 (flipped면 아래 방향으로)
     gsap.to(mesh.position, {
-      y:        floatY,
+      y:        localY + (flipped ? -0.15 : 0.15),
       duration: 1.0,
       yoyo:     true,
       repeat:   -1,
@@ -89,8 +86,8 @@ export class StarManager {
   repositionStar(nodeId: string, node: PathNode): void {
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return;
-    const isFlipped = this.flippedStarIds.has(nodeId);
-    const localY = isFlipped ? -(node.halfHeight + 0.38) : node.halfHeight + 0.38;
+    const flipped = this.flippedStarIds.has(nodeId);
+    const localY = flipped ? -(node.halfHeight + 0.38) : (node.halfHeight + 0.38);
 
     // 부모가 바뀐 경우(튜토리얼 블록 소환 등) 다시 부모화
     if (mesh.parent !== node.mesh) {
@@ -103,9 +100,8 @@ export class StarManager {
     mesh.position.set(0, localY, 0);
     mesh.visible = true;
 
-    const floatY = isFlipped ? localY - 0.15 : localY + 0.15;
     gsap.to(mesh.position, {
-      y: floatY, duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      y: localY + (flipped ? -0.15 : 0.15), duration: 1.0, yoyo: true, repeat: -1, ease: 'sine.inOut',
     });
     gsap.to(mesh.rotation, {
       y: Math.PI * 2, duration: 2.2, repeat: -1, ease: 'none',
@@ -114,12 +110,10 @@ export class StarManager {
 
   /**
    * 해당 노드에 별이 있으면 수집 처리.
-   * 수집됐으면 true, 이미 수집했거나 별 없으면 false 반환.
-   * isPlayerFlipped: 플레이어가 현재 중력 반전 상태인지 여부.
-   * 별의 flipped 상태와 일치해야만 수집 가능.
+   * isEffectiveFlipped: 맵 회전으로 인한 flip 상태. 별의 flipped 여부와 일치해야만 수집 가능.
    */
-  tryCollect(nodeId: string, isPlayerFlipped: boolean): boolean {
-    if (this.flippedStarIds.has(nodeId) !== isPlayerFlipped) return false;
+  tryCollect(nodeId: string, isEffectiveFlipped: boolean): boolean {
+    if (this.flippedStarIds.has(nodeId) && !isEffectiveFlipped) return false;
     if (this.collectedIds.has(nodeId)) return false;
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return false;

@@ -122,10 +122,8 @@
       "flipped": true
     }
   ],
-  "gravityFlipBlocks": [
-    {
-      "nodeId": "b008"
-    }
+  "mapRotateBlocks": [
+    { "nodeId": "b008", "axis": "x", "angle": 180 }
   ],
   "illusionConnections": [],
   "character": {
