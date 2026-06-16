@@ -221,9 +221,9 @@
       "id": "enemy_1",
       "startNodeId": "b004",
       "behavior": "bounce",
-      "bounceAxis": "x",
+      "bounceAxis": "z",
       "chaseRange": 5,
-      "moveInterval": 0.2,
+      "moveInterval": 0,
       "color": "#cc2020"
     }
   ],
