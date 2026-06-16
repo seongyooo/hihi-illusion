@@ -98,6 +98,21 @@ export class CharacterController {
   }
 
   /**
+   * 레벨 언로드 시 호출. 이동 상태와 콜백을 모두 제거해
+   * 고아가 된 GSAP 타임라인의 onComplete가 onArrival을 재발동하지 못하게 막는다.
+   */
+  dispose(): void {
+    this.isMoving       = false;
+    this._movePath      = [];
+    this.pendingTarget  = null;
+    this._currentTarget = null;
+    this._committedEdges.clear();
+    this.onArrival  = undefined;
+    this.onDepart   = undefined;
+    this.shouldBlock = undefined;
+  }
+
+  /**
    * 현재 캐릭터를 새 캐릭터로 교체한다.
    * 설정 화면에서 타입 변경 시 사용.
    */

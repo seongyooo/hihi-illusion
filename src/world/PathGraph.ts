@@ -11,6 +11,7 @@ export interface PathNode {
 }
 
 const XZ_THRESHOLD    = 1.1;
+const MIN_XZ_DIST     = 0.5;  // 이 미만이면 수직 적층으로 판정 → 사다리 없이 이동 불가
 const SAME_FLOOR_Y    = 0.15; // 이 미만이면 같은 층으로 판정
 
 export class PathGraph {
@@ -130,15 +131,36 @@ export class PathGraph {
     for (const node of this.nodes.values()) node.neighbors = [];
     const list = Array.from(this.nodes.values()).filter(n => !this.disabledNodes.has(n.id));
 
+    // 천장 막힘 계산: 같은 X/Z(MIN_XZ_DIST 미만)에 바로 위층 블록이 있으면 이동 불가.
+    // b의 바닥면(b.position.y - 2*b.halfHeight)이 a의 윗면(a.position.y)에
+    // 붙어 있을 때만 막힘 — 멀리 떨어진 위층 블록은 무시.
+    const CEILING_GAP = 0.3; // 바닥면과 윗면 사이 허용 간격 (부동소수점 여유 포함)
+    const ceilingBlocked = new Set<string>();
+    for (const a of list) {
+      for (const b of list) {
+        if (a === b) continue;
+        const xzDist = Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z);
+        if (xzDist >= MIN_XZ_DIST) continue;
+        const bBottom = b.position.y - 2 * b.halfHeight; // b의 바닥면 Y
+        const gap     = bBottom - a.position.y;           // b 바닥 - a 윗면
+        if (gap >= -0.05 && gap < CEILING_GAP) {
+          ceilingBlocked.add(a.id);
+          break;
+        }
+      }
+    }
+
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const a = list[i];
         const b = list[j];
+        // 천장 막힘 노드는 수평 이동 불가
+        if (ceilingBlocked.has(a.id) || ceilingBlocked.has(b.id)) continue;
         const xzDist = Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z);
         const yDiff  = Math.abs(a.position.y - b.position.y);
 
-        // 같은 층: XZ 인접이면 자유 이동
-        if (xzDist <= XZ_THRESHOLD && yDiff < SAME_FLOOR_Y) {
+        // 같은 층: XZ 인접이면 자유 이동 (수직 적층 블록은 제외)
+        if (xzDist >= MIN_XZ_DIST && xzDist <= XZ_THRESHOLD && yDiff < SAME_FLOOR_Y) {
           // hold+spawn 게이트: 타겟 노드는 지정된 스위치 방향 엣지만 허용
           const aGate = this.switchGatedNodes.get(a.id);
           const bGate = this.switchGatedNodes.get(b.id);
@@ -153,6 +175,7 @@ export class PathGraph {
     // 사다리 엣지: 다른 층 이동 (명시적 선언 필요)
     for (const [aId, bId] of this.ladderEdges) {
       if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+      if (ceilingBlocked.has(aId) || ceilingBlocked.has(bId)) continue;
       const aGate = this.switchGatedNodes.get(aId);
       const bGate = this.switchGatedNodes.get(bId);
       if (aGate !== undefined && aGate !== bId) continue;
@@ -169,6 +192,7 @@ export class PathGraph {
     for (const pairs of this.conditionalLadderGroups.values()) {
       for (const [aId, bId] of pairs) {
         if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+        if (ceilingBlocked.has(aId) || ceilingBlocked.has(bId)) continue;
         const a = this.nodes.get(aId);
         const b = this.nodes.get(bId);
         if (a && b) {
@@ -181,6 +205,7 @@ export class PathGraph {
     // 착시 엣지 (카메라 방위각 트리거)
     for (const [aId, bId] of this.illusionEdges) {
       if (this.disabledNodes.has(aId) || this.disabledNodes.has(bId)) continue;
+      if (ceilingBlocked.has(aId) || ceilingBlocked.has(bId)) continue;
       const aGate = this.switchGatedNodes.get(aId);
       const bGate = this.switchGatedNodes.get(bId);
       if (aGate !== undefined && aGate !== bId) continue;

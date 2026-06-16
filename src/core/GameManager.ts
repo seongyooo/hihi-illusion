@@ -28,6 +28,7 @@ import { SwitchManager, type CarryEntry } from '../world/SwitchManager';
 import { ElevatorManager }    from '../world/ElevatorManager';
 import { PatrolManager }      from '../world/PatrolManager';
 import { WorldRotateManager } from '../world/WorldRotateManager';
+import { EnemyManager }      from '../world/EnemyManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -65,6 +66,7 @@ export class GameManager {
   private switchMgr:        SwitchManager   | null = null;
   private elevatorMgr:      ElevatorManager    | null = null;
   private patrolMgr:        PatrolManager      | null = null;
+  private enemyMgr:         EnemyManager       | null = null;
   private worldRotateMgr:   WorldRotateManager | null = null;
   private _teleportPadNodes: Array<[import('../world/PathGraph').PathNode, import('../world/PathGraph').PathNode]> = [];
   private tutorialSequencer: TutorialSequencer | null = null;
@@ -512,6 +514,13 @@ export class GameManager {
       this.patrolMgr.setup(data.patrols!, this.graph);
     }
 
+    // EnemyManager
+    this.enemyMgr = new EnemyManager(this.renderer.scene);
+    if (data.enemies && data.enemies.length > 0) {
+      this.enemyMgr.setup(data.enemies, this.graph);
+    }
+    this.enemyMgr.setOnPlayerKilled(() => { this._respawn(); });
+
     // WorldRotateManager — 맵 전체 회전 블록
     this.worldRotateMgr = new WorldRotateManager();
     if ((data.mapRotateBlocks ?? []).length > 0) {
@@ -529,6 +538,7 @@ export class GameManager {
         {
           beforeRotate: () => {
             this.controller?.stop();
+            this.enemyMgr?.pause();
           },
           onRotateUpdate: () => {
             if (this.graph) this.illusionMgr?.update(this.graph);
@@ -542,6 +552,7 @@ export class GameManager {
             }
             // goalGlow / goalMarker / midpointMarker / 텔레포터 링 위치 갱신
             this._refreshWorldElements();
+            this.enemyMgr?.resume();
           },
         },
       );
@@ -1055,6 +1066,7 @@ export class GameManager {
     this.level = null;
 
     this.graph            = null;
+    this.controller?.dispose();
     this.controller       = null;
     this.illusionMgr      = null;
     this._levelData       = null;
@@ -1067,6 +1079,8 @@ export class GameManager {
     this.elevatorMgr = null;
     this.patrolMgr?.dispose();
     this.patrolMgr = null;
+    this.enemyMgr?.dispose();
+    this.enemyMgr = null;
     this.worldRotateMgr?.dispose();
     this.worldRotateMgr = null;
     this.tutorialSequencer?.dispose();
@@ -1765,6 +1779,10 @@ export class GameManager {
     if (this.graph) this.patrolMgr?.update(this.graph);
     this.level?.update();
     this.controller?.update();
+    if (this.enemyMgr) {
+      const playerNode = this.controller?.getCurrentNode() ?? null;
+      this.enemyMgr.update(playerNode);
+    }
     this.renderer.render();
   }
 }

@@ -43,6 +43,16 @@ interface ZoneEntry {
   depth: number;
 }
 
+interface EnemyEntry {
+  id:            string;
+  nodeId:        string;
+  behavior:      'patrol' | 'chase';
+  patrolPath?:   string[];
+  chaseRange?:   number;
+  moveInterval?: number;
+  color?:        string;
+}
+
 interface SwitchConn {
   switchNodeId: string;
   targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
@@ -121,6 +131,8 @@ export class LevelEditor {
   private patrolListEl!:      HTMLElement;
   private zones: ZoneEntry[] = [];
   private zoneCounter = 0;
+  private enemyEntries: EnemyEntry[] = [];
+  private enemyCounter = 0;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
   private static readonly ZONE_COLORS = [
     0xFF6B6B, // 빨강
@@ -161,6 +173,7 @@ export class LevelEditor {
   private condLadderFormEl!: HTMLElement;
   private zoneListEl!:       HTMLElement;
   private zoneFormEl!:       HTMLElement;
+  private enemyListEl!:      HTMLElement;
   private illusionFormEl!:   HTMLElement;
   private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
@@ -1455,6 +1468,162 @@ export class LevelEditor {
       addBtn.addEventListener('click', () => this.zoneFormEl.classList.toggle('open'));
     }));
 
+    // Enemies
+    p.appendChild(this.buildSection('ENEMIES', (sec) => {
+      this.enemyListEl = document.createElement('div');
+      sec.appendChild(this.enemyListEl);
+      this._rebuildEnemyList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Enemy';
+      addBtn.style.cssText = 'width:100%;margin-top:6px;';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-add-form';
+
+      // nodeId (선택된 블록 자동 입력)
+      const nodeRow = document.createElement('div');
+      nodeRow.className = 'editor-row';
+      const nodeLabel = document.createElement('label');
+      nodeLabel.textContent = 'Node:';
+      nodeLabel.style.minWidth = '60px';
+      const nodeInput = document.createElement('input');
+      nodeInput.className = 'editor-input';
+      nodeInput.style.flex = '1';
+      nodeInput.placeholder = '블록 ID';
+      if (this.selectedBlock) nodeInput.value = this.selectedBlock.id;
+      const nodePickBtn = document.createElement('button');
+      nodePickBtn.className = 'editor-btn';
+      nodePickBtn.textContent = '↗';
+      nodePickBtn.title = '블록 선택';
+      nodePickBtn.addEventListener('click', () => {
+        this.startPick(b => { nodeInput.value = b.id; });
+      });
+      nodeRow.appendChild(nodeLabel);
+      nodeRow.appendChild(nodeInput);
+      nodeRow.appendChild(nodePickBtn);
+      form.appendChild(nodeRow);
+
+      // behavior
+      const behRow = document.createElement('div');
+      behRow.className = 'editor-row';
+      const behLabel = document.createElement('label');
+      behLabel.textContent = 'Behavior:';
+      behLabel.style.minWidth = '60px';
+      const behSel = document.createElement('select');
+      behSel.className = 'editor-input';
+      ['patrol', 'chase'].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        behSel.appendChild(opt);
+      });
+      behRow.appendChild(behLabel);
+      behRow.appendChild(behSel);
+      form.appendChild(behRow);
+
+      // patrolPath — chip pick UI (헬퍼 사용)
+      const ppNodes: string[] = [];
+      const { el: ppSection, refresh: ppRefresh } = this._buildPatrolChipUI(ppNodes);
+      ppSection.style.display = 'none'; // behavior에 따라 초기 숨김
+      form.appendChild(ppSection);
+
+      // behavior 전환 시 patrolPath 섹션 표시/숨김
+      const updatePpVisibility = () => {
+        ppSection.style.display = behSel.value === 'patrol' ? '' : 'none';
+      };
+      behSel.addEventListener('change', updatePpVisibility);
+      updatePpVisibility();
+
+      // chaseRange
+      const crRow = document.createElement('div');
+      crRow.className = 'editor-row';
+      const crLabel = document.createElement('label');
+      crLabel.textContent = 'ChaseRange:';
+      crLabel.style.minWidth = '60px';
+      crLabel.style.fontSize = '11px';
+      const crInput = document.createElement('input');
+      crInput.className = 'editor-input';
+      crInput.type = 'number'; crInput.step = '1'; crInput.min = '1'; crInput.value = '5';
+      crInput.style.width = '60px';
+      crRow.appendChild(crLabel);
+      crRow.appendChild(crInput);
+      form.appendChild(crRow);
+
+      // moveInterval
+      const miRow = document.createElement('div');
+      miRow.className = 'editor-row';
+      const miLabel = document.createElement('label');
+      miLabel.textContent = 'MoveInterval:';
+      miLabel.style.minWidth = '60px';
+      miLabel.style.fontSize = '11px';
+      const miInput = document.createElement('input');
+      miInput.className = 'editor-input';
+      miInput.type = 'number'; miInput.step = '0.1'; miInput.min = '0.1'; miInput.value = '0.8';
+      miInput.style.width = '60px';
+      const miUnit = document.createElement('span');
+      miUnit.style.cssText = 'font-size:11px;color:#888';
+      miUnit.textContent = 'sec';
+      miRow.appendChild(miLabel);
+      miRow.appendChild(miInput);
+      miRow.appendChild(miUnit);
+      form.appendChild(miRow);
+
+      // color
+      const clRow = document.createElement('div');
+      clRow.className = 'editor-row';
+      const clLabel = document.createElement('label');
+      clLabel.textContent = 'Color:';
+      clLabel.style.minWidth = '60px';
+      const clInput = document.createElement('input');
+      clInput.type = 'color';
+      clInput.value = '#CC2020';
+      clInput.style.cssText = 'width:48px;height:26px;border:none;background:none;cursor:pointer;';
+      clRow.appendChild(clLabel);
+      clRow.appendChild(clInput);
+      form.appendChild(clRow);
+
+      // Add 버튼
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn primary';
+      confirmBtn.textContent = 'Add Enemy';
+      confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
+      confirmBtn.addEventListener('click', () => {
+        const nid = nodeInput.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        if (behSel.value === 'patrol' && ppNodes.length < 2) {
+          alert('PatrolPath는 최소 2개 이상의 노드가 필요합니다.');
+          return;
+        }
+        const patrolPath = ppNodes.length >= 2 ? [...ppNodes] : undefined;
+        const entry: EnemyEntry = {
+          id: `enemy_${++this.enemyCounter}`,
+          nodeId: nid,
+          behavior: behSel.value as 'patrol' | 'chase',
+          ...(patrolPath ? { patrolPath } : {}),
+          chaseRange: parseFloat(crInput.value) || 5,
+          moveInterval: parseFloat(miInput.value) || 0.8,
+          color: clInput.value,
+        };
+        this.enemyEntries.push(entry);
+        this._rebuildEnemyList();
+        // 폼 초기화
+        nodeInput.value = '';
+        ppNodes.length = 0; ppRefresh();
+        crInput.value = '5'; miInput.value = '0.8'; clInput.value = '#CC2020';
+        form.classList.remove('open');
+      });
+      form.appendChild(confirmBtn);
+      sec.appendChild(form);
+
+      addBtn.addEventListener('click', () => {
+        if (this.selectedBlock) nodeInput.value = this.selectedBlock.id;
+        form.classList.toggle('open');
+        if (!form.classList.contains('open')) this.cancelPick();
+      });
+    }));
+
     // Camera
     p.appendChild(this.buildSection('CAMERA', (sec) => {
       // 슬라이더 헬퍼
@@ -2075,6 +2244,255 @@ export class LevelEditor {
     }
   }
 
+  /** patrolPath chip UI 빌더 — 추가 폼·편집 폼에서 공통 사용 */
+  private _buildPatrolChipUI(nodes: string[]): { el: HTMLElement; getNodes: () => string[]; refresh: () => void } {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin:4px 0;';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'editor-row';
+    const lbl = document.createElement('label');
+    lbl.textContent = 'PatrolPath:';
+    lbl.style.cssText = 'min-width:60px;font-size:11px;';
+    const pickBtn = document.createElement('button');
+    pickBtn.className = 'editor-btn';
+    pickBtn.textContent = '↗ Pick';
+    pickBtn.title = '블록을 클릭해 경로에 추가';
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'editor-btn';
+    clearBtn.textContent = 'Clear';
+    clearBtn.style.marginLeft = '4px';
+    titleRow.appendChild(lbl);
+    titleRow.appendChild(pickBtn);
+    titleRow.appendChild(clearBtn);
+    wrap.appendChild(titleRow);
+
+    const chipArea = document.createElement('div');
+    chipArea.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px;min-height:22px;margin-top:3px;padding:3px;background:#1a1a1a;border-radius:3px;border:1px solid #333;';
+    wrap.appendChild(chipArea);
+
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:10px;margin-top:2px;';
+    wrap.appendChild(hint);
+
+    const rebuild = () => {
+      chipArea.innerHTML = '';
+      if (nodes.length === 0) {
+        const empty = document.createElement('span');
+        empty.style.cssText = 'font-size:11px;color:#555;line-height:22px;padding:0 4px;';
+        empty.textContent = '경로 없음';
+        chipArea.appendChild(empty);
+      } else {
+        nodes.forEach((id, idx) => {
+          const chip = document.createElement('span');
+          chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;background:#3a2a0a;border:1px solid #cc8820;border-radius:3px;padding:1px 5px;font-size:11px;color:#ffcc44;';
+          chip.textContent = `${idx + 1}. ${id}`;
+          const x = document.createElement('button');
+          x.textContent = '✕';
+          x.style.cssText = 'background:none;border:none;color:#cc4422;cursor:pointer;font-size:10px;padding:0;line-height:1;';
+          x.addEventListener('click', () => { nodes.splice(idx, 1); rebuild(); });
+          chip.appendChild(x);
+          chipArea.appendChild(chip);
+        });
+      }
+      hint.style.color = nodes.length < 2 ? '#cc8820' : '#44aa44';
+      hint.textContent = nodes.length < 2 ? `최소 2개 필요 (현재 ${nodes.length}개)` : `✓ ${nodes.length}개 선택됨`;
+    };
+    rebuild();
+
+    pickBtn.addEventListener('click', () => this.startPick(b => { nodes.push(b.id); rebuild(); }));
+    clearBtn.addEventListener('click', () => { nodes.length = 0; rebuild(); });
+
+    return { el: wrap, getNodes: () => nodes, refresh: rebuild };
+  }
+
+  private _rebuildEnemyList(): void {
+    if (!this.enemyListEl) return;
+    this.enemyListEl.innerHTML = '';
+
+    if (this.enemyEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '적 없음';
+      this.enemyListEl.appendChild(empty);
+      return;
+    }
+
+    this.enemyEntries.forEach((entry, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'margin:2px 0;border-radius:3px;overflow:hidden;';
+
+      // ── 요약 행 ──────────────────────────────────────────────
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;background:#2a1a1a;padding:3px 4px;';
+
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      const ppSuffix = entry.behavior === 'patrol' && entry.patrolPath
+        ? ` [${entry.patrolPath.length}노드]` : '';
+      info.textContent = `${entry.id} — ${entry.nodeId} (${entry.behavior}${ppSuffix})`;
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'editor-btn';
+      editBtn.textContent = '✏';
+      editBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'editor-btn';
+      delBtn.textContent = '✕';
+      delBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
+      delBtn.addEventListener('click', () => {
+        this.enemyEntries.splice(i, 1);
+        this._rebuildEnemyList();
+      });
+
+      row.appendChild(info);
+      row.appendChild(editBtn);
+      row.appendChild(delBtn);
+      wrapper.appendChild(row);
+
+      // ── 인라인 편집 패널 ──────────────────────────────────────
+      const editPanel = document.createElement('div');
+      editPanel.style.cssText = 'display:none;background:#1e1210;border:1px solid #553322;border-top:none;padding:6px;';
+
+      // Node
+      const nodeRow = document.createElement('div');
+      nodeRow.className = 'editor-row';
+      const nodeLbl = document.createElement('label');
+      nodeLbl.textContent = 'Node:';
+      nodeLbl.style.minWidth = '70px';
+      const nodeInp = document.createElement('input');
+      nodeInp.className = 'editor-input';
+      nodeInp.style.flex = '1';
+      nodeInp.value = entry.nodeId;
+      const nodePickBtn = document.createElement('button');
+      nodePickBtn.className = 'editor-btn';
+      nodePickBtn.textContent = '↗';
+      nodePickBtn.addEventListener('click', () => this.startPick(b => { nodeInp.value = b.id; }));
+      nodeRow.appendChild(nodeLbl); nodeRow.appendChild(nodeInp); nodeRow.appendChild(nodePickBtn);
+      editPanel.appendChild(nodeRow);
+
+      // Behavior
+      const behRow = document.createElement('div');
+      behRow.className = 'editor-row';
+      const behLbl = document.createElement('label');
+      behLbl.textContent = 'Behavior:';
+      behLbl.style.minWidth = '70px';
+      const behSel = document.createElement('select');
+      behSel.className = 'editor-input';
+      ['patrol', 'chase'].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        if (v === entry.behavior) opt.selected = true;
+        behSel.appendChild(opt);
+      });
+      behRow.appendChild(behLbl); behRow.appendChild(behSel);
+      editPanel.appendChild(behRow);
+
+      // PatrolPath chip UI
+      const ppNodes = [...(entry.patrolPath ?? [])];
+      const { el: ppEl } = this._buildPatrolChipUI(ppNodes);
+      ppEl.style.display = entry.behavior === 'patrol' ? '' : 'none';
+      behSel.addEventListener('change', () => {
+        ppEl.style.display = behSel.value === 'patrol' ? '' : 'none';
+      });
+      editPanel.appendChild(ppEl);
+
+      // ChaseRange
+      const crRow = document.createElement('div');
+      crRow.className = 'editor-row';
+      const crLbl = document.createElement('label');
+      crLbl.textContent = 'ChaseRange:';
+      crLbl.style.cssText = 'min-width:70px;font-size:11px;';
+      const crInp = document.createElement('input');
+      crInp.className = 'editor-input';
+      crInp.type = 'number'; crInp.step = '1'; crInp.min = '1';
+      crInp.value = String(entry.chaseRange ?? 5);
+      crInp.style.width = '60px';
+      crRow.appendChild(crLbl); crRow.appendChild(crInp);
+      editPanel.appendChild(crRow);
+
+      // MoveInterval
+      const miRow = document.createElement('div');
+      miRow.className = 'editor-row';
+      const miLbl = document.createElement('label');
+      miLbl.textContent = 'MoveInterval:';
+      miLbl.style.cssText = 'min-width:70px;font-size:11px;';
+      const miInp = document.createElement('input');
+      miInp.className = 'editor-input';
+      miInp.type = 'number'; miInp.step = '0.1'; miInp.min = '0.1';
+      miInp.value = String(entry.moveInterval ?? 0.8);
+      miInp.style.width = '60px';
+      const miUnit = document.createElement('span');
+      miUnit.style.cssText = 'font-size:11px;color:#888;';
+      miUnit.textContent = 'sec';
+      miRow.appendChild(miLbl); miRow.appendChild(miInp); miRow.appendChild(miUnit);
+      editPanel.appendChild(miRow);
+
+      // Color
+      const clRow = document.createElement('div');
+      clRow.className = 'editor-row';
+      const clLbl = document.createElement('label');
+      clLbl.textContent = 'Color:';
+      clLbl.style.minWidth = '70px';
+      const clInp = document.createElement('input');
+      clInp.type = 'color';
+      clInp.value = entry.color ?? '#CC2020';
+      clInp.style.cssText = 'width:48px;height:26px;border:none;background:none;cursor:pointer;';
+      clRow.appendChild(clLbl); clRow.appendChild(clInp);
+      editPanel.appendChild(clRow);
+
+      // Save / Cancel
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'editor-btn primary';
+      saveBtn.textContent = 'Save';
+      saveBtn.style.flex = '1';
+      saveBtn.addEventListener('click', () => {
+        const nid = nodeInp.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        const beh = behSel.value as 'patrol' | 'chase';
+        if (beh === 'patrol' && ppNodes.length < 2) {
+          alert('PatrolPath는 최소 2개 이상 필요합니다.'); return;
+        }
+        this.enemyEntries[i] = {
+          ...entry,
+          nodeId:       nid,
+          behavior:     beh,
+          patrolPath:   beh === 'patrol' && ppNodes.length >= 2 ? [...ppNodes] : undefined,
+          chaseRange:   parseFloat(crInp.value) || 5,
+          moveInterval: parseFloat(miInp.value) || 0.8,
+          color:        clInp.value,
+        };
+        this._rebuildEnemyList();
+      });
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'editor-btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.style.flex = '1';
+      cancelBtn.addEventListener('click', () => {
+        editPanel.style.display = 'none';
+        editBtn.textContent = '✏';
+      });
+
+      btnRow.appendChild(saveBtn); btnRow.appendChild(cancelBtn);
+      editPanel.appendChild(btnRow);
+      wrapper.appendChild(editPanel);
+
+      // 편집 버튼 토글
+      editBtn.addEventListener('click', () => {
+        const isOpen = editPanel.style.display !== 'none';
+        editPanel.style.display = isOpen ? 'none' : '';
+        editBtn.textContent = isOpen ? '✏' : '▲';
+      });
+
+      this.enemyListEl.appendChild(wrapper);
+    });
+  }
+
   /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
   private renderSwTargetList(el: HTMLElement): void {
     el.innerHTML = '';
@@ -2234,6 +2652,13 @@ export class LevelEditor {
     if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; }
     this.starEntries        = this.starEntries.filter(e => e.nodeId !== block.id);
     this.mapRotateEntries   = this.mapRotateEntries.filter(e => e.nodeId !== block.id);
+    this.enemyEntries       = this.enemyEntries
+      .filter(e => e.nodeId !== block.id)
+      .map(e => ({
+        ...e,
+        patrolPath: e.patrolPath?.filter(id => id !== block.id),
+      }));
+    this._rebuildEnemyList();
     this.switchConns = this.switchConns
       .map(sw => ({ ...sw, targets: sw.targets.filter(t => t.nodeId !== block.id) }))
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
@@ -2665,6 +3090,17 @@ export class LevelEditor {
         activateElevation: c.elevation,
         elevationTolerance: c.elevationTol,
       })),
+      enemies: this.enemyEntries.length > 0
+        ? this.enemyEntries.map(e => ({
+            id: e.id,
+            startNodeId: e.nodeId,
+            behavior: e.behavior,
+            ...(e.patrolPath && e.patrolPath.length >= 2 ? { patrolPath: e.patrolPath } : {}),
+            ...(e.chaseRange  !== undefined ? { chaseRange:   e.chaseRange }  : {}),
+            ...(e.moveInterval !== undefined ? { moveInterval: e.moveInterval } : {}),
+            ...(e.color ? { color: e.color } : {}),
+          }))
+        : undefined,
       zones: this.zones.length > 0
         ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth }))
         : undefined,
@@ -2705,6 +3141,8 @@ export class LevelEditor {
     this.patrolArrows    = [];
     this.zones           = [];
     this.zoneCounter     = 0;
+    this.enemyEntries    = [];
+    this.enemyCounter    = 0;
     // 오버레이 초기화
     for (const mesh of this.zoneOverlays.values()) {
       this.scene.remove(mesh);
@@ -2817,6 +3255,22 @@ export class LevelEditor {
       .map(z => { const m = z.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
       .reduce((a, b) => Math.max(a, b), 0);
     this.zoneCounter = maxZoneNum;
+
+    // Enemies 복원
+    this.enemyEntries = (data.enemies ?? []).map(e => ({
+      id:           e.id,
+      nodeId:       e.startNodeId,
+      behavior:     e.behavior,
+      patrolPath:   e.patrolPath,
+      chaseRange:   e.chaseRange,
+      moveInterval: e.moveInterval,
+      color:        e.color,
+    }));
+    const maxEnemyNum = this.enemyEntries
+      .map(e => { const m = e.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((a, b) => Math.max(a, b), 0);
+    this.enemyCounter = maxEnemyNum;
+    this._rebuildEnemyList();
 
     // initialCamera 복원
     this.initCam = data.initialCamera

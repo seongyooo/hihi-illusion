@@ -113,6 +113,16 @@ export interface ZoneDef {
   depth: number;   // Z 방향 칸 수
 }
 
+export interface EnemyDef {
+  id:            string;
+  startNodeId:   string;
+  behavior:      'patrol' | 'chase';
+  patrolPath?:   string[];
+  chaseRange?:   number;
+  moveInterval?: number;
+  color?:        string;
+}
+
 export interface LevelData {
   id: string;
   name: string;
@@ -160,6 +170,7 @@ export interface LevelData {
     angle:   number;   // degrees (예: 180, 90)
     pivotY?: number;   // X축 회전 전용 피벗 Y (미지정 시 맵 중심)
   }>;
+  enemies?: EnemyDef[];
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string; flipped?: boolean };
