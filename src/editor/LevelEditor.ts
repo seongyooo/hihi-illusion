@@ -46,11 +46,12 @@ interface ZoneEntry {
 interface EnemyEntry {
   id:            string;
   nodeId:        string;
-  behavior:      'patrol' | 'chase';
+  behavior:      'patrol' | 'chase' | 'bounce';
   patrolPath?:   string[];
   chaseRange?:   number;
   moveInterval?: number;
   color?:        string;
+  bounceAxis?:   'x' | 'z';
 }
 
 interface SwitchConn {
@@ -1514,7 +1515,7 @@ export class LevelEditor {
       behLabel.style.minWidth = '60px';
       const behSel = document.createElement('select');
       behSel.className = 'editor-input';
-      ['patrol', 'chase'].forEach(v => {
+      ['patrol', 'chase', 'bounce'].forEach(v => {
         const opt = document.createElement('option');
         opt.value = v; opt.textContent = v;
         behSel.appendChild(opt);
@@ -1526,15 +1527,35 @@ export class LevelEditor {
       // patrolPath — chip pick UI (헬퍼 사용)
       const ppNodes: string[] = [];
       const { el: ppSection, refresh: ppRefresh } = this._buildPatrolChipUI(ppNodes);
-      ppSection.style.display = 'none'; // behavior에 따라 초기 숨김
+      ppSection.style.display = 'none';
       form.appendChild(ppSection);
 
-      // behavior 전환 시 patrolPath 섹션 표시/숨김
-      const updatePpVisibility = () => {
+      // bounceAxis 행
+      const baRow = document.createElement('div');
+      baRow.className = 'editor-row';
+      const baLabel = document.createElement('label');
+      baLabel.textContent = 'BounceAxis:';
+      baLabel.style.minWidth = '60px';
+      baLabel.style.fontSize = '11px';
+      const baSel = document.createElement('select');
+      baSel.className = 'editor-input';
+      ['x', 'z'].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v.toUpperCase();
+        baSel.appendChild(opt);
+      });
+      baRow.appendChild(baLabel);
+      baRow.appendChild(baSel);
+      baRow.style.display = 'none';
+      form.appendChild(baRow);
+
+      // behavior 전환 시 표시/숨김
+      const updateAddVisibility = () => {
         ppSection.style.display = behSel.value === 'patrol' ? '' : 'none';
+        baRow.style.display    = behSel.value === 'bounce' ? '' : 'none';
       };
-      behSel.addEventListener('change', updatePpVisibility);
-      updatePpVisibility();
+      behSel.addEventListener('change', updateAddVisibility);
+      updateAddVisibility();
 
       // chaseRange
       const crRow = document.createElement('div');
@@ -1596,12 +1617,14 @@ export class LevelEditor {
           alert('PatrolPath는 최소 2개 이상의 노드가 필요합니다.');
           return;
         }
-        const patrolPath = ppNodes.length >= 2 ? [...ppNodes] : undefined;
+        const beh = behSel.value as 'patrol' | 'chase' | 'bounce';
+        const patrolPath = beh === 'patrol' && ppNodes.length >= 2 ? [...ppNodes] : undefined;
         const entry: EnemyEntry = {
           id: `enemy_${++this.enemyCounter}`,
           nodeId: nid,
-          behavior: behSel.value as 'patrol' | 'chase',
+          behavior: beh,
           ...(patrolPath ? { patrolPath } : {}),
+          ...(beh === 'bounce' ? { bounceAxis: baSel.value as 'x' | 'z' } : {}),
           chaseRange: parseFloat(crInput.value) || 5,
           moveInterval: parseFloat(miInput.value) >= 0 ? parseFloat(miInput.value) : 0.8,
           color: clInput.value,
@@ -1611,6 +1634,7 @@ export class LevelEditor {
         // 폼 초기화
         nodeInput.value = '';
         ppNodes.length = 0; ppRefresh();
+        baSel.value = 'x';
         crInput.value = '5'; miInput.value = '0.8'; clInput.value = '#CC2020';
         form.classList.remove('open');
       });
@@ -2329,7 +2353,10 @@ export class LevelEditor {
       const info = document.createElement('span');
       info.style.flex = '1';
       const ppSuffix = entry.behavior === 'patrol' && entry.patrolPath
-        ? ` [${entry.patrolPath.length}노드]` : '';
+        ? ` [${entry.patrolPath.length}노드]`
+        : entry.behavior === 'bounce'
+        ? ` [${(entry.bounceAxis ?? 'x').toUpperCase()}축]`
+        : '';
       info.textContent = `${entry.id} — ${entry.nodeId} (${entry.behavior}${ppSuffix})`;
 
       const editBtn = document.createElement('button');
@@ -2380,7 +2407,7 @@ export class LevelEditor {
       behLbl.style.minWidth = '70px';
       const behSel = document.createElement('select');
       behSel.className = 'editor-input';
-      ['patrol', 'chase'].forEach(v => {
+      ['patrol', 'chase', 'bounce'].forEach(v => {
         const opt = document.createElement('option');
         opt.value = v; opt.textContent = v;
         if (v === entry.behavior) opt.selected = true;
@@ -2393,10 +2420,30 @@ export class LevelEditor {
       const ppNodes = [...(entry.patrolPath ?? [])];
       const { el: ppEl } = this._buildPatrolChipUI(ppNodes);
       ppEl.style.display = entry.behavior === 'patrol' ? '' : 'none';
-      behSel.addEventListener('change', () => {
-        ppEl.style.display = behSel.value === 'patrol' ? '' : 'none';
-      });
       editPanel.appendChild(ppEl);
+
+      // BounceAxis
+      const baRow = document.createElement('div');
+      baRow.className = 'editor-row';
+      const baLbl = document.createElement('label');
+      baLbl.textContent = 'BounceAxis:';
+      baLbl.style.cssText = 'min-width:70px;font-size:11px;';
+      const baSelE = document.createElement('select');
+      baSelE.className = 'editor-input';
+      ['x', 'z'].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v.toUpperCase();
+        if (v === (entry.bounceAxis ?? 'x')) opt.selected = true;
+        baSelE.appendChild(opt);
+      });
+      baRow.appendChild(baLbl); baRow.appendChild(baSelE);
+      baRow.style.display = entry.behavior === 'bounce' ? '' : 'none';
+      editPanel.appendChild(baRow);
+
+      behSel.addEventListener('change', () => {
+        ppEl.style.display  = behSel.value === 'patrol' ? '' : 'none';
+        baRow.style.display = behSel.value === 'bounce' ? '' : 'none';
+      });
 
       // ChaseRange
       const crRow = document.createElement('div');
@@ -2453,7 +2500,7 @@ export class LevelEditor {
       saveBtn.addEventListener('click', () => {
         const nid = nodeInp.value.trim();
         if (!nid) { alert('Node ID를 입력하세요.'); return; }
-        const beh = behSel.value as 'patrol' | 'chase';
+        const beh = behSel.value as 'patrol' | 'chase' | 'bounce';
         if (beh === 'patrol' && ppNodes.length < 2) {
           alert('PatrolPath는 최소 2개 이상 필요합니다.'); return;
         }
@@ -2462,6 +2509,7 @@ export class LevelEditor {
           nodeId:       nid,
           behavior:     beh,
           patrolPath:   beh === 'patrol' && ppNodes.length >= 2 ? [...ppNodes] : undefined,
+          bounceAxis:   beh === 'bounce' ? baSelE.value as 'x' | 'z' : undefined,
           chaseRange:   parseFloat(crInp.value) || 5,
           moveInterval: parseFloat(miInp.value) >= 0 ? parseFloat(miInp.value) : 0.8,
           color:        clInp.value,
@@ -3096,6 +3144,7 @@ export class LevelEditor {
             startNodeId: e.nodeId,
             behavior: e.behavior,
             ...(e.patrolPath && e.patrolPath.length >= 2 ? { patrolPath: e.patrolPath } : {}),
+            ...(e.bounceAxis ? { bounceAxis: e.bounceAxis } : {}),
             ...(e.chaseRange  !== undefined ? { chaseRange:   e.chaseRange }  : {}),
             ...(e.moveInterval !== undefined ? { moveInterval: e.moveInterval } : {}),
             ...(e.color ? { color: e.color } : {}),
@@ -3262,6 +3311,7 @@ export class LevelEditor {
       nodeId:       e.startNodeId,
       behavior:     e.behavior,
       patrolPath:   e.patrolPath,
+      bounceAxis:   e.bounceAxis,
       chaseRange:   e.chaseRange,
       moveInterval: e.moveInterval,
       color:        e.color,

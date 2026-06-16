@@ -116,11 +116,12 @@ export interface ZoneDef {
 export interface EnemyDef {
   id:            string;
   startNodeId:   string;
-  behavior:      'patrol' | 'chase';
+  behavior:      'patrol' | 'chase' | 'bounce';
   patrolPath?:   string[];
   chaseRange?:   number;
   moveInterval?: number;
   color?:        string;
+  bounceAxis?:   'x' | 'z';
 }
 
 export interface LevelData {

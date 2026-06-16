@@ -18,6 +18,9 @@ export class Enemy {
   private patrolNodes: PathNode[] = [];
   private patrolIndex = 0;
 
+  // bounce 전용
+  private _bounceDir = 1;
+
   private _paused = false;
 
   private readonly _wp = new THREE.Vector3();
@@ -61,6 +64,7 @@ export class Enemy {
     if (this.isMoving || this._paused) return;
     if (this.def.behavior === 'patrol') this._tickPatrol();
     else if (this.def.behavior === 'chase') this._tickChase(playerNode);
+    else if (this.def.behavior === 'bounce') this._tickBounce();
   }
 
   dispose(): void {
@@ -89,6 +93,35 @@ export class Enemy {
       return;
     }
     this._moveToNode(target, () => { this.patrolIndex = nextIndex; });
+  }
+
+  private _tickBounce(): void {
+    const axis = this.def.bounceAxis ?? 'x';
+    let target = this._findBounceNeighbor(axis, this._bounceDir);
+    if (!target) {
+      this._bounceDir *= -1;
+      target = this._findBounceNeighbor(axis, this._bounceDir);
+    }
+    if (!target) return;
+    this._moveToNode(target, () => {});
+  }
+
+  private _findBounceNeighbor(axis: 'x' | 'z', dir: number): PathNode | null {
+    const pos = this.currentNode.position;
+    const PERP_MAX = 0.3;
+    let best: PathNode | null = null;
+    let bestDist = Infinity;
+    for (const nb of this.currentNode.neighbors) {
+      const dx = nb.position.x - pos.x;
+      const dz = nb.position.z - pos.z;
+      const axisVal = axis === 'x' ? dx : dz;
+      const perpVal = axis === 'x' ? dz : dx;
+      if (Math.abs(perpVal) > PERP_MAX) continue;
+      if (Math.sign(axisVal) !== dir) continue;
+      const dist = Math.abs(axisVal);
+      if (dist < bestDist) { bestDist = dist; best = nb; }
+    }
+    return best;
   }
 
   private _tickChase(playerNode: PathNode | null): void {
