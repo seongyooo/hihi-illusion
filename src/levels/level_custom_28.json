@@ -995,9 +995,9 @@
     "flipped": true
   },
   "initialCamera": {
-    "azimuth": -127,
-    "polar": 80,
-    "distance": 26,
+    "azimuth": 45,
+    "polar": 33,
+    "distance": 14,
     "targetY": 0
   }
 }

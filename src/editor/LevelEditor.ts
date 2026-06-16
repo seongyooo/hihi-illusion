@@ -1560,7 +1560,7 @@ export class LevelEditor {
       miLabel.style.fontSize = '11px';
       const miInput = document.createElement('input');
       miInput.className = 'editor-input';
-      miInput.type = 'number'; miInput.step = '0.1'; miInput.min = '0.1'; miInput.value = '0.8';
+      miInput.type = 'number'; miInput.step = '0.05'; miInput.min = '0'; miInput.value = '0.8';
       miInput.style.width = '60px';
       const miUnit = document.createElement('span');
       miUnit.style.cssText = 'font-size:11px;color:#888';
@@ -1603,7 +1603,7 @@ export class LevelEditor {
           behavior: behSel.value as 'patrol' | 'chase',
           ...(patrolPath ? { patrolPath } : {}),
           chaseRange: parseFloat(crInput.value) || 5,
-          moveInterval: parseFloat(miInput.value) || 0.8,
+          moveInterval: parseFloat(miInput.value) >= 0 ? parseFloat(miInput.value) : 0.8,
           color: clInput.value,
         };
         this.enemyEntries.push(entry);
@@ -2420,7 +2420,7 @@ export class LevelEditor {
       miLbl.style.cssText = 'min-width:70px;font-size:11px;';
       const miInp = document.createElement('input');
       miInp.className = 'editor-input';
-      miInp.type = 'number'; miInp.step = '0.1'; miInp.min = '0.1';
+      miInp.type = 'number'; miInp.step = '0.05'; miInp.min = '0';
       miInp.value = String(entry.moveInterval ?? 0.8);
       miInp.style.width = '60px';
       const miUnit = document.createElement('span');
@@ -2463,7 +2463,7 @@ export class LevelEditor {
           behavior:     beh,
           patrolPath:   beh === 'patrol' && ppNodes.length >= 2 ? [...ppNodes] : undefined,
           chaseRange:   parseFloat(crInp.value) || 5,
-          moveInterval: parseFloat(miInp.value) || 0.8,
+          moveInterval: parseFloat(miInp.value) >= 0 ? parseFloat(miInp.value) : 0.8,
           color:        clInp.value,
         };
         this._rebuildEnemyList();

@@ -110,22 +110,25 @@ export class Enemy {
 
     const targetY = target.position.y;
 
+    // 애니메이션은 플레이어와 동일한 타이밍으로 고정 (0.1 + 0.15 + 0.1 = 0.35s)
+    // moveInterval은 도착 후 대기 시간 — 0으로 설정 시 플레이어 최대 속도와 동일
+    const interval = this.def.moveInterval ?? 0.8;
+
     const tl = gsap.timeline({
       onComplete: () => {
         this.currentNode = target;
         target.mesh.getWorldPosition(this._wp);
         this.mesh.position.set(this._wp.x, this._wp.y + target.halfHeight, this._wp.z);
         onDone();
-        const interval = (this.def.moveInterval ?? 0.8) * 1000;
         this.waitTimer = setTimeout(() => {
           this.waitTimer = null;
           this.isMoving = false;
-        }, interval);
+        }, interval * 1000);
       },
     });
 
     if (dx !== 0 || dz !== 0) {
-      tl.to(this.mesh.rotation, { y: Math.atan2(dx, dz), duration: 0.08 }, 0);
+      tl.to(this.mesh.rotation, { y: Math.atan2(dx, dz), duration: 0.1 }, 0);
     }
     tl.to(this.mesh.position, {
       x: target.position.x,
@@ -133,7 +136,7 @@ export class Enemy {
       z: target.position.z,
       duration: 0.15,
       ease: 'power1.out',
-    }, 0.08);
+    }, 0.1);
     tl.to(this.mesh.position, {
       y: targetY,
       duration: 0.1,
