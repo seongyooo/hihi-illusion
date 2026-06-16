@@ -1478,6 +1478,7 @@ export class GameManager {
   /** 가시 블록 착지 시 레벨 전체 재시작 (별 등 모든 상태 초기화) */
   private _respawn(): void {
     if (!this.character) return;
+    if (this.goalReached) return;
     // 파티클 + 사운드 피드백
     this.particles.burst(this.character.mesh.position.clone(), 0xFF3322, 18, 1.5, 0.8);
     this.audio.playTeleport();
