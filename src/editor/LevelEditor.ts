@@ -1830,7 +1830,7 @@ export class LevelEditor {
       sec.appendChild(addBtn);
 
       const form = document.createElement('div');
-      form.className = 'editor-form';
+      form.className = 'editor-add-form';
       form.style.display = 'none';
       sec.appendChild(form);
 
@@ -1838,11 +1838,38 @@ export class LevelEditor {
         form.style.display = form.style.display === 'none' ? '' : 'none';
       });
 
+      // ── 헬퍼: 라벨 + 인풋 행 생성
+      const makeRow = (label: string, el: HTMLElement) => {
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.style.cssText = 'min-width:80px;font-size:11px;color:#aaa;';
+        row.appendChild(lbl);
+        row.appendChild(el);
+        form.appendChild(row);
+        return el;
+      };
+
+      // Node ID + Pick
+      const nodeRow = document.createElement('div');
+      nodeRow.className = 'editor-row';
+      const nodeLbl = document.createElement('label');
+      nodeLbl.textContent = 'Node';
+      nodeLbl.style.cssText = 'min-width:80px;font-size:11px;color:#aaa;';
       const nidInp = document.createElement('input');
       nidInp.className = 'editor-input';
+      nidInp.style.flex = '1';
       nidInp.placeholder = 'Node ID';
-      form.appendChild(nidInp);
+      const pickBtn = document.createElement('button');
+      pickBtn.className = 'editor-btn';
+      pickBtn.textContent = '↗';
+      pickBtn.title = '블록 클릭으로 선택';
+      pickBtn.addEventListener('click', () => this.startPick(b => { nidInp.value = b.id; }));
+      nodeRow.appendChild(nodeLbl); nodeRow.appendChild(nidInp); nodeRow.appendChild(pickBtn);
+      form.appendChild(nodeRow);
 
+      // Direction
       const dirSel = document.createElement('select');
       dirSel.className = 'editor-input';
       for (const d of ['x+', 'x-', 'z+', 'z-']) {
@@ -1850,40 +1877,42 @@ export class LevelEditor {
         opt.value = opt.textContent = d;
         dirSel.appendChild(opt);
       }
-      form.appendChild(dirSel);
+      makeRow('Direction', dirSel);
 
+      // Interval
       const intInp = document.createElement('input');
-      intInp.className = 'editor-input';
-      intInp.type = 'number'; intInp.min = '0.2'; intInp.step = '0.1'; intInp.value = '2';
-      intInp.placeholder = 'Interval (s)';
-      form.appendChild(intInp);
+      intInp.className = 'editor-input'; intInp.type = 'number';
+      intInp.min = '0.2'; intInp.step = '0.1'; intInp.value = '2';
+      makeRow('Interval (s)', intInp);
 
+      // Speed
       const spdInp = document.createElement('input');
-      spdInp.className = 'editor-input';
-      spdInp.type = 'number'; spdInp.min = '1'; spdInp.step = '0.5'; spdInp.value = '4';
-      spdInp.placeholder = 'Speed (u/s)';
-      form.appendChild(spdInp);
+      spdInp.className = 'editor-input'; spdInp.type = 'number';
+      spdInp.min = '1'; spdInp.step = '0.5'; spdInp.value = '4';
+      makeRow('Speed (u/s)', spdInp);
 
+      // Range
       const rngInp = document.createElement('input');
-      rngInp.className = 'editor-input';
-      rngInp.type = 'number'; rngInp.min = '1'; rngInp.step = '1'; rngInp.value = '10';
-      rngInp.placeholder = 'Range';
-      form.appendChild(rngInp);
+      rngInp.className = 'editor-input'; rngInp.type = 'number';
+      rngInp.min = '1'; rngInp.step = '1'; rngInp.value = '10';
+      makeRow('Range', rngInp);
 
+      // Start Delay
       const delInp = document.createElement('input');
-      delInp.className = 'editor-input';
-      delInp.type = 'number'; delInp.min = '0'; delInp.step = '0.1'; delInp.value = '0';
-      delInp.placeholder = 'Start delay (s)';
-      form.appendChild(delInp);
+      delInp.className = 'editor-input'; delInp.type = 'number';
+      delInp.min = '0'; delInp.step = '0.1'; delInp.value = '0';
+      makeRow('Delay (s)', delInp);
 
+      // Color
       const clInp = document.createElement('input');
       clInp.type = 'color'; clInp.value = '#555566';
       clInp.className = 'editor-input';
-      form.appendChild(clInp);
+      makeRow('Color', clInp);
 
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'editor-btn';
+      confirmBtn.className = 'editor-btn primary';
       confirmBtn.textContent = 'Add';
+      confirmBtn.style.marginTop = '4px';
       form.appendChild(confirmBtn);
 
       confirmBtn.addEventListener('click', () => {
@@ -1893,11 +1922,11 @@ export class LevelEditor {
           id: `cannon_${++this.cannonCounter}`,
           nodeId: nid,
           direction: dirSel.value as 'x+' | 'x-' | 'z+' | 'z-',
-          interval: parseFloat(intInp.value) || 2,
-          speed: parseFloat(spdInp.value) || 4,
-          range: parseFloat(rngInp.value) || 10,
+          interval:   parseFloat(intInp.value) || 2,
+          speed:      parseFloat(spdInp.value) || 4,
+          range:      parseFloat(rngInp.value) || 10,
           startDelay: parseFloat(delInp.value) || 0,
-          color: clInp.value,
+          color:      clInp.value,
         });
         this._rebuildCannonList();
         nidInp.value = '';
@@ -2861,19 +2890,121 @@ export class LevelEditor {
       return;
     }
     this.cannonEntries.forEach((e, i) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'margin:2px 0;';
+
+      // 헤더 행
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;margin:2px 0;background:#1a1a2e;padding:3px 4px;border-radius:3px;';
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;background:#1a1a2e;padding:3px 4px;border-radius:3px;';
       const dot = document.createElement('span');
       dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${e.color};flex-shrink:0;`;
       const info = document.createElement('span');
       info.style.flex = '1';
-      info.textContent = `${e.id}: ${e.nodeId} ${e.direction} ×${e.interval}s`;
+      info.textContent = `${e.nodeId} ${e.direction} | ×${e.interval}s spd:${e.speed} rng:${e.range}`;
+      const editBtn = document.createElement('button');
+      editBtn.className = 'editor-btn'; editBtn.textContent = '✎';
+      editBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
       const del = document.createElement('button');
       del.className = 'editor-btn'; del.textContent = '✕';
       del.style.cssText = 'padding:1px 6px;font-size:11px;';
       del.addEventListener('click', () => { this.cannonEntries.splice(i, 1); this._rebuildCannonList(); });
-      row.appendChild(dot); row.appendChild(info); row.appendChild(del);
-      this.cannonListEl!.appendChild(row);
+      row.appendChild(dot); row.appendChild(info); row.appendChild(editBtn); row.appendChild(del);
+      wrap.appendChild(row);
+
+      // 인라인 편집 폼 (접혀있음)
+      const editForm = document.createElement('div');
+      editForm.className = 'editor-add-form';
+      editForm.style.cssText = 'display:none;margin-top:2px;padding:6px;background:#111122;border-radius:3px;';
+      wrap.appendChild(editForm);
+
+      const makeField = (label: string, el: HTMLElement) => {
+        const r = document.createElement('div');
+        r.className = 'editor-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.style.cssText = 'min-width:80px;font-size:11px;color:#aaa;';
+        r.appendChild(lbl); r.appendChild(el);
+        editForm.appendChild(r);
+        return el;
+      };
+
+      // Node + Pick
+      const enodeRow = document.createElement('div');
+      enodeRow.className = 'editor-row';
+      const enodeLbl = document.createElement('label');
+      enodeLbl.textContent = 'Node';
+      enodeLbl.style.cssText = 'min-width:80px;font-size:11px;color:#aaa;';
+      const enidInp = document.createElement('input');
+      enidInp.className = 'editor-input'; enidInp.style.flex = '1';
+      enidInp.value = e.nodeId;
+      const epickBtn = document.createElement('button');
+      epickBtn.className = 'editor-btn'; epickBtn.textContent = '↗';
+      epickBtn.title = '블록 클릭으로 선택';
+      epickBtn.addEventListener('click', () => this.startPick(b => { enidInp.value = b.id; }));
+      enodeRow.appendChild(enodeLbl); enodeRow.appendChild(enidInp); enodeRow.appendChild(epickBtn);
+      editForm.appendChild(enodeRow);
+
+      const edirSel = document.createElement('select');
+      edirSel.className = 'editor-input';
+      for (const d of ['x+', 'x-', 'z+', 'z-']) {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = d;
+        if (d === e.direction) opt.selected = true;
+        edirSel.appendChild(opt);
+      }
+      makeField('Direction', edirSel);
+
+      const eintInp = document.createElement('input');
+      eintInp.className = 'editor-input'; eintInp.type = 'number';
+      eintInp.min = '0.2'; eintInp.step = '0.1'; eintInp.value = String(e.interval);
+      makeField('Interval (s)', eintInp);
+
+      const espdInp = document.createElement('input');
+      espdInp.className = 'editor-input'; espdInp.type = 'number';
+      espdInp.min = '1'; espdInp.step = '0.5'; espdInp.value = String(e.speed);
+      makeField('Speed (u/s)', espdInp);
+
+      const erngInp = document.createElement('input');
+      erngInp.className = 'editor-input'; erngInp.type = 'number';
+      erngInp.min = '1'; erngInp.step = '1'; erngInp.value = String(e.range);
+      makeField('Range', erngInp);
+
+      const edelInp = document.createElement('input');
+      edelInp.className = 'editor-input'; edelInp.type = 'number';
+      edelInp.min = '0'; edelInp.step = '0.1'; edelInp.value = String(e.startDelay);
+      makeField('Delay (s)', edelInp);
+
+      const eclInp = document.createElement('input');
+      eclInp.type = 'color'; eclInp.value = e.color;
+      eclInp.className = 'editor-input';
+      makeField('Color', eclInp);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'editor-btn primary';
+      saveBtn.textContent = 'Save';
+      saveBtn.style.marginTop = '4px';
+      saveBtn.addEventListener('click', () => {
+        const nid = enidInp.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        this.cannonEntries[i] = {
+          ...e,
+          nodeId:     nid,
+          direction:  edirSel.value as 'x+' | 'x-' | 'z+' | 'z-',
+          interval:   parseFloat(eintInp.value) || 2,
+          speed:      parseFloat(espdInp.value) || 4,
+          range:      parseFloat(erngInp.value) || 10,
+          startDelay: parseFloat(edelInp.value) || 0,
+          color:      eclInp.value,
+        };
+        this._rebuildCannonList();
+      });
+      editForm.appendChild(saveBtn);
+
+      editBtn.addEventListener('click', () => {
+        editForm.style.display = editForm.style.display === 'none' ? '' : 'none';
+      });
+
+      this.cannonListEl!.appendChild(wrap);
     });
   }
 
