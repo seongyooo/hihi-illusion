@@ -113,6 +113,13 @@ export interface ZoneDef {
   depth: number;   // Z 방향 칸 수
 }
 
+export interface LaserDef {
+  id:         string;
+  emitterAId: string;  // 블록 ID
+  emitterBId: string;  // 블록 ID
+  color?:     string;  // hex, 기본 '#FF2020'
+}
+
 export interface EnemyDef {
   id:            string;
   startNodeId:   string;
@@ -172,6 +179,12 @@ export interface LevelData {
     pivotY?: number;   // X축 회전 전용 피벗 Y (미지정 시 맵 중심)
   }>;
   enemies?: EnemyDef[];
+  lasers?: LaserDef[];
+  laserSwitches?: Array<{
+    switchNodeId: string;
+    laserIds:     string[];
+    type:         'toggle' | 'hold';
+  }>;
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string; flipped?: boolean };

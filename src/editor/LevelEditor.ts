@@ -54,6 +54,19 @@ interface EnemyEntry {
   bounceAxis?:   'x' | 'z';
 }
 
+interface LaserEntry {
+  id:         string;
+  emitterAId: string;
+  emitterBId: string;
+  color:      string;
+}
+
+interface LaserSwitchEntry {
+  switchNodeId: string;
+  laserIds:     string[];
+  type:         'toggle' | 'hold';
+}
+
 interface SwitchConn {
   switchNodeId: string;
   targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
@@ -134,6 +147,9 @@ export class LevelEditor {
   private zoneCounter = 0;
   private enemyEntries: EnemyEntry[] = [];
   private enemyCounter = 0;
+  private laserEntries: LaserEntry[] = [];
+  private laserCounter = 0;
+  private laserSwitchEntries: LaserSwitchEntry[] = [];
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
   private static readonly ZONE_COLORS = [
     0xFF6B6B, // 빨강
@@ -175,6 +191,8 @@ export class LevelEditor {
   private zoneListEl!:       HTMLElement;
   private zoneFormEl!:       HTMLElement;
   private enemyListEl!:      HTMLElement;
+  private laserListEl!:      HTMLElement;
+  private laserSwListEl!:    HTMLElement;
   private illusionFormEl!:   HTMLElement;
   private ladderFormEl!:     HTMLElement;
   private teleporterFormEl!: HTMLElement;
@@ -1648,6 +1666,144 @@ export class LevelEditor {
       });
     }));
 
+    // Lasers
+    p.appendChild(this.buildSection('LASERS', (sec) => {
+      this.laserListEl = document.createElement('div');
+      sec.appendChild(this.laserListEl);
+      this._rebuildLaserList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Laser';
+      addBtn.style.cssText = 'margin-top:4px;width:100%;';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-form';
+
+      const makePickRow = (label: string, placeholder: string): { inp: HTMLInputElement; row: HTMLElement } => {
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.style.minWidth = '65px';
+        lbl.style.fontSize = '11px';
+        const inp = document.createElement('input');
+        inp.className = 'editor-input';
+        inp.placeholder = placeholder;
+        inp.style.flex = '1';
+        const pickBtn = document.createElement('button');
+        pickBtn.className = 'editor-btn';
+        pickBtn.textContent = '↗';
+        pickBtn.addEventListener('click', () => this.startPick(b => { inp.value = b.id; }));
+        row.appendChild(lbl); row.appendChild(inp); row.appendChild(pickBtn);
+        return { inp, row };
+      };
+
+      const { inp: inpA, row: rowA } = makePickRow('Emitter A:', 'block id');
+      const { inp: inpB, row: rowB } = makePickRow('Emitter B:', 'block id');
+      form.appendChild(rowA);
+      form.appendChild(rowB);
+
+      // Color
+      const clRow = document.createElement('div');
+      clRow.className = 'editor-row';
+      const clLbl = document.createElement('label');
+      clLbl.textContent = 'Color:';
+      clLbl.style.minWidth = '65px';
+      const clInp = document.createElement('input');
+      clInp.type = 'color'; clInp.value = '#FF2020';
+      clInp.style.cssText = 'width:48px;height:26px;border:none;background:none;cursor:pointer;';
+      clRow.appendChild(clLbl); clRow.appendChild(clInp);
+      form.appendChild(clRow);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn primary';
+      confirmBtn.textContent = 'Add Laser';
+      confirmBtn.style.cssText = 'margin-top:6px;width:100%;';
+      confirmBtn.addEventListener('click', () => {
+        const a = inpA.value.trim();
+        const b = inpB.value.trim();
+        if (!a || !b) { alert('Emitter A / B 블록 ID를 입력하세요.'); return; }
+        this.laserEntries.push({ id: `laser_${++this.laserCounter}`, emitterAId: a, emitterBId: b, color: clInp.value });
+        this._rebuildLaserList();
+        inpA.value = ''; inpB.value = ''; clInp.value = '#FF2020';
+        form.classList.remove('open');
+      });
+      form.appendChild(confirmBtn);
+      sec.appendChild(form);
+      addBtn.addEventListener('click', () => form.classList.toggle('open'));
+
+      // Laser Switches
+      const swTitle = document.createElement('div');
+      swTitle.style.cssText = 'font-size:11px;color:#aaa;margin-top:8px;margin-bottom:2px;';
+      swTitle.textContent = 'Laser Switches';
+      sec.appendChild(swTitle);
+
+      this.laserSwListEl = document.createElement('div');
+      sec.appendChild(this.laserSwListEl);
+      this._rebuildLaserSwList();
+
+      const addSwBtn = document.createElement('button');
+      addSwBtn.className = 'editor-btn';
+      addSwBtn.textContent = '+ Add Switch';
+      addSwBtn.style.cssText = 'margin-top:4px;width:100%;';
+      sec.appendChild(addSwBtn);
+
+      const swForm = document.createElement('div');
+      swForm.className = 'editor-form';
+
+      // Switch node pick
+      const { inp: swInp, row: swRow } = makePickRow('Switch:', 'switch block id');
+      swForm.appendChild(swRow);
+
+      // Target laser ids (comma separated)
+      const lidRow = document.createElement('div');
+      lidRow.className = 'editor-row';
+      const lidLbl = document.createElement('label');
+      lidLbl.textContent = 'LaserIDs:';
+      lidLbl.style.cssText = 'min-width:65px;font-size:11px;';
+      const lidInp = document.createElement('input');
+      lidInp.className = 'editor-input';
+      lidInp.placeholder = 'laser_1,laser_2';
+      lidInp.style.flex = '1';
+      lidRow.appendChild(lidLbl); lidRow.appendChild(lidInp);
+      swForm.appendChild(lidRow);
+
+      // Type
+      const stRow = document.createElement('div');
+      stRow.className = 'editor-row';
+      const stLbl = document.createElement('label');
+      stLbl.textContent = 'Type:';
+      stLbl.style.minWidth = '65px';
+      const stSel = document.createElement('select');
+      stSel.className = 'editor-input';
+      ['toggle', 'hold'].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        stSel.appendChild(opt);
+      });
+      stRow.appendChild(stLbl); stRow.appendChild(stSel);
+      swForm.appendChild(stRow);
+
+      const swConfirm = document.createElement('button');
+      swConfirm.className = 'editor-btn primary';
+      swConfirm.textContent = 'Add';
+      swConfirm.style.cssText = 'margin-top:6px;width:100%;';
+      swConfirm.addEventListener('click', () => {
+        const nid = swInp.value.trim();
+        const ids = lidInp.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (!nid || ids.length === 0) { alert('Switch 노드 ID와 레이저 ID를 입력하세요.'); return; }
+        this.laserSwitchEntries.push({ switchNodeId: nid, laserIds: ids, type: stSel.value as 'toggle' | 'hold' });
+        this._rebuildLaserSwList();
+        swInp.value = ''; lidInp.value = '';
+        swForm.classList.remove('open');
+      });
+      swForm.appendChild(swConfirm);
+      sec.appendChild(swForm);
+      addSwBtn.addEventListener('click', () => swForm.classList.toggle('open'));
+    }));
+
     // Camera
     p.appendChild(this.buildSection('CAMERA', (sec) => {
       // 슬라이더 헬퍼
@@ -2541,6 +2697,58 @@ export class LevelEditor {
     });
   }
 
+  private _rebuildLaserList(): void {
+    if (!this.laserListEl) return;
+    this.laserListEl.innerHTML = '';
+    if (this.laserEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '레이저 없음';
+      this.laserListEl.appendChild(empty);
+      return;
+    }
+    this.laserEntries.forEach((e, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;margin:2px 0;background:#1a1a2e;padding:3px 4px;border-radius:3px;';
+      const dot = document.createElement('span');
+      dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${e.color};flex-shrink:0;`;
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `${e.id}: ${e.emitterAId} ↔ ${e.emitterBId}`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn'; del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => { this.laserEntries.splice(i, 1); this._rebuildLaserList(); });
+      row.appendChild(dot); row.appendChild(info); row.appendChild(del);
+      this.laserListEl.appendChild(row);
+    });
+  }
+
+  private _rebuildLaserSwList(): void {
+    if (!this.laserSwListEl) return;
+    this.laserSwListEl.innerHTML = '';
+    if (this.laserSwitchEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:2px 0;';
+      empty.textContent = '스위치 없음';
+      this.laserSwListEl.appendChild(empty);
+      return;
+    }
+    this.laserSwitchEntries.forEach((e, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:11px;margin:2px 0;background:#1a2a1a;padding:3px 4px;border-radius:3px;';
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `${e.switchNodeId} [${e.type}] → ${e.laserIds.join(', ')}`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn'; del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => { this.laserSwitchEntries.splice(i, 1); this._rebuildLaserSwList(); });
+      row.appendChild(info); row.appendChild(del);
+      this.laserSwListEl.appendChild(row);
+    });
+  }
+
   /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
   private renderSwTargetList(el: HTMLElement): void {
     el.innerHTML = '';
@@ -3150,6 +3358,17 @@ export class LevelEditor {
             ...(e.color ? { color: e.color } : {}),
           }))
         : undefined,
+      lasers: this.laserEntries.length > 0
+        ? this.laserEntries.map(e => ({
+            id: e.id,
+            emitterAId: e.emitterAId,
+            emitterBId: e.emitterBId,
+            color: e.color,
+          }))
+        : undefined,
+      laserSwitches: this.laserSwitchEntries.length > 0
+        ? this.laserSwitchEntries.map(e => ({ ...e }))
+        : undefined,
       zones: this.zones.length > 0
         ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth }))
         : undefined,
@@ -3321,6 +3540,18 @@ export class LevelEditor {
       .reduce((a, b) => Math.max(a, b), 0);
     this.enemyCounter = maxEnemyNum;
     this._rebuildEnemyList();
+
+    // Lasers 복원
+    this.laserEntries = (data.lasers ?? []).map(e => ({
+      id: e.id, emitterAId: e.emitterAId, emitterBId: e.emitterBId, color: e.color ?? '#FF2020',
+    }));
+    const maxLaserNum = this.laserEntries
+      .map(e => { const m = e.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((a, b) => Math.max(a, b), 0);
+    this.laserCounter = maxLaserNum;
+    this.laserSwitchEntries = (data.laserSwitches ?? []).map(e => ({ ...e }));
+    this._rebuildLaserList();
+    this._rebuildLaserSwList();
 
     // initialCamera 복원
     this.initCam = data.initialCamera

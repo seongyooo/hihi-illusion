@@ -30,6 +30,7 @@ import { ElevatorManager }    from '../world/ElevatorManager';
 import { PatrolManager }      from '../world/PatrolManager';
 import { WorldRotateManager } from '../world/WorldRotateManager';
 import { EnemyManager }      from '../world/EnemyManager';
+import { LaserManager }      from '../world/LaserManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -69,6 +70,8 @@ export class GameManager {
   private elevatorMgr:      ElevatorManager    | null = null;
   private patrolMgr:        PatrolManager      | null = null;
   private enemyMgr:         EnemyManager       | null = null;
+  private laserMgr:         LaserManager       | null = null;
+  private laserSwitchMap:   Map<string, { laserIds: string[]; type: 'toggle' | 'hold' }> = new Map();
   private worldRotateMgr:   WorldRotateManager | null = null;
   private _teleportPadNodes: Array<[import('../world/PathGraph').PathNode, import('../world/PathGraph').PathNode]> = [];
   private tutorialSequencer: TutorialSequencer | null = null;
@@ -535,6 +538,27 @@ export class GameManager {
     }
     this.enemyMgr.setOnPlayerKilled(() => { this._respawn(); });
 
+    // LaserManager
+    const getEmitterPos = (blockId: string): THREE.Vector3 | null => {
+      const node = this.graph?.getNode(blockId);
+      if (node) return node.position.clone();
+      // walkable 아닌 블록: mesh worldPos + halfHeight
+      const blk = this.level?.blocks.get(blockId);
+      if (!blk) return null;
+      const wp = new THREE.Vector3();
+      blk.mesh.getWorldPosition(wp);
+      return wp; // 중심 Y 사용
+    };
+    this.laserMgr = new LaserManager(this.level.getGroup(), getEmitterPos);
+    if (data.lasers && data.lasers.length > 0) {
+      this.laserMgr.setup(data.lasers);
+    }
+    // laserSwitch 맵 구성
+    this.laserSwitchMap.clear();
+    for (const ls of data.laserSwitches ?? []) {
+      this.laserSwitchMap.set(ls.switchNodeId, { laserIds: ls.laserIds, type: ls.type });
+    }
+
     // WorldRotateManager — 맵 전체 회전 블록
     this.worldRotateMgr = new WorldRotateManager();
     if ((data.mapRotateBlocks ?? []).length > 0) {
@@ -599,10 +623,33 @@ export class GameManager {
         onDepart: (nodeId) => {
           this.audio.playStep();
           this.switchMgr?.onCharacterDepart(nodeId, this.graph!);
+          // hold 레이저 스위치 — 벗어나면 레이저 재활성
+          const lsDepart = this.laserSwitchMap.get(nodeId);
+          if (lsDepart?.type === 'hold') {
+            for (const lid of lsDepart.laserIds) this.laserMgr?.setActive(lid, true);
+          }
         },
         onArrival: (nodeId) => {
           // 가시 블록 — 즉시 리스폰 (blinking 타입은 가시가 표시 중일 때만)
           if (this.level!.getSpikeNodeIds().has(nodeId) && this.level!.isBlinkingSpikeActive(nodeId)) {
+            this._respawn();
+            return;
+          }
+
+          // 레이저 스위치 처리
+          const lsSwitch = this.laserSwitchMap.get(nodeId);
+          if (lsSwitch) {
+            if (lsSwitch.type === 'toggle') {
+              for (const lid of lsSwitch.laserIds) this.laserMgr?.toggleLaser(lid);
+            } else {
+              // hold: 서 있는 동안 레이저 꺼짐
+              for (const lid of lsSwitch.laserIds) this.laserMgr?.setActive(lid, false);
+            }
+          }
+
+          // 레이저 충돌 판정
+          const arrivedNodeForLaser = this.graph?.getNode(nodeId);
+          if (arrivedNodeForLaser && this.laserMgr?.isNodeInLaser(arrivedNodeForLaser)) {
             this._respawn();
             return;
           }
@@ -1095,6 +1142,9 @@ export class GameManager {
     this.patrolMgr = null;
     this.enemyMgr?.dispose();
     this.enemyMgr = null;
+    this.laserMgr?.dispose();
+    this.laserMgr = null;
+    this.laserSwitchMap.clear();
     this.worldRotateMgr?.dispose();
     this.worldRotateMgr = null;
     this.tutorialSequencer?.dispose();
@@ -1798,6 +1848,14 @@ export class GameManager {
     if (this.enemyMgr) {
       const playerNode = this.controller?.getCurrentNode() ?? null;
       this.enemyMgr.update(playerNode);
+    }
+    // 레이저 빔 위치 갱신 + 이동 중 충돌 체크
+    if (this.laserMgr) {
+      this.laserMgr.update();
+      const playerNode = this.controller?.getCurrentNode();
+      if (playerNode && this.laserMgr.isNodeInLaser(playerNode)) {
+        this._respawn();
+      }
     }
     this.renderer.render();
   }
