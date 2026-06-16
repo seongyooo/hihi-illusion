@@ -120,8 +120,8 @@ export class CannonManager {
     const speed    = def.speed  ?? 4;
     const duration = range / speed;
 
-    const ballGeo = new THREE.SphereGeometry(0.13, 8, 6);
-    const ballMat = new THREE.MeshBasicMaterial({ color: 0x222233 });
+    const ballGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+    const ballMat = new THREE.MeshLambertMaterial({ color: 0x222233 });
     const ball    = new THREE.Mesh(ballGeo, ballMat);
     ball.position.copy(origin);
     this.parent.add(ball);
@@ -143,6 +143,13 @@ export class CannonManager {
         (ball.material as THREE.Material).dispose();
       },
     });
+    // 날아가면서 살짝 회전
+    gsap.to(ball.rotation, {
+      x: Math.PI * 4 * (dirVec.z !== 0 ? 1 : 0),
+      z: Math.PI * 4 * (dirVec.x !== 0 ? 1 : 0),
+      duration,
+      ease: 'none',
+    });
   }
 
   private _dirFromStr(dir: 'x+' | 'x-' | 'z+' | 'z-'): THREE.Vector3 {
@@ -156,28 +163,25 @@ export class CannonManager {
 
   private _buildCannonMesh(color: THREE.Color, dir: THREE.Vector3): THREE.Group {
     const group = new THREE.Group();
-    const mat   = new THREE.MeshLambertMaterial({ color });
 
-    // 받침대
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.14, 0.44), mat.clone() as THREE.MeshLambertMaterial);
-    base.position.y = 0.07;
-    group.add(base);
-
-    // 몸통 (원기둥)
-    const bodyGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.22, 8);
-    const body    = new THREE.Mesh(bodyGeo, mat.clone() as THREE.MeshLambertMaterial);
-    body.position.y = 0.25;
+    // 메인 블록 (일반 블록과 동일한 비율 0.5h)
+    const bodyMat = new THREE.MeshLambertMaterial({ color });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.46, 0.82), bodyMat);
+    body.position.y = 0.23;
+    body.castShadow = true;
     group.add(body);
 
-    // 포신 (방향으로 회전된 원기둥)
-    const barrelGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.48, 8);
-    const barrel    = new THREE.Mesh(barrelGeo, mat.clone() as THREE.MeshLambertMaterial);
-    // 기본 cylinder은 Y축. dir 방향으로 회전
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    barrel.quaternion.copy(q);
-    // 포신 끝이 dir 방향으로 나오도록 위치 설정
-    barrel.position.set(dir.x * 0.24, 0.22, dir.z * 0.24);
-    group.add(barrel);
+    // 발사 방향 표시: 앞면에 돌출된 작은 큐브 노치
+    const notchMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(color).multiplyScalar(1.5) });
+    const notch = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), notchMat);
+    notch.position.set(dir.x * 0.44, 0.23, dir.z * 0.44);
+    group.add(notch);
+
+    // 윗면 발광 인디케이터 (방향 화살표 대신 작은 밝은 큐브)
+    const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.5) });
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.14), glowMat);
+    glow.position.set(dir.x * 0.2, 0.5, dir.z * 0.2);
+    group.add(glow);
 
     return group;
   }
