@@ -72,6 +72,7 @@ export class GameManager {
   private enemyMgr:         EnemyManager       | null = null;
   private laserMgr:         LaserManager       | null = null;
   private laserSwitchMap:   Map<string, { laserIds: string[]; type: 'toggle' | 'hold' }> = new Map();
+  private laserSwitchMarkers: THREE.Object3D[] = [];
   private worldRotateMgr:   WorldRotateManager | null = null;
   private _teleportPadNodes: Array<[import('../world/PathGraph').PathNode, import('../world/PathGraph').PathNode]> = [];
   private tutorialSequencer: TutorialSequencer | null = null;
@@ -542,21 +543,38 @@ export class GameManager {
     const getEmitterPos = (blockId: string): THREE.Vector3 | null => {
       const node = this.graph?.getNode(blockId);
       if (node) return node.position.clone();
-      // walkable 아닌 블록: mesh worldPos + halfHeight
+      // walkable 아닌 블록: mesh worldPos + halfHeight (윗면 Y)
       const blk = this.level?.blocks.get(blockId);
       if (!blk) return null;
+      const bd = data.blocks.find(b => b.id === blockId);
       const wp = new THREE.Vector3();
       blk.mesh.getWorldPosition(wp);
-      return wp; // 중심 Y 사용
+      wp.y += (bd?.size[1] ?? 1) / 2; // 중심 → 윗면
+      return wp;
     };
     this.laserMgr = new LaserManager(this.level.getGroup(), getEmitterPos);
     if (data.lasers && data.lasers.length > 0) {
       this.laserMgr.setup(data.lasers);
     }
-    // laserSwitch 맵 구성
+    // laserSwitch 맵 구성 + 시각 마커
     this.laserSwitchMap.clear();
+    for (const m of this.laserSwitchMarkers) m.removeFromParent();
+    this.laserSwitchMarkers = [];
     for (const ls of data.laserSwitches ?? []) {
       this.laserSwitchMap.set(ls.switchNodeId, { laserIds: ls.laserIds, type: ls.type });
+      // 스위치 노드 위에 발광 링 마커 추가
+      const swNode = this.graph?.getNode(ls.switchNodeId);
+      if (swNode) {
+        const markerColor = ls.type === 'toggle' ? 0xFF6600 : 0xFF9900;
+        const ringGeo = new THREE.TorusGeometry(0.38, 0.045, 6, 20);
+        const ringMat = new THREE.MeshBasicMaterial({ color: markerColor, transparent: true, opacity: 0.9 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(swNode.position.x, swNode.position.y + 0.05, swNode.position.z);
+        this.level.getGroup().add(ring);
+        this.laserSwitchMarkers.push(ring);
+        gsap.to(ringMat, { opacity: 0.3, duration: 0.7, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+      }
     }
 
     // WorldRotateManager — 맵 전체 회전 블록
@@ -1145,6 +1163,13 @@ export class GameManager {
     this.laserMgr?.dispose();
     this.laserMgr = null;
     this.laserSwitchMap.clear();
+    for (const m of this.laserSwitchMarkers) {
+      gsap.killTweensOf((m as THREE.Mesh).material);
+      m.removeFromParent();
+      (m as THREE.Mesh).geometry?.dispose();
+      ((m as THREE.Mesh).material as THREE.Material)?.dispose();
+    }
+    this.laserSwitchMarkers = [];
     this.worldRotateMgr?.dispose();
     this.worldRotateMgr = null;
     this.tutorialSequencer?.dispose();

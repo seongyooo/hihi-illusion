@@ -4,7 +4,7 @@ import type { LaserDef } from './Level';
 import type { PathNode } from './PathGraph';
 
 /** 플레이어 노드 중심이 빔 선분에 이 거리 이내면 사망 */
-const HIT_RADIUS = 0.42;
+const HIT_RADIUS = 0.55;
 
 interface LaserState {
   def:    LaserDef;
@@ -170,16 +170,14 @@ export class LaserManager {
     const len2 = abx*abx + aby*aby + abz*abz;
     if (len2 < 0.001) return false;
 
-    // 선분 위 투영 비율 (0~1)
+    // 선분 위 투영 비율 (0~1 클램프)
     const t = (apx*abx + apy*aby + apz*abz) / len2;
-    // 이미터 블록 자체(양 끝 5%)는 안전 구간
-    if (t <= 0.05 || t >= 0.95) return false;
+    if (t < 0 || t > 1) return false;
 
     // 선분 위 가장 가까운 점까지 거리²
-    const tc = Math.max(0, Math.min(1, t));
-    const dx = p.x - (a.x + tc * abx);
-    const dy = p.y - (a.y + tc * aby);
-    const dz = p.z - (a.z + tc * abz);
+    const dx = p.x - (a.x + t * abx);
+    const dy = p.y - (a.y + t * aby);
+    const dz = p.z - (a.z + t * abz);
     return dx*dx + dy*dy + dz*dz < HIT_RADIUS * HIT_RADIUS;
   }
 }
