@@ -78,6 +78,15 @@ interface CannonEntry {
   color:       string;
 }
 
+interface IcicleEntry {
+  id:          string;
+  nodeId:      string;
+  interval:    number;
+  startDelay:  number;
+  warningTime: number;
+  color:       string;
+}
+
 interface SwitchConn {
   switchNodeId: string;
   targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
@@ -164,6 +173,9 @@ export class LevelEditor {
   private cannonEntries: CannonEntry[] = [];
   private cannonCounter = 0;
   private cannonListEl: HTMLElement | null = null;
+  private icicleEntries: IcicleEntry[] = [];
+  private icicleCounter = 0;
+  private icicleListEl: HTMLElement | null = null;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
   private static readonly ZONE_COLORS = [
     0xFF6B6B, // 빨강
@@ -1933,6 +1945,93 @@ export class LevelEditor {
       });
     }));
 
+    // Icicles
+    p.appendChild(this.buildSection('ICICLES', (sec) => {
+      this.icicleListEl = document.createElement('div');
+      sec.appendChild(this.icicleListEl);
+      this._rebuildIcicleList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Icicle';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-add-form';
+      sec.appendChild(form);
+
+      addBtn.addEventListener('click', () => form.classList.toggle('open'));
+
+      const makeRow = (label: string, el: HTMLElement) => {
+        const row = document.createElement('div');
+        row.className = 'editor-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.style.cssText = 'min-width:84px;font-size:11px;color:#aaa;';
+        row.appendChild(lbl); row.appendChild(el);
+        form.appendChild(row);
+        return el;
+      };
+
+      // Node + Pick
+      const nodeRow = document.createElement('div');
+      nodeRow.className = 'editor-row';
+      const nodeLbl = document.createElement('label');
+      nodeLbl.textContent = 'Node';
+      nodeLbl.style.cssText = 'min-width:84px;font-size:11px;color:#aaa;';
+      const nidInp = document.createElement('input');
+      nidInp.className = 'editor-input'; nidInp.style.flex = '1';
+      nidInp.placeholder = 'Node ID';
+      const pickBtn = document.createElement('button');
+      pickBtn.className = 'editor-btn'; pickBtn.textContent = '↗';
+      pickBtn.title = '블록 클릭으로 선택';
+      pickBtn.addEventListener('click', () => this.startPick(b => { nidInp.value = b.id; }));
+      nodeRow.appendChild(nodeLbl); nodeRow.appendChild(nidInp); nodeRow.appendChild(pickBtn);
+      form.appendChild(nodeRow);
+
+      const intInp = document.createElement('input');
+      intInp.className = 'editor-input'; intInp.type = 'number';
+      intInp.min = '0.5'; intInp.step = '0.5'; intInp.value = '3';
+      makeRow('Interval (s)', intInp);
+
+      const delInp = document.createElement('input');
+      delInp.className = 'editor-input'; delInp.type = 'number';
+      delInp.min = '0'; delInp.step = '0.1'; delInp.value = '0';
+      makeRow('Delay (s)', delInp);
+
+      const warnInp = document.createElement('input');
+      warnInp.className = 'editor-input'; warnInp.type = 'number';
+      warnInp.min = '0.1'; warnInp.step = '0.1'; warnInp.value = '0.5';
+      makeRow('Warning (s)', warnInp);
+
+      const clInp = document.createElement('input');
+      clInp.type = 'color'; clInp.value = '#aaddff';
+      clInp.className = 'editor-input';
+      makeRow('Color', clInp);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn primary';
+      confirmBtn.textContent = 'Add';
+      confirmBtn.style.marginTop = '4px';
+      form.appendChild(confirmBtn);
+
+      confirmBtn.addEventListener('click', () => {
+        const nid = nidInp.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        this.icicleEntries.push({
+          id: `icicle_${++this.icicleCounter}`,
+          nodeId:      nid,
+          interval:    parseFloat(intInp.value)  || 3,
+          startDelay:  parseFloat(delInp.value)  || 0,
+          warningTime: parseFloat(warnInp.value) || 0.5,
+          color:       clInp.value,
+        });
+        this._rebuildIcicleList();
+        nidInp.value = '';
+        form.classList.remove('open');
+      });
+    }));
+
     // Camera
     p.appendChild(this.buildSection('CAMERA', (sec) => {
       // 슬라이더 헬퍼
@@ -3007,6 +3106,102 @@ export class LevelEditor {
     });
   }
 
+  private _rebuildIcicleList(): void {
+    if (!this.icicleListEl) return;
+    this.icicleListEl.innerHTML = '';
+    if (this.icicleEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '고드름 없음';
+      this.icicleListEl.appendChild(empty);
+      return;
+    }
+    this.icicleEntries.forEach((e, i) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'margin:2px 0;';
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;background:#1a1a2e;padding:3px 4px;border-radius:3px;';
+      const dot = document.createElement('span');
+      dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${e.color};flex-shrink:0;`;
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `${e.nodeId} ×${e.interval}s warn:${e.warningTime}s`;
+      const editBtn = document.createElement('button');
+      editBtn.className = 'editor-btn'; editBtn.textContent = '✎';
+      editBtn.style.cssText = 'padding:1px 6px;font-size:11px;';
+      const del = document.createElement('button');
+      del.className = 'editor-btn'; del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => { this.icicleEntries.splice(i, 1); this._rebuildIcicleList(); });
+      row.appendChild(dot); row.appendChild(info); row.appendChild(editBtn); row.appendChild(del);
+      wrap.appendChild(row);
+
+      const editForm = document.createElement('div');
+      editForm.className = 'editor-add-form';
+      editForm.style.cssText = 'margin-top:2px;padding:6px;background:#111122;border-radius:3px;';
+      wrap.appendChild(editForm);
+
+      const makeField = (label: string, el: HTMLElement) => {
+        const r = document.createElement('div'); r.className = 'editor-row';
+        const lbl = document.createElement('label');
+        lbl.textContent = label; lbl.style.cssText = 'min-width:84px;font-size:11px;color:#aaa;';
+        r.appendChild(lbl); r.appendChild(el); editForm.appendChild(r); return el;
+      };
+
+      const enodeRow = document.createElement('div'); enodeRow.className = 'editor-row';
+      const enodeLbl = document.createElement('label');
+      enodeLbl.textContent = 'Node'; enodeLbl.style.cssText = 'min-width:84px;font-size:11px;color:#aaa;';
+      const enidInp = document.createElement('input');
+      enidInp.className = 'editor-input'; enidInp.style.flex = '1'; enidInp.value = e.nodeId;
+      const epickBtn = document.createElement('button');
+      epickBtn.className = 'editor-btn'; epickBtn.textContent = '↗';
+      epickBtn.addEventListener('click', () => this.startPick(b => { enidInp.value = b.id; }));
+      enodeRow.appendChild(enodeLbl); enodeRow.appendChild(enidInp); enodeRow.appendChild(epickBtn);
+      editForm.appendChild(enodeRow);
+
+      const eintInp = document.createElement('input');
+      eintInp.className = 'editor-input'; eintInp.type = 'number';
+      eintInp.min = '0.5'; eintInp.step = '0.5'; eintInp.value = String(e.interval);
+      makeField('Interval (s)', eintInp);
+
+      const edelInp = document.createElement('input');
+      edelInp.className = 'editor-input'; edelInp.type = 'number';
+      edelInp.min = '0'; edelInp.step = '0.1'; edelInp.value = String(e.startDelay);
+      makeField('Delay (s)', edelInp);
+
+      const ewarnInp = document.createElement('input');
+      ewarnInp.className = 'editor-input'; ewarnInp.type = 'number';
+      ewarnInp.min = '0.1'; ewarnInp.step = '0.1'; ewarnInp.value = String(e.warningTime);
+      makeField('Warning (s)', ewarnInp);
+
+      const eclInp = document.createElement('input');
+      eclInp.type = 'color'; eclInp.value = e.color; eclInp.className = 'editor-input';
+      makeField('Color', eclInp);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'editor-btn primary'; saveBtn.textContent = 'Save';
+      saveBtn.style.marginTop = '4px';
+      saveBtn.addEventListener('click', () => {
+        const nid = enidInp.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        this.icicleEntries[i] = {
+          ...e,
+          nodeId:      nid,
+          interval:    parseFloat(eintInp.value)  || 3,
+          startDelay:  parseFloat(edelInp.value)  || 0,
+          warningTime: parseFloat(ewarnInp.value) || 0.5,
+          color:       eclInp.value,
+        };
+        this._rebuildIcicleList();
+      });
+      editForm.appendChild(saveBtn);
+
+      editBtn.addEventListener('click', () => editForm.classList.toggle('open'));
+      this.icicleListEl!.appendChild(wrap);
+    });
+  }
+
   /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
   private renderSwTargetList(el: HTMLElement): void {
     el.innerHTML = '';
@@ -3639,6 +3834,16 @@ export class LevelEditor {
             ...(e.color !== '#555566'? { color: e.color }           : {}),
           }))
         : undefined,
+      icicles: this.icicleEntries.length > 0
+        ? this.icicleEntries.map(e => ({
+            id: e.id,
+            nodeId: e.nodeId,
+            interval: e.interval,
+            ...(e.startDelay  !== 0   ? { startDelay:  e.startDelay }  : {}),
+            ...(e.warningTime !== 0.5 ? { warningTime: e.warningTime } : {}),
+            ...(e.color !== '#aaddff' ? { color: e.color }             : {}),
+          }))
+        : undefined,
       zones: this.zones.length > 0
         ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth }))
         : undefined,
@@ -3839,6 +4044,21 @@ export class LevelEditor {
       .reduce((a, b) => Math.max(a, b), 0);
     this.cannonCounter = maxCannonNum;
     this._rebuildCannonList();
+
+    // Icicles 복원
+    this.icicleEntries = (data.icicles ?? []).map(e => ({
+      id:          e.id,
+      nodeId:      e.nodeId,
+      interval:    e.interval,
+      startDelay:  e.startDelay  ?? 0,
+      warningTime: e.warningTime ?? 0.5,
+      color:       e.color ?? '#aaddff',
+    }));
+    const maxIcicleNum = this.icicleEntries
+      .map(e => { const m = e.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((a, b) => Math.max(a, b), 0);
+    this.icicleCounter = maxIcicleNum;
+    this._rebuildIcicleList();
 
     // initialCamera 복원
     this.initCam = data.initialCamera

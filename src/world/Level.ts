@@ -142,6 +142,15 @@ export interface EnemyDef {
   bounceAxis?:   'x' | 'z';
 }
 
+export interface IcicleDef {
+  id:           string;
+  nodeId:       string;    // 고드름이 달릴 블록 ID
+  interval:     number;    // 낙하 주기 (초)
+  startDelay?:  number;    // 첫 낙하까지 딜레이 (초)
+  warningTime?: number;    // 낙하 전 경고 흔들림 시간 (기본 0.5)
+  color?:       string;    // hex, 기본 '#aaddff'
+}
+
 export interface LevelData {
   id: string;
   name: string;
@@ -197,6 +206,7 @@ export interface LevelData {
     type:         'toggle' | 'hold';
   }>;
   cannons?: CannonDef[];
+  icicles?: IcicleDef[];
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string; flipped?: boolean };
