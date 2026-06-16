@@ -24,8 +24,7 @@ export class LaserManager {
   private getEmitterPos: (blockId: string) => THREE.Vector3 | null;
 
   private readonly _tmp = new THREE.Vector3();
-  private readonly _ab  = new THREE.Vector3();
-  private readonly _ap  = new THREE.Vector3();
+  private readonly _dir = new THREE.Vector3();
 
   /**
    * @param parent       빔이 소속될 씬/그룹 (levelGroup 권장 — 맵 회전 시 함께 움직임)
@@ -146,14 +145,12 @@ export class LaserManager {
   private _applyGeometry(s: LaserState): void {
     const { posA, posB, core, glow, capA, capB } = s;
 
-    this._tmp.addVectors(posA, posB).multiplyScalar(0.5); // midpoint
+    this._tmp.addVectors(posA, posB).multiplyScalar(0.5);
     const length = posA.distanceTo(posB);
 
-    this._ab.subVectors(posB, posA).normalize();
-    const q = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      length > 0.001 ? this._ab : new THREE.Vector3(0, 1, 0),
-    );
+    this._dir.subVectors(posB, posA);
+    const dirNorm = length > 0.001 ? this._dir.clone().normalize() : new THREE.Vector3(0, 1, 0);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirNorm);
 
     for (const mesh of [core, glow]) {
       mesh.position.copy(this._tmp);
@@ -165,15 +162,24 @@ export class LaserManager {
     capB.position.copy(posB);
   }
 
-  /** 점 p가 선분 [a,b] 에서 HIT_RADIUS 이내인지 (이미터 양 끝 제외) */
+  /** 점 p가 선분 [a,b]에서 HIT_RADIUS 이내인지 — 완전 로컬 연산 */
   private _hitTest(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): boolean {
-    this._ab.subVectors(b, a);
-    this._ap.subVectors(p, a);
-    const len2 = this._ab.dot(this._ab);
+    // AB 벡터 (스칼라 성분)
+    const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+    const apx = p.x - a.x, apy = p.y - a.y, apz = p.z - a.z;
+    const len2 = abx*abx + aby*aby + abz*abz;
     if (len2 < 0.001) return false;
-    const t = this._ap.dot(this._ab) / len2;
-    if (t <= 0.08 || t >= 0.92) return false;   // 이미터 블록 자체는 안전
-    this._tmp.copy(a).addScaledVector(this._ab, Math.max(0, Math.min(1, t)));
-    return p.distanceTo(this._tmp) < HIT_RADIUS;
+
+    // 선분 위 투영 비율 (0~1)
+    const t = (apx*abx + apy*aby + apz*abz) / len2;
+    // 이미터 블록 자체(양 끝 5%)는 안전 구간
+    if (t <= 0.05 || t >= 0.95) return false;
+
+    // 선분 위 가장 가까운 점까지 거리²
+    const tc = Math.max(0, Math.min(1, t));
+    const dx = p.x - (a.x + tc * abx);
+    const dy = p.y - (a.y + tc * aby);
+    const dz = p.z - (a.z + tc * abz);
+    return dx*dx + dy*dy + dz*dz < HIT_RADIUS * HIT_RADIUS;
   }
 }
