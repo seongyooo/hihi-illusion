@@ -384,6 +384,42 @@ canvas {
   border-color: rgba(245, 240, 232, 0.35);
 }
 
+.stage-select__page-nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stage-select__page-btn {
+  font-family: 'Georgia', serif;
+  font-size: clamp(11px, 2.5vw, 13px);
+  letter-spacing: 0.2em;
+  color: rgba(245, 240, 232, 0.6);
+  background: transparent;
+  border: 1px solid rgba(245, 240, 232, 0.2);
+  padding: 8px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.stage-select__page-btn:hover:not(:disabled) {
+  color: #f5f0e8;
+  border-color: rgba(245, 240, 232, 0.55);
+}
+
+.stage-select__page-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.stage-select__page-label {
+  font-family: 'Georgia', serif;
+  font-size: clamp(11px, 2.5vw, 13px);
+  letter-spacing: 0.25em;
+  color: rgba(245, 240, 232, 0.4);
+}
+
 /* ── Level Editor ──────────────────────────────── */
 .editor-overlay {
   position: absolute;

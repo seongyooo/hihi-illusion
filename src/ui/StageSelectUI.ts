@@ -2,11 +2,12 @@ import { CustomLevelStore } from '../editor/CustomLevelStore';
 import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { ProgressStore }     from '../core/ProgressStore';
 
-const TOTAL_STAGES       = 30;
+const PAGE_SIZE          = 30;
 const BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS);
 
 export class StageSelectUI {
   private el: HTMLElement;
+  private currentPage = 1;
   onSelect:   (stageNum: number) => void = () => {};
   onBack:     () => void = () => {};
   onTutorial: () => void = () => {};
@@ -25,20 +26,35 @@ export class StageSelectUI {
     container.appendChild(this.el);
   }
 
+  private getTotalStages(): number {
+    const maxCustom = CUSTOM_STAGE_NUMS.length > 0
+      ? Math.max(...CUSTOM_STAGE_NUMS)
+      : 0;
+    return Math.max(maxCustom, PAGE_SIZE);
+  }
+
   private buildGrid(): void {
     const back = this.el.querySelector('.stage-select__back');
     this.el.innerHTML = '';
     if (back) this.el.appendChild(back);
 
+    const totalStages = this.getTotalStages();
+    const totalPages  = Math.ceil(totalStages / PAGE_SIZE);
+
     const title = document.createElement('h2');
     title.className = 'stage-select__title';
-    title.textContent = 'SELECT STAGE';
+    title.textContent = totalPages > 1
+      ? `SELECT STAGE  ·  ${this.currentPage} / ${totalPages}`
+      : 'SELECT STAGE';
     this.el.appendChild(title);
 
     const grid = document.createElement('div');
     grid.className = 'stage-select__grid';
 
-    for (let i = 1; i <= TOTAL_STAGES; i++) {
+    const startStage = (this.currentPage - 1) * PAGE_SIZE + 1;
+    const endStage   = Math.min(this.currentPage * PAGE_SIZE, totalStages);
+
+    for (let i = startStage; i <= endStage; i++) {
       const btn = document.createElement('button');
       btn.className = 'stage-select__cell';
       btn.textContent = String(i);
@@ -52,12 +68,10 @@ export class StageSelectUI {
         btn.addEventListener('click', () => this.onSelect(i));
         if (isCustom) btn.title = CustomLevelStore.getByStage(i)!.data.name;
       } else if (hasContent && !isUnlocked) {
-        // 콘텐츠는 있지만 아직 잠긴 스테이지
         btn.classList.add('locked', 'locked--progress');
         btn.disabled = true;
         btn.title = '이전 스테이지를 클리어하세요';
       } else {
-        // 콘텐츠 없음
         btn.classList.add('locked');
         btn.disabled = true;
       }
@@ -66,6 +80,39 @@ export class StageSelectUI {
     }
 
     this.el.appendChild(grid);
+
+    // 페이지 네비게이션
+    if (totalPages > 1) {
+      const nav = document.createElement('div');
+      nav.className = 'stage-select__page-nav';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'stage-select__page-btn';
+      prevBtn.textContent = '← PREV';
+      prevBtn.disabled = this.currentPage <= 1;
+      prevBtn.addEventListener('click', () => {
+        this.currentPage--;
+        this.buildGrid();
+      });
+
+      const pageLabel = document.createElement('span');
+      pageLabel.className = 'stage-select__page-label';
+      pageLabel.textContent = `${this.currentPage} / ${totalPages}`;
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'stage-select__page-btn';
+      nextBtn.textContent = 'NEXT →';
+      nextBtn.disabled = this.currentPage >= totalPages;
+      nextBtn.addEventListener('click', () => {
+        this.currentPage++;
+        this.buildGrid();
+      });
+
+      nav.appendChild(prevBtn);
+      nav.appendChild(pageLabel);
+      nav.appendChild(nextBtn);
+      this.el.appendChild(nav);
+    }
 
     // 튜토리얼 다시하기 버튼 (튜토리얼 완료한 경우에만 표시)
     if (ProgressStore.isTutorialDone()) {
@@ -78,7 +125,8 @@ export class StageSelectUI {
   }
 
   show(): void {
-    this.buildGrid();  // rebuild so custom stages and progress are reflected
+    this.currentPage = 1;
+    this.buildGrid();
     requestAnimationFrame(() => this.el.classList.add('visible'));
   }
 
