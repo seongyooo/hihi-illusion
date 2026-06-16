@@ -108,16 +108,14 @@ export class Enemy {
 
   private _findBounceNeighbor(axis: 'x' | 'z', dir: number): PathNode | null {
     const pos = this.currentNode.position;
-    const PERP_MAX = 0.3;
     let best: PathNode | null = null;
     let bestDist = Infinity;
     for (const nb of this.currentNode.neighbors) {
-      const dx = nb.position.x - pos.x;
-      const dz = nb.position.z - pos.z;
-      const axisVal = axis === 'x' ? dx : dz;
-      const perpVal = axis === 'x' ? dz : dx;
-      if (Math.abs(perpVal) > PERP_MAX) continue;
-      if (Math.sign(axisVal) !== dir) continue;
+      const axisVal = axis === 'x'
+        ? nb.position.x - pos.x
+        : nb.position.z - pos.z;
+      // 바운스 방향 성분이 양수인 이웃만 선택 (착시 엣지 포함)
+      if (axisVal * dir <= 0.3) continue;
       const dist = Math.abs(axisVal);
       if (dist < bestDist) { bestDist = dist; best = nb; }
     }
