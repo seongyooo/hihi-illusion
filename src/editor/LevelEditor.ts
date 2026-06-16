@@ -67,6 +67,17 @@ interface LaserSwitchEntry {
   type:         'toggle' | 'hold';
 }
 
+interface CannonEntry {
+  id:          string;
+  nodeId:      string;
+  direction:   'x+' | 'x-' | 'z+' | 'z-';
+  interval:    number;
+  speed:       number;
+  startDelay:  number;
+  range:       number;
+  color:       string;
+}
+
 interface SwitchConn {
   switchNodeId: string;
   targets:      SwitchTarget[];   // 타깃별 moveTarget 개별 지원
@@ -150,6 +161,9 @@ export class LevelEditor {
   private laserEntries: LaserEntry[] = [];
   private laserCounter = 0;
   private laserSwitchEntries: LaserSwitchEntry[] = [];
+  private cannonEntries: CannonEntry[] = [];
+  private cannonCounter = 0;
+  private cannonListEl: HTMLElement | null = null;
   private zoneOverlays: Map<string, THREE.Mesh> = new Map();
   private static readonly ZONE_COLORS = [
     0xFF6B6B, // 빨강
@@ -1804,6 +1818,93 @@ export class LevelEditor {
       addSwBtn.addEventListener('click', () => swForm.classList.toggle('open'));
     }));
 
+    // Cannons
+    p.appendChild(this.buildSection('CANNONS', (sec) => {
+      this.cannonListEl = document.createElement('div');
+      sec.appendChild(this.cannonListEl);
+      this._rebuildCannonList();
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'editor-btn';
+      addBtn.textContent = '+ Add Cannon';
+      sec.appendChild(addBtn);
+
+      const form = document.createElement('div');
+      form.className = 'editor-form';
+      form.style.display = 'none';
+      sec.appendChild(form);
+
+      addBtn.addEventListener('click', () => {
+        form.style.display = form.style.display === 'none' ? '' : 'none';
+      });
+
+      const nidInp = document.createElement('input');
+      nidInp.className = 'editor-input';
+      nidInp.placeholder = 'Node ID';
+      form.appendChild(nidInp);
+
+      const dirSel = document.createElement('select');
+      dirSel.className = 'editor-input';
+      for (const d of ['x+', 'x-', 'z+', 'z-']) {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = d;
+        dirSel.appendChild(opt);
+      }
+      form.appendChild(dirSel);
+
+      const intInp = document.createElement('input');
+      intInp.className = 'editor-input';
+      intInp.type = 'number'; intInp.min = '0.2'; intInp.step = '0.1'; intInp.value = '2';
+      intInp.placeholder = 'Interval (s)';
+      form.appendChild(intInp);
+
+      const spdInp = document.createElement('input');
+      spdInp.className = 'editor-input';
+      spdInp.type = 'number'; spdInp.min = '1'; spdInp.step = '0.5'; spdInp.value = '4';
+      spdInp.placeholder = 'Speed (u/s)';
+      form.appendChild(spdInp);
+
+      const rngInp = document.createElement('input');
+      rngInp.className = 'editor-input';
+      rngInp.type = 'number'; rngInp.min = '1'; rngInp.step = '1'; rngInp.value = '10';
+      rngInp.placeholder = 'Range';
+      form.appendChild(rngInp);
+
+      const delInp = document.createElement('input');
+      delInp.className = 'editor-input';
+      delInp.type = 'number'; delInp.min = '0'; delInp.step = '0.1'; delInp.value = '0';
+      delInp.placeholder = 'Start delay (s)';
+      form.appendChild(delInp);
+
+      const clInp = document.createElement('input');
+      clInp.type = 'color'; clInp.value = '#555566';
+      clInp.className = 'editor-input';
+      form.appendChild(clInp);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'editor-btn';
+      confirmBtn.textContent = 'Add';
+      form.appendChild(confirmBtn);
+
+      confirmBtn.addEventListener('click', () => {
+        const nid = nidInp.value.trim();
+        if (!nid) { alert('Node ID를 입력하세요.'); return; }
+        this.cannonEntries.push({
+          id: `cannon_${++this.cannonCounter}`,
+          nodeId: nid,
+          direction: dirSel.value as 'x+' | 'x-' | 'z+' | 'z-',
+          interval: parseFloat(intInp.value) || 2,
+          speed: parseFloat(spdInp.value) || 4,
+          range: parseFloat(rngInp.value) || 10,
+          startDelay: parseFloat(delInp.value) || 0,
+          color: clInp.value,
+        });
+        this._rebuildCannonList();
+        nidInp.value = '';
+        form.style.display = 'none';
+      });
+    }));
+
     // Camera
     p.appendChild(this.buildSection('CAMERA', (sec) => {
       // 슬라이더 헬퍼
@@ -2749,6 +2850,33 @@ export class LevelEditor {
     });
   }
 
+  private _rebuildCannonList(): void {
+    if (!this.cannonListEl) return;
+    this.cannonListEl.innerHTML = '';
+    if (this.cannonEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:#888;margin:4px 0;';
+      empty.textContent = '대포 없음';
+      this.cannonListEl.appendChild(empty);
+      return;
+    }
+    this.cannonEntries.forEach((e, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;margin:2px 0;background:#1a1a2e;padding:3px 4px;border-radius:3px;';
+      const dot = document.createElement('span');
+      dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${e.color};flex-shrink:0;`;
+      const info = document.createElement('span');
+      info.style.flex = '1';
+      info.textContent = `${e.id}: ${e.nodeId} ${e.direction} ×${e.interval}s`;
+      const del = document.createElement('button');
+      del.className = 'editor-btn'; del.textContent = '✕';
+      del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', () => { this.cannonEntries.splice(i, 1); this._rebuildCannonList(); });
+      row.appendChild(dot); row.appendChild(info); row.appendChild(del);
+      this.cannonListEl!.appendChild(row);
+    });
+  }
+
   /** swPendingTargets를 기반으로 #sw-target-list 내용을 렌더링 */
   private renderSwTargetList(el: HTMLElement): void {
     el.innerHTML = '';
@@ -3369,6 +3497,18 @@ export class LevelEditor {
       laserSwitches: this.laserSwitchEntries.length > 0
         ? this.laserSwitchEntries.map(e => ({ ...e }))
         : undefined,
+      cannons: this.cannonEntries.length > 0
+        ? this.cannonEntries.map(e => ({
+            id: e.id,
+            nodeId: e.nodeId,
+            direction: e.direction,
+            interval: e.interval,
+            ...(e.speed !== 4        ? { speed: e.speed }           : {}),
+            ...(e.startDelay !== 0   ? { startDelay: e.startDelay } : {}),
+            ...(e.range !== 10       ? { range: e.range }           : {}),
+            ...(e.color !== '#555566'? { color: e.color }           : {}),
+          }))
+        : undefined,
       zones: this.zones.length > 0
         ? this.zones.map(z => ({ id: z.id, gridX: z.gridX, gridZ: z.gridZ, width: z.width, depth: z.depth }))
         : undefined,
@@ -3552,6 +3692,23 @@ export class LevelEditor {
     this.laserSwitchEntries = (data.laserSwitches ?? []).map(e => ({ ...e }));
     this._rebuildLaserList();
     this._rebuildLaserSwList();
+
+    // Cannons 복원
+    this.cannonEntries = (data.cannons ?? []).map(e => ({
+      id: e.id,
+      nodeId: e.nodeId,
+      direction: e.direction,
+      interval: e.interval,
+      speed: e.speed ?? 4,
+      startDelay: e.startDelay ?? 0,
+      range: e.range ?? 10,
+      color: e.color ?? '#555566',
+    }));
+    const maxCannonNum = this.cannonEntries
+      .map(e => { const m = e.id.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; })
+      .reduce((a, b) => Math.max(a, b), 0);
+    this.cannonCounter = maxCannonNum;
+    this._rebuildCannonList();
 
     // initialCamera 복원
     this.initCam = data.initialCamera

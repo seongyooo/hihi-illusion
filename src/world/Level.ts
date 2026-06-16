@@ -120,6 +120,17 @@ export interface LaserDef {
   color?:     string;  // hex, 기본 '#FF2020'
 }
 
+export interface CannonDef {
+  id:          string;
+  nodeId:      string;              // 대포가 올라갈 블록 ID
+  direction:   'x+' | 'x-' | 'z+' | 'z-';
+  interval:    number;              // 발사 간격 (초)
+  speed?:      number;              // 포탄 속도 (units/s), 기본 4
+  startDelay?: number;              // 첫 발사 딜레이 (초), 기본 0
+  range?:      number;              // 최대 사거리, 기본 10
+  color?:      string;              // hex, 기본 '#555566'
+}
+
 export interface EnemyDef {
   id:            string;
   startNodeId:   string;
@@ -185,6 +196,7 @@ export interface LevelData {
     laserIds:     string[];
     type:         'toggle' | 'hold';
   }>;
+  cannons?: CannonDef[];
   zones?: ZoneDef[];
   character: { startNodeId: string };
   midpoint?: { blockId: string; flipped?: boolean };

@@ -31,6 +31,7 @@ import { PatrolManager }      from '../world/PatrolManager';
 import { WorldRotateManager } from '../world/WorldRotateManager';
 import { EnemyManager }      from '../world/EnemyManager';
 import { LaserManager }      from '../world/LaserManager';
+import { CannonManager }   from '../world/CannonManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
@@ -73,6 +74,7 @@ export class GameManager {
   private laserMgr:         LaserManager       | null = null;
   private laserSwitchMap:   Map<string, { laserIds: string[]; type: 'toggle' | 'hold' }> = new Map();
   private laserSwitchMarkers: THREE.Object3D[] = [];
+  private cannonMgr: CannonManager | null = null;
   private worldRotateMgr:   WorldRotateManager | null = null;
   private _teleportPadNodes: Array<[import('../world/PathGraph').PathNode, import('../world/PathGraph').PathNode]> = [];
   private tutorialSequencer: TutorialSequencer | null = null;
@@ -577,6 +579,15 @@ export class GameManager {
       }
     }
 
+    // CannonManager
+    this.cannonMgr = new CannonManager(this.level.getGroup(), (nodeId) => {
+      const node = this.graph?.getNode(nodeId);
+      return node ? node.position.clone() : null;
+    });
+    if (data.cannons && data.cannons.length > 0) {
+      this.cannonMgr.setup(data.cannons);
+    }
+
     // WorldRotateManager — 맵 전체 회전 블록
     this.worldRotateMgr = new WorldRotateManager();
     if ((data.mapRotateBlocks ?? []).length > 0) {
@@ -668,6 +679,13 @@ export class GameManager {
           // 레이저 충돌 판정
           const arrivedNodeForLaser = this.graph?.getNode(nodeId);
           if (arrivedNodeForLaser && this.laserMgr?.isNodeInLaser(arrivedNodeForLaser)) {
+            this._respawn();
+            return;
+          }
+
+          // 대포 포탄 충돌 판정
+          const arrivedNodeForCannon = this.graph?.getNode(nodeId);
+          if (arrivedNodeForCannon && this.cannonMgr?.isPlayerHit(arrivedNodeForCannon)) {
             this._respawn();
             return;
           }
@@ -974,7 +992,11 @@ export class GameManager {
     this._currentLevelId    = null;
 
     this._initLevelObjects(data);
-    this.hud.enableSkip(() => { onExit ? onExit() : this.stageSelect.show(); });
+    this.hud.enableSkip(() => {
+      if (onExit) { onExit(); return; }
+      const chapter = Math.ceil(this.currentStageNum / 30) || 1;
+      this.stageSelect.show(chapter);
+    });
     this._startCameraFlyIn(data);
   }
 
@@ -1170,6 +1192,8 @@ export class GameManager {
       ((m as THREE.Mesh).material as THREE.Material)?.dispose();
     }
     this.laserSwitchMarkers = [];
+    this.cannonMgr?.dispose();
+    this.cannonMgr = null;
     this.worldRotateMgr?.dispose();
     this.worldRotateMgr = null;
     this.tutorialSequencer?.dispose();
@@ -1879,6 +1903,14 @@ export class GameManager {
       this.laserMgr.update();
       const playerNode = this.controller?.getCurrentNode();
       if (playerNode && this.laserMgr.isNodeInLaser(playerNode)) {
+        this._respawn();
+      }
+    }
+    // 대포 포탄 업데이트 + 충돌 체크
+    if (this.cannonMgr) {
+      this.cannonMgr.update();
+      const playerNode = this.controller?.getCurrentNode();
+      if (playerNode && this.cannonMgr.isPlayerHit(playerNode)) {
         this._respawn();
       }
     }
