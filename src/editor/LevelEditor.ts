@@ -1831,11 +1831,10 @@ export class LevelEditor {
 
       const form = document.createElement('div');
       form.className = 'editor-add-form';
-      form.style.display = 'none';
       sec.appendChild(form);
 
       addBtn.addEventListener('click', () => {
-        form.style.display = form.style.display === 'none' ? '' : 'none';
+        form.classList.toggle('open');
       });
 
       // ── 헬퍼: 라벨 + 인풋 행 생성
@@ -1930,7 +1929,7 @@ export class LevelEditor {
         });
         this._rebuildCannonList();
         nidInp.value = '';
-        form.style.display = 'none';
+        form.classList.remove('open');
       });
     }));
 
@@ -2914,7 +2913,7 @@ export class LevelEditor {
       // 인라인 편집 폼 (접혀있음)
       const editForm = document.createElement('div');
       editForm.className = 'editor-add-form';
-      editForm.style.cssText = 'display:none;margin-top:2px;padding:6px;background:#111122;border-radius:3px;';
+      editForm.style.cssText = 'margin-top:2px;padding:6px;background:#111122;border-radius:3px;';
       wrap.appendChild(editForm);
 
       const makeField = (label: string, el: HTMLElement) => {
@@ -3001,7 +3000,7 @@ export class LevelEditor {
       editForm.appendChild(saveBtn);
 
       editBtn.addEventListener('click', () => {
-        editForm.style.display = editForm.style.display === 'none' ? '' : 'none';
+        editForm.classList.toggle('open');
       });
 
       this.cannonListEl!.appendChild(wrap);
