@@ -16,6 +16,7 @@ import { HUD }                from '../ui/HUD';
 import { BlockLabels }        from '../ui/BlockLabels';
 import { StageSelectUI }      from '../ui/StageSelectUI';
 import { ChapterSelectUI }    from '../ui/ChapterSelectUI';
+import { WorldMapScene }      from '../ui/WorldMapScene';
 import { TitleScreen }        from '../ui/TitleScreen';
 import { TutorialHint }       from '../ui/TutorialHint';
 import { EditorLobby }        from '../ui/EditorLobby';
@@ -51,6 +52,8 @@ export class GameManager {
   private blockLabels:   BlockLabels;
   private stageSelect:    StageSelectUI;
   private chapterSelect:  ChapterSelectUI;
+  private worldMapScene:  WorldMapScene | null = null;
+  private _worldMapActive = false;
   private titleScreen:   TitleScreen;
   private tutorialHint:  TutorialHint;
   private editorLobby:    EditorLobby;
@@ -151,7 +154,11 @@ export class GameManager {
     this.titleScreen.onPlay = () => {
       this.audio.playClick();
       this.titleScreen.hide();
-      this.chapterSelect.show();
+      if (GraphicsSettings.worldMapMode) {
+        this._showWorldMap();
+      } else {
+        this.chapterSelect.show();
+      }
     };
 
     this.chapterSelect.onSelect = (chapter) => {
@@ -264,6 +271,10 @@ export class GameManager {
       this.orbit.dampingFactor = val;
     };
 
+    this.settingsScreen.onWorldMapModeChange = (_v) => {
+      // setting saved automatically; takes effect on next Play press
+    };
+
     this.settingsScreen.onCharacterTypeChange = (type) => {
       GraphicsSettings.characterType = type;
       if (!this.character || !this.controller) return;
@@ -335,7 +346,15 @@ export class GameManager {
     };
 
     this.stageSelect.onSelect   = (stageNum) => { this.audio.playClick(); this.loadStage(stageNum); };
-    this.stageSelect.onBack     = () => { this.audio.playClick(); this.stageSelect.hide(); this.chapterSelect.show(); };
+    this.stageSelect.onBack     = () => {
+      this.audio.playClick();
+      this.stageSelect.hide();
+      if (GraphicsSettings.worldMapMode && this._worldMapActive === false) {
+        this._showWorldMap();
+      } else {
+        this.chapterSelect.show();
+      }
+    };
     this.stageSelect.onTutorial = () => {
       this.audio.playClick();
       this.stageSelect.hide();
@@ -371,6 +390,31 @@ export class GameManager {
   }
 
   // ── Effects ───────────────────────────────────────────────────────────
+
+  private _showWorldMap(): void {
+    this.unloadCurrent();
+    if (!this.worldMapScene) {
+      this.worldMapScene = new WorldMapScene(
+        this.renderer.scene,
+        this.renderer.camera as THREE.OrthographicCamera,
+        this.orbit,
+        this.renderer.renderer.domElement,
+        document.getElementById('app') ?? document.body,
+      );
+      this.worldMapScene.onChapterSelect = (ch) => {
+        this._worldMapActive = false;
+        this.worldMapScene?.hide();
+        this.stageSelect.show(ch);
+      };
+      this.worldMapScene.onBack = () => {
+        this._worldMapActive = false;
+        this.worldMapScene?.hide();
+        this.titleScreen.show();
+      };
+    }
+    this._worldMapActive = true;
+    this.worldMapScene.show();
+  }
 
   private _triggerIllusionEffect(): void {
     // 모바일 햅틱
@@ -1089,6 +1133,11 @@ export class GameManager {
 
   private unloadCurrent(): void {
     if (!this.level) return;
+
+    this._worldMapActive = false;
+    if (this.worldMapScene) {
+      this.worldMapScene.hide();
+    }
 
     // fly-in 취소 및 이벤트 리스너 정리
     this.flyInCancelFn?.();
@@ -1833,6 +1882,8 @@ export class GameManager {
       } else {
         // 일반 스테이지 클리어: 다음 스테이지 언락 + Next Stage / Stage Select 버튼 표시
         ProgressStore.unlockStage(this.currentStageNum + 1);
+        // 월드맵 모드: 챕터 경계 클리어 시 게이트 열기
+        this.worldMapScene?.notifyStageCleared(this.currentStageNum);
         const nextNum = this.getNextStageNum();
         const onNext  = nextNum !== null && ProgressStore.isUnlocked(nextNum)
           ? () => { this.audio.playClick(); this.loadStage(nextNum); }
@@ -1894,6 +1945,13 @@ export class GameManager {
 
   private animate(): void {
     requestAnimationFrame(this.animate);
+
+    if (this._worldMapActive && this.worldMapScene) {
+      this.orbit.update();
+      this.worldMapScene.update();
+      this.renderer.render();
+      return;
+    }
 
     this.orbit.update();
 

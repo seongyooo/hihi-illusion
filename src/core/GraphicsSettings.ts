@@ -22,6 +22,7 @@ const KEY_LIGHT_HEMI     = 'hihi_light_hemi';
 const KEY_EXPOSURE       = 'hihi_exposure';
 const KEY_ROTATE_SPEED   = 'hihi_rotate_speed';
 const KEY_DAMPING_FACTOR = 'hihi_damping_factor';
+const KEY_WORLD_MAP      = 'hihi_world_map_mode';
 
 export const EXPOSURE_DEFAULT       = 0.48; // Enhanced 모드 기본 노출값
 export const BLOCK_RADIUS_DEFAULT  = 0.04; // 블록 모서리 반지름 비율 기본값
@@ -148,6 +149,14 @@ export class GraphicsSettings {
     return getNum(KEY_DAMPING_FACTOR) ?? DAMPING_FACTOR_DEFAULT;
   }
   static set dampingFactor(val: number) { setNum(KEY_DAMPING_FACTOR, val === DAMPING_FACTOR_DEFAULT ? null : val); }
+
+  static get worldMapMode(): boolean {
+    return localStorage.getItem(KEY_WORLD_MAP) === 'true';
+  }
+  static set worldMapMode(v: boolean) {
+    if (v) localStorage.setItem(KEY_WORLD_MAP, 'true');
+    else localStorage.removeItem(KEY_WORLD_MAP);
+  }
 
   static getEffectiveExposure(): number {
     return GraphicsSettings.exposureOverride ?? EXPOSURE_DEFAULT;

@@ -51,6 +51,7 @@ export class SettingsScreen {
   onBlockXZChange:        (val: number)             => void = () => {};
   onRotateSpeedChange:    (val: number)             => void = () => {};
   onDampingFactorChange:  (val: number)             => void = () => {};
+  onWorldMapModeChange:   (v: boolean)              => void = () => {};
 
   constructor(container: HTMLElement) {
     this.el = document.createElement('div');
@@ -118,6 +119,16 @@ export class SettingsScreen {
       (val) => { this.onStarBgChange(val); this.preview.refresh(); },
     );
     body.appendChild(starRow.el);
+
+    const wmRow = this.makeToggleRow(
+      'World Map Mode',
+      GraphicsSettings.worldMapMode,
+      (v) => {
+        GraphicsSettings.worldMapMode = v;
+        this.onWorldMapModeChange(v);
+      },
+    );
+    body.appendChild(wmRow.el);
 
     // — COLORS —
     body.appendChild(this.makeSection('COLORS'));
