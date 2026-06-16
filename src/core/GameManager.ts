@@ -15,6 +15,7 @@ import { IllusionManager }    from '../illusion/IllusionManager';
 import { HUD }                from '../ui/HUD';
 import { BlockLabels }        from '../ui/BlockLabels';
 import { StageSelectUI }      from '../ui/StageSelectUI';
+import { ChapterSelectUI }    from '../ui/ChapterSelectUI';
 import { TitleScreen }        from '../ui/TitleScreen';
 import { TutorialHint }       from '../ui/TutorialHint';
 import { EditorLobby }        from '../ui/EditorLobby';
@@ -45,7 +46,8 @@ export class GameManager {
   private orbit:         OrbitControls;
   private cameraCtrl:    CameraController;
   private blockLabels:   BlockLabels;
-  private stageSelect:   StageSelectUI;
+  private stageSelect:    StageSelectUI;
+  private chapterSelect:  ChapterSelectUI;
   private titleScreen:   TitleScreen;
   private tutorialHint:  TutorialHint;
   private editorLobby:    EditorLobby;
@@ -133,14 +135,26 @@ export class GameManager {
 
     this.cameraCtrl   = new CameraController(this.renderer.camera, this.orbit.target);
     this.blockLabels  = new BlockLabels(container, this.renderer.camera);
-    this.stageSelect  = new StageSelectUI(container);
-    this.titleScreen  = new TitleScreen(container);
+    this.stageSelect   = new StageSelectUI(container);
+    this.chapterSelect = new ChapterSelectUI(container);
+    this.titleScreen   = new TitleScreen(container);
     this.tutorialHint = new TutorialHint(container);
 
     this.titleScreen.onPlay = () => {
       this.audio.playClick();
       this.titleScreen.hide();
-      this.stageSelect.show();
+      this.chapterSelect.show();
+    };
+
+    this.chapterSelect.onSelect = (chapter) => {
+      this.audio.playClick();
+      this.chapterSelect.hide();
+      this.stageSelect.show(chapter);
+    };
+    this.chapterSelect.onBack = () => {
+      this.audio.playClick();
+      this.chapterSelect.hide();
+      this.titleScreen.show();
     };
 
     this.editorLobby = new EditorLobby(container);
@@ -313,7 +327,7 @@ export class GameManager {
     };
 
     this.stageSelect.onSelect   = (stageNum) => { this.audio.playClick(); this.loadStage(stageNum); };
-    this.stageSelect.onBack     = () => { this.audio.playClick(); this.stageSelect.hide(); this.titleScreen.show(); };
+    this.stageSelect.onBack     = () => { this.audio.playClick(); this.stageSelect.hide(); this.chapterSelect.show(); };
     this.stageSelect.onTutorial = () => {
       this.audio.playClick();
       this.stageSelect.hide();
@@ -876,7 +890,7 @@ export class GameManager {
 
       this.hud.enableSkip(() => { this.titleScreen.show(); });
     } else {
-      this.hud.enableSkip(() => { this.stageSelect.show(); });
+      this.hud.enableSkip(() => { this.chapterSelect.show(); });
     }
 
     // Intro camera fly-in
@@ -1091,6 +1105,7 @@ export class GameManager {
     this.hud.reset();
     this.tutorialHint.hide();
     this.titleScreen.hide();
+    this.chapterSelect.hide();
     this.editorLobby.hide();
     this.stageSelect.hide();
 
@@ -1703,7 +1718,7 @@ export class GameManager {
         const onNext  = nextNum !== null && ProgressStore.isUnlocked(nextNum)
           ? () => { this.audio.playClick(); this.loadStage(nextNum); }
           : undefined;
-        const onSelect = () => { this.audio.playClick(); this.stageSelect.show(); };
+        const onSelect = () => { this.audio.playClick(); this.chapterSelect.show(); };
         this.hud.showClear(onNext, onSelect);
       }
     }, 800);

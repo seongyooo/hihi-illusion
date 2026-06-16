@@ -7,7 +7,7 @@ const BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS);
 
 export class StageSelectUI {
   private el: HTMLElement;
-  private currentPage = 1;
+  private currentChapter = 1;
   onSelect:   (stageNum: number) => void = () => {};
   onBack:     () => void = () => {};
   onTutorial: () => void = () => {};
@@ -18,19 +18,11 @@ export class StageSelectUI {
 
     const backBtn = document.createElement('button');
     backBtn.className = 'stage-select__back';
-    backBtn.textContent = '← Main';
+    backBtn.textContent = '← Chapters';
     backBtn.addEventListener('click', () => this.onBack());
     this.el.appendChild(backBtn);
 
-    this.buildGrid();
     container.appendChild(this.el);
-  }
-
-  private getTotalStages(): number {
-    const maxCustom = CUSTOM_STAGE_NUMS.length > 0
-      ? Math.max(...CUSTOM_STAGE_NUMS)
-      : 0;
-    return Math.max(maxCustom, PAGE_SIZE);
   }
 
   private buildGrid(): void {
@@ -38,21 +30,16 @@ export class StageSelectUI {
     this.el.innerHTML = '';
     if (back) this.el.appendChild(back);
 
-    const totalStages = this.getTotalStages();
-    const totalPages  = Math.ceil(totalStages / PAGE_SIZE);
-
     const title = document.createElement('h2');
     title.className = 'stage-select__title';
-    title.textContent = totalPages > 1
-      ? `SELECT STAGE  ·  ${this.currentPage} / ${totalPages}`
-      : 'SELECT STAGE';
+    title.textContent = `CHAPTER ${this.currentChapter}`;
     this.el.appendChild(title);
 
     const grid = document.createElement('div');
     grid.className = 'stage-select__grid';
 
-    const startStage = (this.currentPage - 1) * PAGE_SIZE + 1;
-    const endStage   = Math.min(this.currentPage * PAGE_SIZE, totalStages);
+    const startStage = (this.currentChapter - 1) * PAGE_SIZE + 1;
+    const endStage   = this.currentChapter * PAGE_SIZE;
 
     for (let i = startStage; i <= endStage; i++) {
       const btn = document.createElement('button');
@@ -81,41 +68,8 @@ export class StageSelectUI {
 
     this.el.appendChild(grid);
 
-    // 페이지 네비게이션
-    if (totalPages > 1) {
-      const nav = document.createElement('div');
-      nav.className = 'stage-select__page-nav';
-
-      const prevBtn = document.createElement('button');
-      prevBtn.className = 'stage-select__page-btn';
-      prevBtn.textContent = '← PREV';
-      prevBtn.disabled = this.currentPage <= 1;
-      prevBtn.addEventListener('click', () => {
-        this.currentPage--;
-        this.buildGrid();
-      });
-
-      const pageLabel = document.createElement('span');
-      pageLabel.className = 'stage-select__page-label';
-      pageLabel.textContent = `${this.currentPage} / ${totalPages}`;
-
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'stage-select__page-btn';
-      nextBtn.textContent = 'NEXT →';
-      nextBtn.disabled = this.currentPage >= totalPages;
-      nextBtn.addEventListener('click', () => {
-        this.currentPage++;
-        this.buildGrid();
-      });
-
-      nav.appendChild(prevBtn);
-      nav.appendChild(pageLabel);
-      nav.appendChild(nextBtn);
-      this.el.appendChild(nav);
-    }
-
-    // 튜토리얼 다시하기 버튼 (튜토리얼 완료한 경우에만 표시)
-    if (ProgressStore.isTutorialDone()) {
+    // 튜토리얼 다시하기 버튼
+    if (this.currentChapter === 1 && ProgressStore.isTutorialDone()) {
       const tutorialBtn = document.createElement('button');
       tutorialBtn.className = 'stage-select__tutorial-btn';
       tutorialBtn.textContent = '튜토리얼 다시하기';
@@ -124,8 +78,8 @@ export class StageSelectUI {
     }
   }
 
-  show(): void {
-    this.currentPage = 1;
+  show(chapter = 1): void {
+    this.currentChapter = chapter;
     this.buildGrid();
     requestAnimationFrame(() => this.el.classList.add('visible'));
   }
@@ -133,5 +87,4 @@ export class StageSelectUI {
   hide(): void {
     this.el.classList.remove('visible');
   }
-
 }
