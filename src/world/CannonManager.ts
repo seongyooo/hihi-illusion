@@ -3,7 +3,7 @@ import gsap from 'gsap';
 import type { CannonDef } from './Level';
 import type { PathNode } from './PathGraph';
 
-const HIT_RADIUS = 0.48;
+const HIT_RADIUS = 0.32;
 
 interface CannonState {
   def:          CannonDef;
