@@ -19,6 +19,7 @@ interface EditorBlock {
   walkable: boolean;
   isSpike: boolean;
   spikeType: 'always' | 'blinking';
+  isCube: boolean;
   mesh: THREE.Group;  // Block.mesh (THREE.Group with per-face materials)
 }
 
@@ -104,8 +105,9 @@ const DEFAULT_COLOR = '#A8C5DA';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function blockWorldPos(gridX: number, floor: number, gridZ: number): THREE.Vector3 {
-  return new THREE.Vector3(gridX + 0.5, floor * 0.5 + 0.25, gridZ + 0.5);
+function blockWorldPos(gridX: number, floor: number, gridZ: number, cube = false): THREE.Vector3 {
+  const y = cube ? floor * 0.5 + 0.5 : floor * 0.5 + 0.25;
+  return new THREE.Vector3(gridX + 0.5, y, gridZ + 0.5);
 }
 
 function floorY(floor: number): number {
@@ -238,10 +240,13 @@ export class LevelEditor {
   private colorInput!: HTMLInputElement;
   private walkableInput!: HTMLInputElement;
   private spikeInput!: HTMLInputElement;
+  private cubeInput!: HTMLInputElement;
   private spikeTypeSelect!: HTMLSelectElement;
   private spikeModeBtn!: HTMLButtonElement;
   private spikeModeType: 'always' | 'blinking' = 'always';
   private spikeMode = false;
+  private cubeModeBtn!: HTMLButtonElement;
+  private cubeMode = false;
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
@@ -504,6 +509,26 @@ export class LevelEditor {
       presetRow.appendChild(swatchWrap);
       sec.appendChild(presetRow);
 
+      // Cube mode toggle
+      const cubeModeRow = document.createElement('div');
+      cubeModeRow.className = 'editor-row';
+      this.cubeModeBtn = document.createElement('button');
+      this.cubeModeBtn.className = 'editor-btn';
+      this.cubeModeBtn.textContent = '⬛ Cube Mode: OFF';
+      this.cubeModeBtn.style.cssText = 'width:100%;text-align:left;';
+      this.cubeModeBtn.addEventListener('click', () => {
+        this.cubeMode = !this.cubeMode;
+        this.cubeModeBtn.textContent = `⬛ Cube Mode: ${this.cubeMode ? 'ON' : 'OFF'}`;
+        this.cubeModeBtn.classList.toggle('active', this.cubeMode);
+        // ghost geometry 갱신
+        this.ghostMesh.geometry.dispose();
+        this.ghostMesh.geometry = this.cubeMode
+          ? new THREE.BoxGeometry(1, 1, 1)
+          : new THREE.BoxGeometry(1, 0.5, 1);
+      });
+      cubeModeRow.appendChild(this.cubeModeBtn);
+      sec.appendChild(cubeModeRow);
+
       // Spike mode toggle
       const spikeModeRow = document.createElement('div');
       spikeModeRow.className = 'editor-row';
@@ -619,6 +644,33 @@ export class LevelEditor {
       spikeTypeRow.appendChild(spikeTypeLabel);
       spikeTypeRow.appendChild(this.spikeTypeSelect);
       sec.appendChild(spikeTypeRow);
+
+      const cubeRow = document.createElement('div');
+      cubeRow.className = 'editor-row';
+      const cubeLabel = document.createElement('label');
+      cubeLabel.textContent = 'Cube (1×1×1):';
+      this.cubeInput = document.createElement('input');
+      this.cubeInput.type = 'checkbox';
+      this.cubeInput.checked = false;
+      this.cubeInput.addEventListener('change', () => {
+        const b = this.selectedBlock;
+        if (!b) return;
+        b.isCube = this.cubeInput.checked;
+        const newSize: [number, number, number] = b.isCube ? [1, 1, 1] : [1, 0.5, 1];
+        const newY = b.isCube ? b.floor * 0.5 + 0.5 : b.floor * 0.5 + 0.25;
+        // mesh 재생성
+        const colorHex = parseInt(b.color.replace('#', ''), 16);
+        const newInst = new Block({ position: [b.mesh.position.x, newY, b.mesh.position.z], color: colorHex, size: newSize });
+        newInst.mesh.userData.editorBlockId = b.id;
+        newInst.mesh.traverse(child => { child.userData.editorBlockId = b.id; });
+        this.scene.remove(b.mesh);
+        this.scene.add(newInst.mesh);
+        b.mesh = newInst.mesh;
+        this.updateMarkers();
+      });
+      cubeRow.appendChild(cubeLabel);
+      cubeRow.appendChild(this.cubeInput);
+      sec.appendChild(cubeRow);
 
       // ── Start / Goal buttons with status labels ──
       {
@@ -3233,6 +3285,7 @@ export class LevelEditor {
       this.walkableInput.checked = b.walkable;
       this.spikeInput.checked    = b.isSpike;
       this.spikeTypeSelect.value = b.spikeType;
+      this.cubeInput.checked     = b.isCube;
 
       // Start / Goal 상태 레이블
       const isStart = b.id === this.startNodeId;
@@ -3316,9 +3369,11 @@ export class LevelEditor {
     if (gridX < 0 || gridX >= GRID_SIZE || gridZ < 0 || gridZ >= GRID_SIZE) return;
 
     const id = this.nextBlockId();
-    const pos = blockWorldPos(gridX, this.currentFloor, gridZ);
+    const isCube = this.cubeMode;
+    const blockSize: [number, number, number] = isCube ? [1, 1, 1] : [1, 0.5, 1];
+    const pos = blockWorldPos(gridX, this.currentFloor, gridZ, isCube);
     const colorHex = parseInt(this.currentColor.replace('#', ''), 16);
-    const blockInst = new Block({ position: [pos.x, pos.y, pos.z], color: colorHex, size: [1, 0.5, 1] });
+    const blockInst = new Block({ position: [pos.x, pos.y, pos.z], color: colorHex, size: blockSize });
     blockInst.mesh.userData.editorBlockId = id;
     blockInst.mesh.traverse(child => { child.userData.editorBlockId = id; });
     this.scene.add(blockInst.mesh);
@@ -3332,6 +3387,7 @@ export class LevelEditor {
       walkable: true,
       isSpike: this.spikeMode,
       spikeType: this.spikeModeType,
+      isCube,
       mesh: blockInst.mesh,
     };
     if (this.spikeMode) this._setSpikeIndicator(block, true);
@@ -3435,7 +3491,7 @@ export class LevelEditor {
     // 중력 프리뷰 상태에서는 mesh.position (실제 이동된 위치)을 사용
     const markerPos = (b: EditorBlock) => ({
       x: b.mesh.position.x,
-      y: b.mesh.position.y + 0.25, // center + halfHeight(0.25)
+      y: b.mesh.position.y + (b.isCube ? 0.5 : 0.25),
       z: b.mesh.position.z,
     });
 
@@ -3564,7 +3620,7 @@ export class LevelEditor {
       const gridX = Math.floor(pt.x);
       const gridZ = Math.floor(pt.z);
       if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
-        const pos = blockWorldPos(gridX, this.currentFloor, gridZ);
+        const pos = blockWorldPos(gridX, this.currentFloor, gridZ, this.cubeMode);
         this.ghostMesh.position.copy(pos);
         const occupied = !!this.getBlockAt(gridX, this.currentFloor, gridZ);
         this.ghostMesh.visible = !occupied;
@@ -3759,9 +3815,9 @@ export class LevelEditor {
       backgroundColor: this.bgColor,
       blocks: this.blocks.map(b => ({
         id: b.id,
-        position: [b.gridX + 0.5, b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
+        position: [b.gridX + 0.5, b.isCube ? b.floor * 0.5 + 0.5 : b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
         color: b.color,
-        size: [1, 0.5, 1] as [number, number, number],
+        size: (b.isCube ? [1, 1, 1] : [1, 0.5, 1]) as [number, number, number],
         walkable: b.walkable,
         ...(b.isSpike ? { isSpike: true, spikeType: b.spikeType } : {}),
       })),
@@ -3912,12 +3968,16 @@ export class LevelEditor {
     // Parse blocks
     let maxCounter = 0;
     for (const bd of data.blocks) {
-      const floor = Math.round((bd.position[1] - 0.25) / 0.5);
+      const isCube = bd.size[1] >= 0.9;
+      const floor = isCube
+        ? Math.round((bd.position[1] - 0.5) / 0.5)
+        : Math.round((bd.position[1] - 0.25) / 0.5);
       const gridX = Math.round(bd.position[0] - 0.5);
       const gridZ = Math.round(bd.position[2] - 0.5);
 
       const colorHex = parseInt(bd.color.replace('#', ''), 16);
-      const blockInst = new Block({ position: [bd.position[0], bd.position[1], bd.position[2]], color: colorHex, size: [1, 0.5, 1] });
+      const blockSize: [number, number, number] = isCube ? [1, 1, 1] : [1, 0.5, 1];
+      const blockInst = new Block({ position: [bd.position[0], bd.position[1], bd.position[2]], color: colorHex, size: blockSize });
       blockInst.mesh.userData.editorBlockId = bd.id;
       blockInst.mesh.traverse(child => { child.userData.editorBlockId = bd.id; });
       this.scene.add(blockInst.mesh);
@@ -3931,6 +3991,7 @@ export class LevelEditor {
         walkable: bd.walkable,
         isSpike: !!bd.isSpike,
         spikeType: bd.spikeType ?? 'always',
+        isCube,
         mesh: blockInst.mesh,
       };
       if (bd.isSpike) this._setSpikeIndicator(block, true);
