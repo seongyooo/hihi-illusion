@@ -4,6 +4,7 @@ import type { LevelData } from '../world/Level';
 import type { PatrolDef } from '../world/PatrolManager';
 import { Block, recolorBlockGroup } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
+import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 
 const FACE_BRIGHTNESS = [0.82, 0.65, 1.0, 0.45, 0.70, 0.55];
 
@@ -2146,8 +2147,7 @@ export class LevelEditor {
       const numInput = document.createElement('input');
       numInput.type = 'number';
       numInput.className = 'editor-input';
-      numInput.min = '4';
-      numInput.max = '30';
+      numInput.min = '1';
       numInput.value = String(this.stageNum);
       numInput.addEventListener('input', () => { this.stageNum = parseInt(numInput.value) || 4; });
       numRow.appendChild(numLabel);
@@ -4091,12 +4091,12 @@ export class LevelEditor {
       character: { startNodeId: '' },
       goal: { blockId: '' },
     });
-    // 빈 슬롯 중 가장 작은 번호 자동 선택
-    const used = CustomLevelStore.getAll().map(l => l.stageNum);
-    let next = 4;
-    while (used.includes(next) && next <= 30) next++;
-    this.stageNum = next <= 30 ? next : 4;
-    this.stageName = 'Custom Level';
+    // 빌트인 + localStorage 스테이지 번호 중 최댓값 + 1
+    const usedCustom = CustomLevelStore.getAll().map(l => l.stageNum);
+    const allUsed = [...CUSTOM_STAGE_NUMS, ...usedCustom];
+    const next = allUsed.length > 0 ? Math.max(...allUsed) + 1 : 1;
+    this.stageNum = next;
+    this.stageName = `Stage ${next}`;
     this.bgColor   = '#E8EEF5';
     this.rebuildPanel(); // Export 섹션의 입력값도 갱신
   }
