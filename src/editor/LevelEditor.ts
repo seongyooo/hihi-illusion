@@ -569,7 +569,7 @@ export class LevelEditor {
       this.wedgeDirSelect = document.createElement('select');
       this.wedgeDirSelect.className = 'editor-input';
       this.wedgeDirSelect.style.flex = '1';
-      (['z+', 'z-', 'x+', 'x-'] as WedgeDirection[]).forEach(dir => {
+      (['z+', 'z-', 'x+', 'x-', 'y+', 'y-'] as WedgeDirection[]).forEach(dir => {
         const opt = document.createElement('option');
         opt.value = dir;
         opt.textContent = dir;
@@ -736,7 +736,7 @@ export class LevelEditor {
       this.wedgeDirSelSel = document.createElement('select');
       this.wedgeDirSelSel.className = 'editor-input';
       this.wedgeDirSelSel.style.width = '48px';
-      (['z+', 'z-', 'x+', 'x-'] as WedgeDirection[]).forEach(dir => {
+      (['z+', 'z-', 'x+', 'x-', 'y+', 'y-'] as WedgeDirection[]).forEach(dir => {
         const opt = document.createElement('option');
         opt.value = dir;
         opt.textContent = dir;

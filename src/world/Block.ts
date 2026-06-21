@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { GraphicsSettings } from '../core/GraphicsSettings';
 
 export type BlockVariant = 'default' | 'stone' | 'metal';
-export type WedgeDirection = 'x+' | 'x-' | 'z+' | 'z-';
+export type WedgeDirection = 'x+' | 'x-' | 'z+' | 'z-' | 'y+' | 'y-';
 
 export interface BlockOptions {
   position: [number, number, number];
@@ -65,15 +65,23 @@ export function makeWedgeGeo(direction: WedgeDirection = 'z+'): THREE.BufferGeom
     1, 5, 2,            // 오른쪽 삼각형
   ]);
 
-  const angleMap: Record<WedgeDirection, number> = {
-    'z+': 0,
-    'z-': Math.PI,
-    'x-': Math.PI / 2,
-    'x+': -Math.PI / 2,
-  };
-  const angle = angleMap[direction];
-  if (angle !== 0) {
-    geo.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
+  if (direction === 'y+') {
+    // 경사면이 위(+Y)를 향함: X축 -90° 회전
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+  } else if (direction === 'y-') {
+    // 경사면이 아래(-Y)를 향함: X축 +90° 회전
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+  } else {
+    const yAngleMap: Record<string, number> = {
+      'z+': 0,
+      'z-': Math.PI,
+      'x-': Math.PI / 2,
+      'x+': -Math.PI / 2,
+    };
+    const angle = yAngleMap[direction];
+    if (angle !== 0) {
+      geo.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
+    }
   }
   geo.computeVertexNormals();
   return geo;
