@@ -3,12 +3,15 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { GraphicsSettings } from '../core/GraphicsSettings';
 
 export type BlockVariant = 'default' | 'stone' | 'metal';
+export type WedgeDirection = 'x+' | 'x-' | 'z+' | 'z-';
 
 export interface BlockOptions {
   position: [number, number, number];
   color?: number;
   size?: [number, number, number];
   variant?: BlockVariant;
+  shape?: 'default' | 'wedge';
+  wedgeDirection?: WedgeDirection;
   castShadow?: boolean;
   receiveShadow?: boolean;
 }
@@ -32,6 +35,48 @@ function makeBlockMat(hex: number, variant: BlockVariant): THREE.Material {
     return new THREE.MeshStandardMaterial({ color, roughness, metalness });
   }
   return new THREE.MeshLambertMaterial({ color });
+}
+
+// ── Wedge geometry ────────────────────────────────────────────────────────
+
+/**
+ * 삼각형(쐐기) 블록 geometry.
+ * 기준 방향: 'z+' = 경사가 +Z 방향으로 낮아짐, 높은 벽이 -Z에 위치.
+ * direction에 따라 Y축 회전 적용.
+ */
+export function makeWedgeGeo(direction: WedgeDirection = 'z+'): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  // 6개 꼭짓점: 바닥 4개 + 상단 뒤쪽(-Z) 2개
+  // 기준: 경사가 +Z 방향, 높은 벽이 -Z
+  const verts = new Float32Array([
+    -0.5, -0.5, -0.5,  // 0 bottom-back-left
+     0.5, -0.5, -0.5,  // 1 bottom-back-right
+     0.5, -0.5,  0.5,  // 2 bottom-front-right
+    -0.5, -0.5,  0.5,  // 3 bottom-front-left
+    -0.5,  0.5, -0.5,  // 4 top-back-left
+     0.5,  0.5, -0.5,  // 5 top-back-right
+  ]);
+  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+  geo.setIndex([
+    0, 1, 2,  0, 2, 3,  // 바닥면
+    0, 4, 5,  0, 5, 1,  // 뒤 벽 (높은 면)
+    3, 5, 4,  3, 2, 5,  // 경사면
+    0, 3, 4,            // 왼쪽 삼각형
+    1, 5, 2,            // 오른쪽 삼각형
+  ]);
+
+  const angleMap: Record<WedgeDirection, number> = {
+    'z+': 0,
+    'z-': Math.PI,
+    'x-': Math.PI / 2,
+    'x+': -Math.PI / 2,
+  };
+  const angle = angleMap[direction];
+  if (angle !== 0) {
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
+  }
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -62,11 +107,15 @@ export function buildBlockMeshGroup(
   variant: BlockVariant = 'default',
   castShadow = true,
   receiveShadow = true,
+  shape: 'default' | 'wedge' = 'default',
+  wedgeDirection: WedgeDirection = 'z+',
 ): THREE.Group {
   const [w, h, d] = size;
 
   const group = new THREE.Group();
-  const geo   = makeBlockGeo(w, h, d);
+  const geo   = shape === 'wedge'
+    ? makeWedgeGeo(wedgeDirection)
+    : makeBlockGeo(w, h, d);
   const mesh  = new THREE.Mesh(geo, makeBlockMat(hex, variant));
   mesh.castShadow    = castShadow;
   mesh.receiveShadow = receiveShadow;
@@ -100,23 +149,29 @@ export class Block {
   private variant: BlockVariant;
   private currentHex: number; // 현재 적용된 색상 (revariant 시 재사용)
   private readonly size: [number, number, number];
+  private readonly shape: 'default' | 'wedge';
+  private readonly wedgeDirection: WedgeDirection;
 
   constructor(options: BlockOptions) {
     const {
       position,
-      color    = 0xA8D8EA,
-      size     = [1, 1, 1],
-      variant  = 'default',
-      castShadow    = true,
-      receiveShadow = true,
+      color          = 0xA8D8EA,
+      size           = [1, 1, 1],
+      variant        = 'default',
+      shape          = 'default',
+      wedgeDirection = 'z+',
+      castShadow     = true,
+      receiveShadow  = true,
     } = options;
 
-    this.originalColor = color;
-    this.currentHex    = color;
-    this.variant       = variant;
-    this.size          = size;
+    this.originalColor    = color;
+    this.currentHex       = color;
+    this.variant          = variant;
+    this.size             = size;
+    this.shape            = shape;
+    this.wedgeDirection   = wedgeDirection;
 
-    this.mesh = buildBlockMeshGroup(color, size, variant, castShadow, receiveShadow);
+    this.mesh = buildBlockMeshGroup(color, size, variant, castShadow, receiveShadow, shape, wedgeDirection);
     this.mesh.position.set(...position);
   }
 
@@ -137,6 +192,8 @@ export class Block {
     const mesh = this.mesh.children[0] as THREE.Mesh;
     mesh.geometry.dispose();
     const [w, h, d] = this.size;
-    mesh.geometry = makeBlockGeo(w, h, d);
+    mesh.geometry = this.shape === 'wedge'
+      ? makeWedgeGeo(this.wedgeDirection)
+      : makeBlockGeo(w, h, d);
   }
 }

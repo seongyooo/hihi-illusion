@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { LevelData } from '../world/Level';
 import type { PatrolDef } from '../world/PatrolManager';
-import { Block, recolorBlockGroup } from '../world/Block';
+import { Block, recolorBlockGroup, makeWedgeGeo } from '../world/Block';
+import type { WedgeDirection } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
 import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 
@@ -20,6 +21,8 @@ interface EditorBlock {
   isSpike: boolean;
   spikeType: 'always' | 'blinking';
   isCube: boolean;
+  shape: 'default' | 'wedge';
+  wedgeDirection: WedgeDirection;
   mesh: THREE.Group;  // Block.mesh (THREE.Group with per-face materials)
 }
 
@@ -241,12 +244,18 @@ export class LevelEditor {
   private walkableInput!: HTMLInputElement;
   private spikeInput!: HTMLInputElement;
   private cubeInput!: HTMLInputElement;
+  private wedgeInput!: HTMLInputElement;
+  private wedgeDirSelSel!: HTMLSelectElement;
   private spikeTypeSelect!: HTMLSelectElement;
   private spikeModeBtn!: HTMLButtonElement;
   private spikeModeType: 'always' | 'blinking' = 'always';
   private spikeMode = false;
   private cubeModeBtn!: HTMLButtonElement;
   private cubeMode = false;
+  private wedgeModeBtn!: HTMLButtonElement;
+  private wedgeMode = false;
+  private wedgeDirection: WedgeDirection = 'z+';
+  private wedgeDirSelect!: HTMLSelectElement;
   private selIdEl!: HTMLElement;
   private selFloorEl!: HTMLElement;
   private floorLabel!: HTMLElement;
@@ -520,14 +529,59 @@ export class LevelEditor {
         this.cubeMode = !this.cubeMode;
         this.cubeModeBtn.textContent = `⬛ Cube Mode: ${this.cubeMode ? 'ON' : 'OFF'}`;
         this.cubeModeBtn.classList.toggle('active', this.cubeMode);
-        // ghost geometry 갱신
-        this.ghostMesh.geometry.dispose();
-        this.ghostMesh.geometry = this.cubeMode
-          ? new THREE.BoxGeometry(1, 1, 1)
-          : new THREE.BoxGeometry(1, 0.5, 1);
+        if (this.cubeMode) {
+          // wedge mode 끄기
+          this.wedgeMode = false;
+          this.wedgeModeBtn.textContent = '◤ Wedge Mode: OFF';
+          this.wedgeModeBtn.classList.remove('active');
+        }
+        this._refreshGhostGeo();
       });
       cubeModeRow.appendChild(this.cubeModeBtn);
       sec.appendChild(cubeModeRow);
+
+      // Wedge mode toggle
+      const wedgeModeRow = document.createElement('div');
+      wedgeModeRow.className = 'editor-row';
+      this.wedgeModeBtn = document.createElement('button');
+      this.wedgeModeBtn.className = 'editor-btn';
+      this.wedgeModeBtn.textContent = '◤ Wedge Mode: OFF';
+      this.wedgeModeBtn.style.cssText = 'width:100%;text-align:left;';
+      this.wedgeModeBtn.addEventListener('click', () => {
+        this.wedgeMode = !this.wedgeMode;
+        this.wedgeModeBtn.textContent = `◤ Wedge Mode: ${this.wedgeMode ? 'ON' : 'OFF'}`;
+        this.wedgeModeBtn.classList.toggle('active', this.wedgeMode);
+        if (this.wedgeMode) {
+          // cube mode 끄기
+          this.cubeMode = false;
+          this.cubeModeBtn.textContent = '⬛ Cube Mode: OFF';
+          this.cubeModeBtn.classList.remove('active');
+        }
+        this._refreshGhostGeo();
+      });
+      wedgeModeRow.appendChild(this.wedgeModeBtn);
+      sec.appendChild(wedgeModeRow);
+
+      const wedgeDirRow = document.createElement('div');
+      wedgeDirRow.className = 'editor-row';
+      const wedgeDirLabel = document.createElement('label');
+      wedgeDirLabel.textContent = 'Wedge Dir:';
+      this.wedgeDirSelect = document.createElement('select');
+      this.wedgeDirSelect.className = 'editor-input';
+      this.wedgeDirSelect.style.flex = '1';
+      (['z+', 'z-', 'x+', 'x-'] as WedgeDirection[]).forEach(dir => {
+        const opt = document.createElement('option');
+        opt.value = dir;
+        opt.textContent = dir;
+        this.wedgeDirSelect.appendChild(opt);
+      });
+      this.wedgeDirSelect.addEventListener('change', () => {
+        this.wedgeDirection = this.wedgeDirSelect.value as WedgeDirection;
+        this._refreshGhostGeo();
+      });
+      wedgeDirRow.appendChild(wedgeDirLabel);
+      wedgeDirRow.appendChild(this.wedgeDirSelect);
+      sec.appendChild(wedgeDirRow);
 
       // Spike mode toggle
       const spikeModeRow = document.createElement('div');
@@ -671,6 +725,54 @@ export class LevelEditor {
       cubeRow.appendChild(cubeLabel);
       cubeRow.appendChild(this.cubeInput);
       sec.appendChild(cubeRow);
+
+      const wedgeSelRow = document.createElement('div');
+      wedgeSelRow.className = 'editor-row';
+      const wedgeSelLabel = document.createElement('label');
+      wedgeSelLabel.textContent = 'Wedge (◤):';
+      this.wedgeInput = document.createElement('input');
+      this.wedgeInput.type = 'checkbox';
+      this.wedgeInput.checked = false;
+      this.wedgeDirSelSel = document.createElement('select');
+      this.wedgeDirSelSel.className = 'editor-input';
+      this.wedgeDirSelSel.style.width = '48px';
+      (['z+', 'z-', 'x+', 'x-'] as WedgeDirection[]).forEach(dir => {
+        const opt = document.createElement('option');
+        opt.value = dir;
+        opt.textContent = dir;
+        this.wedgeDirSelSel.appendChild(opt);
+      });
+      const applyWedgeChange = () => {
+        const b = this.selectedBlock;
+        if (!b) return;
+        b.shape          = this.wedgeInput.checked ? 'wedge' : 'default';
+        b.wedgeDirection = this.wedgeDirSelSel.value as WedgeDirection;
+        b.isCube         = b.shape === 'wedge' ? false : b.isCube;
+        this.cubeInput.checked = b.isCube;
+        const isCubelike = b.shape === 'wedge' || b.isCube;
+        const newSize: [number, number, number] = isCubelike ? [1, 1, 1] : [1, 0.5, 1];
+        const newY = isCubelike ? b.floor * 0.5 + 0.5 : b.floor * 0.5 + 0.25;
+        const colorHex = parseInt(b.color.replace('#', ''), 16);
+        const newInst = new Block({
+          position: [b.mesh.position.x, newY, b.mesh.position.z],
+          color: colorHex,
+          size: newSize,
+          shape: b.shape,
+          wedgeDirection: b.wedgeDirection,
+        });
+        newInst.mesh.userData.editorBlockId = b.id;
+        newInst.mesh.traverse(child => { child.userData.editorBlockId = b.id; });
+        this.scene.remove(b.mesh);
+        this.scene.add(newInst.mesh);
+        b.mesh = newInst.mesh;
+        this.updateMarkers();
+      };
+      this.wedgeInput.addEventListener('change', applyWedgeChange);
+      this.wedgeDirSelSel.addEventListener('change', applyWedgeChange);
+      wedgeSelRow.appendChild(wedgeSelLabel);
+      wedgeSelRow.appendChild(this.wedgeInput);
+      wedgeSelRow.appendChild(this.wedgeDirSelSel);
+      sec.appendChild(wedgeSelRow);
 
       // ── Start / Goal buttons with status labels ──
       {
@@ -3285,7 +3387,9 @@ export class LevelEditor {
       this.walkableInput.checked = b.walkable;
       this.spikeInput.checked    = b.isSpike;
       this.spikeTypeSelect.value = b.spikeType;
-      this.cubeInput.checked     = b.isCube;
+      this.cubeInput.checked        = b.isCube;
+      this.wedgeInput.checked       = b.shape === 'wedge';
+      this.wedgeDirSelSel.value     = b.wedgeDirection;
 
       // Start / Goal 상태 레이블
       const isStart = b.id === this.startNodeId;
@@ -3369,11 +3473,19 @@ export class LevelEditor {
     if (gridX < 0 || gridX >= GRID_SIZE || gridZ < 0 || gridZ >= GRID_SIZE) return;
 
     const id = this.nextBlockId();
-    const isCube = this.cubeMode;
-    const blockSize: [number, number, number] = isCube ? [1, 1, 1] : [1, 0.5, 1];
-    const pos = blockWorldPos(gridX, this.currentFloor, gridZ, isCube);
+    const isWedge  = this.wedgeMode;
+    const isCube   = !isWedge && this.cubeMode;
+    const isCubelike = isCube || isWedge; // wedge도 cube 크기 (1×1×1)
+    const blockSize: [number, number, number] = isCubelike ? [1, 1, 1] : [1, 0.5, 1];
+    const pos = blockWorldPos(gridX, this.currentFloor, gridZ, isCubelike);
     const colorHex = parseInt(this.currentColor.replace('#', ''), 16);
-    const blockInst = new Block({ position: [pos.x, pos.y, pos.z], color: colorHex, size: blockSize });
+    const blockInst = new Block({
+      position: [pos.x, pos.y, pos.z],
+      color: colorHex,
+      size: blockSize,
+      shape: isWedge ? 'wedge' : 'default',
+      wedgeDirection: this.wedgeDirection,
+    });
     blockInst.mesh.userData.editorBlockId = id;
     blockInst.mesh.traverse(child => { child.userData.editorBlockId = id; });
     this.scene.add(blockInst.mesh);
@@ -3388,6 +3500,8 @@ export class LevelEditor {
       isSpike: this.spikeMode,
       spikeType: this.spikeModeType,
       isCube,
+      shape: isWedge ? 'wedge' : 'default',
+      wedgeDirection: this.wedgeDirection,
       mesh: blockInst.mesh,
     };
     if (this.spikeMode) this._setSpikeIndicator(block, true);
@@ -3620,7 +3734,8 @@ export class LevelEditor {
       const gridX = Math.floor(pt.x);
       const gridZ = Math.floor(pt.z);
       if (gridX >= 0 && gridX < GRID_SIZE && gridZ >= 0 && gridZ < GRID_SIZE) {
-        const pos = blockWorldPos(gridX, this.currentFloor, gridZ, this.cubeMode);
+        const isCubelike = this.cubeMode || this.wedgeMode;
+        const pos = blockWorldPos(gridX, this.currentFloor, gridZ, isCubelike);
         this.ghostMesh.position.copy(pos);
         const occupied = !!this.getBlockAt(gridX, this.currentFloor, gridZ);
         this.ghostMesh.visible = !occupied;
@@ -3629,6 +3744,17 @@ export class LevelEditor {
       }
     } else {
       this.ghostMesh.visible = false;
+    }
+  }
+
+  private _refreshGhostGeo(): void {
+    this.ghostMesh.geometry.dispose();
+    if (this.wedgeMode) {
+      this.ghostMesh.geometry = makeWedgeGeo(this.wedgeDirection);
+    } else if (this.cubeMode) {
+      this.ghostMesh.geometry = new THREE.BoxGeometry(1, 1, 1);
+    } else {
+      this.ghostMesh.geometry = new THREE.BoxGeometry(1, 0.5, 1);
     }
   }
 
@@ -3813,14 +3939,18 @@ export class LevelEditor {
       id: `custom_stage_${this.stageNum}`,
       name: this.stageName,
       backgroundColor: this.bgColor,
-      blocks: this.blocks.map(b => ({
-        id: b.id,
-        position: [b.gridX + 0.5, b.isCube ? b.floor * 0.5 + 0.5 : b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
-        color: b.color,
-        size: (b.isCube ? [1, 1, 1] : [1, 0.5, 1]) as [number, number, number],
-        walkable: b.walkable,
-        ...(b.isSpike ? { isSpike: true, spikeType: b.spikeType } : {}),
-      })),
+      blocks: this.blocks.map(b => {
+        const isCubelike = b.isCube || b.shape === 'wedge';
+        return {
+          id: b.id,
+          position: [b.gridX + 0.5, isCubelike ? b.floor * 0.5 + 0.5 : b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
+          color: b.color,
+          size: (isCubelike ? [1, 1, 1] : [1, 0.5, 1]) as [number, number, number],
+          walkable: b.walkable,
+          ...(b.isSpike ? { isSpike: true, spikeType: b.spikeType } : {}),
+          ...(b.shape === 'wedge' ? { shape: 'wedge' as const, wedgeDirection: b.wedgeDirection } : {}),
+        };
+      }),
       ladders: this.ladderConns,
       conditionalLadders: (() => {
         const map = new Map<string, Array<{ nodeA: string; nodeB: string }>>();
@@ -3968,16 +4098,25 @@ export class LevelEditor {
     // Parse blocks
     let maxCounter = 0;
     for (const bd of data.blocks) {
-      const isCube = bd.size[1] >= 0.9;
-      const floor = isCube
+      const isWedge    = bd.shape === 'wedge';
+      const isCube     = !isWedge && bd.size[1] >= 0.9;
+      const isCubelike = isCube || isWedge;
+      const floor = isCubelike
         ? Math.round((bd.position[1] - 0.5) / 0.5)
         : Math.round((bd.position[1] - 0.25) / 0.5);
       const gridX = Math.round(bd.position[0] - 0.5);
       const gridZ = Math.round(bd.position[2] - 0.5);
 
       const colorHex = parseInt(bd.color.replace('#', ''), 16);
-      const blockSize: [number, number, number] = isCube ? [1, 1, 1] : [1, 0.5, 1];
-      const blockInst = new Block({ position: [bd.position[0], bd.position[1], bd.position[2]], color: colorHex, size: blockSize });
+      const blockSize: [number, number, number] = isCubelike ? [1, 1, 1] : [1, 0.5, 1];
+      const wedgeDir = (bd.wedgeDirection ?? 'z+') as WedgeDirection;
+      const blockInst = new Block({
+        position: [bd.position[0], bd.position[1], bd.position[2]],
+        color: colorHex,
+        size: blockSize,
+        shape: isWedge ? 'wedge' : 'default',
+        wedgeDirection: wedgeDir,
+      });
       blockInst.mesh.userData.editorBlockId = bd.id;
       blockInst.mesh.traverse(child => { child.userData.editorBlockId = bd.id; });
       this.scene.add(blockInst.mesh);
@@ -3992,6 +4131,8 @@ export class LevelEditor {
         isSpike: !!bd.isSpike,
         spikeType: bd.spikeType ?? 'always',
         isCube,
+        shape: isWedge ? 'wedge' : 'default',
+        wedgeDirection: wedgeDir,
         mesh: blockInst.mesh,
       };
       if (bd.isSpike) this._setSpikeIndicator(block, true);

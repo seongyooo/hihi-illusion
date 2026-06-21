@@ -97,6 +97,8 @@ export interface BlockData {
   variant?: string;
   isSpike?: boolean;
   spikeType?: 'always' | 'blinking';
+  shape?: 'default' | 'wedge';
+  wedgeDirection?: import('./Block').WedgeDirection;
 }
 
 export interface RotatingSectionData {
@@ -271,10 +273,12 @@ export class Level {
       // per-block JSON variant takes priority; then variantOverride (from settings, non-tutorial only)
       const resolvedVariant = (bd.variant ?? variantOverride ?? 'default') as import('./Block').BlockVariant;
       const block = new Block({
-        position: bd.position,
-        color:    parseInt(bd.color.replace('#', ''), 16),
-        size:     bd.size,
-        variant:  resolvedVariant,
+        position:      bd.position,
+        color:         parseInt(bd.color.replace('#', ''), 16),
+        size:          bd.size,
+        variant:       resolvedVariant,
+        shape:         bd.shape ?? 'default',
+        wedgeDirection: bd.wedgeDirection ?? 'z+',
       });
       const blockTopY = bd.position[1] + bd.size[1] / 2;
       block.mesh.userData.blockId   = bd.id;
