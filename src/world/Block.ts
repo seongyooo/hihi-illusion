@@ -45,44 +45,41 @@ function makeBlockMat(hex: number, variant: BlockVariant): THREE.Material {
  * direction에 따라 Y축 회전 적용.
  */
 export function makeWedgeGeo(direction: WedgeDirection = 'z+'): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry();
-  // 6개 꼭짓점: 바닥 4개 + 상단 뒤쪽(-Z) 2개
-  // 기준: 경사가 +Z 방향, 높은 벽이 -Z
-  const verts = new Float32Array([
-    -0.5, -0.5, -0.5,  // 0 bottom-back-left
-     0.5, -0.5, -0.5,  // 1 bottom-back-right
-     0.5, -0.5,  0.5,  // 2 bottom-front-right
-    -0.5, -0.5,  0.5,  // 3 bottom-front-left
-    -0.5,  0.5, -0.5,  // 4 top-back-left
-     0.5,  0.5, -0.5,  // 5 top-back-right
-  ]);
-  geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-  geo.setIndex([
-    0, 1, 2,  0, 2, 3,  // 바닥면
-    0, 4, 5,  0, 5, 1,  // 뒤 벽 (높은 면)
-    3, 5, 4,  3, 2, 5,  // 경사면
-    0, 3, 4,            // 왼쪽 삼각형
-    1, 5, 2,            // 오른쪽 삼각형
+  // 비인덱스 방식: 면마다 꼭짓점을 독립적으로 선언해
+  // computeVertexNormals()가 각 면의 법선을 정확히 계산하도록 함.
+  // 기준: 경사가 +Z 방향으로 낮아짐 (높은 벽이 -Z)
+  // eslint-disable-next-line prettier/prettier
+  const positions = new Float32Array([
+    // 바닥면 (-Y)
+    -0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,-0.5, 0.5,
+    -0.5,-0.5,-0.5,  0.5,-0.5, 0.5, -0.5,-0.5, 0.5,
+    // 뒤 벽 (-Z, 높은 면)
+    -0.5,-0.5,-0.5, -0.5, 0.5,-0.5,  0.5, 0.5,-0.5,
+    -0.5,-0.5,-0.5,  0.5, 0.5,-0.5,  0.5,-0.5,-0.5,
+    // 경사면 (+Y+Z)
+    -0.5,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5, 0.5,-0.5,
+    -0.5,-0.5, 0.5,  0.5, 0.5,-0.5, -0.5, 0.5,-0.5,
+    // 왼쪽 삼각형 (-X)
+    -0.5,-0.5,-0.5, -0.5,-0.5, 0.5, -0.5, 0.5,-0.5,
+    // 오른쪽 삼각형 (+X)
+     0.5,-0.5,-0.5,  0.5, 0.5,-0.5,  0.5,-0.5, 0.5,
   ]);
 
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
   if (direction === 'y+') {
-    // 경사면이 위(+Y)를 향함: X축 -90° 회전
     geo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
   } else if (direction === 'y-') {
-    // 경사면이 아래(-Y)를 향함: X축 +90° 회전
     geo.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   } else {
     const yAngleMap: Record<string, number> = {
-      'z+': 0,
-      'z-': Math.PI,
-      'x-': Math.PI / 2,
-      'x+': -Math.PI / 2,
+      'z+': 0, 'z-': Math.PI, 'x-': Math.PI / 2, 'x+': -Math.PI / 2,
     };
     const angle = yAngleMap[direction];
-    if (angle !== 0) {
-      geo.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
-    }
+    if (angle !== 0) geo.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
   }
+
   geo.computeVertexNormals();
   return geo;
 }
