@@ -1416,12 +1416,9 @@ export class GameManager {
       activateElevation: number; elevationTolerance: number;
     }> = [];
 
-    // 축-정렬 블록 쌍 허용 오차 (°)
+    // 착시 허용 오차 (°)
     const AZ_TOL      = 1;
     const EL_TOL      = 1;
-    // 대각선 배치 블록 쌍 허용 오차: face 공식의 elevation 오차가 최대 ~7° 발생하므로 여유 있게 설정
-    const AZ_TOL_DIAG = 1;
-    const EL_TOL_DIAG = 3;
 
     const EL_MIN = -5;  // 카메라 elevation 하한 (여유 포함)
     const EL_MAX = 65;  // 카메라 elevation 상한 (여유 포함)
@@ -1460,17 +1457,14 @@ export class GameManager {
         const yDiff  = Math.abs(B_topY - A_topY);
         if (xzDist <= 1.1 && yDiff < 0.15) continue;
 
-        // 대각선 여부: dx와 dz가 모두 의미 있을 때 → 더 넓은 허용 오차 사용
         const isDiag = Math.abs(dx) > 0.01 && Math.abs(dz) > 0.01;
-        const azTol  = isDiag ? AZ_TOL_DIAG : AZ_TOL;
-        const elTol  = isDiag ? EL_TOL_DIAG : EL_TOL;
 
         // X축 방향 face 쌍: A의 ±x 면 → B의 ∓x 면
         if (Math.abs(dx) > 0.01) {
           const signX = dx > 0 ? 1 : -1;
           const FA = { x: a.position[0] + signX * a.size[0] / 2, y: A_topY, z: a.position[2] };
           const FB = { x: b.position[0] - signX * b.size[0] / 2, y: B_topY, z: b.position[2] };
-          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, azTol, elTol);
+          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, AZ_TOL, EL_TOL);
         }
 
         // Z축 방향 face 쌍: A의 ±z 면 → B의 ∓z 면
@@ -1478,12 +1472,12 @@ export class GameManager {
           const signZ = dz > 0 ? 1 : -1;
           const FA = { x: a.position[0], y: A_topY, z: a.position[2] + signZ * a.size[2] / 2 };
           const FB = { x: b.position[0], y: B_topY, z: b.position[2] - signZ * b.size[2] / 2 };
-          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, azTol, elTol);
+          tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, AZ_TOL, EL_TOL);
         }
 
-        // 대각선 배치 추가: center-to-center 벡터로 보완 (face 공식과 다른 각도 커버)
+        // 대각선 배치 추가: center-to-center 벡터로 보완
         if (isDiag) {
-          tryRegister(a.id, b.id, dx, B_topY - A_topY, dz, azTol, elTol);
+          tryRegister(a.id, b.id, dx, B_topY - A_topY, dz, AZ_TOL, EL_TOL);
         }
       }
     }
@@ -1521,23 +1515,21 @@ export class GameManager {
           if (xzDist <= 1.1 && yDiff < 0.15) continue;
 
           const isDiagM = Math.abs(dx) > 0.01 && Math.abs(dz) > 0.01;
-          const azTolM  = isDiagM ? AZ_TOL_DIAG : AZ_TOL;
-          const elTolM  = isDiagM ? EL_TOL_DIAG : EL_TOL;
 
           if (Math.abs(dx) > 0.01) {
             const signX = dx > 0 ? 1 : -1;
             const FA = { x: a.position[0] + signX * a.size[0] / 2, y: A_topY, z: a.position[2] };
             const FB = { x: b.position[0] - signX * b.size[0] / 2, y: B_topY, z: b.position[2] };
-            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, azTolM, elTolM);
+            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, AZ_TOL, EL_TOL);
           }
           if (Math.abs(dz) > 0.01) {
             const signZ = dz > 0 ? 1 : -1;
             const FA = { x: a.position[0], y: A_topY, z: a.position[2] + signZ * a.size[2] / 2 };
             const FB = { x: b.position[0], y: B_topY, z: b.position[2] - signZ * b.size[2] / 2 };
-            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, azTolM, elTolM);
+            tryRegister(a.id, b.id, FB.x - FA.x, FB.y - FA.y, FB.z - FA.z, AZ_TOL, EL_TOL);
           }
           if (isDiagM) {
-            tryRegister(a.id, b.id, dx, B_topY - A_topY, dz, azTolM, elTolM);
+            tryRegister(a.id, b.id, dx, B_topY - A_topY, dz, AZ_TOL, EL_TOL);
           }
         }
       }
