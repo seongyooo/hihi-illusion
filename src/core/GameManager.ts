@@ -1420,8 +1420,8 @@ export class GameManager {
     const AZ_TOL      = 1;
     const EL_TOL      = 1;
     // 대각선 배치 블록 쌍 허용 오차: face 공식의 elevation 오차가 최대 ~7° 발생하므로 여유 있게 설정
-    const AZ_TOL_DIAG = 3;
-    const EL_TOL_DIAG = 8;
+    const AZ_TOL_DIAG = 1;
+    const EL_TOL_DIAG = 3;
 
     const EL_MIN = -5;  // 카메라 elevation 하한 (여유 포함)
     const EL_MAX = 65;  // 카메라 elevation 상한 (여유 포함)
