@@ -91,17 +91,13 @@ export function makeWedgeGeo(direction: WedgeDirection = 'z+'): THREE.BufferGeom
  * - ratio: 모서리 반지름 비율 (Y 방향 포함)
  * - xzRatio: XZ 팽창 비율 (인접 블록 이음새 제거용, radius와 독립 조절 가능)
  */
-// 구분선 제거 시 적용할 XZ 팽창 비율 (이음새를 덮을 만큼의 최소값)
-const SEAMLESS_XZ_RATIO = 0.025;
-
 function makeBlockGeo(
   w: number, h: number, d: number,
   ratio   = GraphicsSettings.blockRadiusRatio,
   xzRatio = GraphicsSettings.blockXZRatio,
 ): THREE.BufferGeometry {
-  const r           = Math.min(w, h, d) * Math.max(0, ratio);
-  const seamless    = GraphicsSettings.blockDividers ? 0 : Math.min(w, d) * SEAMLESS_XZ_RATIO;
-  const inflate     = Math.min(w, d) * Math.max(0, xzRatio) + seamless;
+  const r       = Math.min(w, h, d) * Math.max(0, ratio);
+  const inflate = Math.min(w, d)    * Math.max(0, xzRatio);
   if (r <= 0 && inflate <= 0) return new THREE.BoxGeometry(w, h, d);
   if (r <= 0)                 return new THREE.BoxGeometry(w + 2 * inflate, h, d + 2 * inflate);
   return new RoundedBoxGeometry(w + 2 * inflate, h, d + 2 * inflate, ROUNDED_SEGMENTS, r);

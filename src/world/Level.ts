@@ -3,6 +3,8 @@ import gsap from 'gsap';
 import { Block } from './Block';
 import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
+import { buildSeamMesh, disposeSeamGroup } from './SeamMeshBuilder';
+import { GraphicsSettings } from '../core/GraphicsSettings';
 
 // ---------- 가시 메시 생성 ----------
 export const SPIKE_H      = 0.22;
@@ -236,6 +238,9 @@ export class Level {
   private blinkIsActive  = false; // 현재 사이클에서 가시가 위험 상태인가
   private scene: THREE.Scene;
 
+  private levelBlocks: BlockData[] = [];   // seam mesh 재빌드용 원본 BlockData
+  private seamGroup: THREE.Group | null = null; // 구분선 제거 merged mesh
+
   // blinking 속도 설정 (dev에서 조절 가능)
   blinkOnDuration  = 1.5; // 가시 올라와 있는 시간(초)
   blinkOffDuration = 1.0; // 가시 내려가 있는 시간(초)
@@ -339,6 +344,10 @@ export class Level {
     // (WorldRotateManager.setup()이 위치 오프셋을 나중에 설정)
     this.flipPivot.add(this.group);
     this.scene.add(this.flipPivot);
+
+    // seam mesh 빌드 (blockDividers=false 시)
+    this.levelBlocks = data.blocks;
+    this.rebuildSeamMesh(null);
   }
 
   getGroup(): THREE.Group               { return this.group; }
@@ -414,6 +423,7 @@ export class Level {
   /** Apply a global hex color to all blocks, or restore each block's original JSON color. */
   recolorAllBlocks(hexOverride: number | null): void {
     this.blocks.forEach(block => block.recolor(hexOverride));
+    this.rebuildSeamMesh(hexOverride);
   }
 
   /** Apply a global material variant to all blocks. */
@@ -424,6 +434,17 @@ export class Level {
   /** Rebuild geometry for all blocks (called when block radius changes). */
   regeometryAllBlocks(): void {
     this.blocks.forEach(block => block.rebuildGeometry());
+  }
+
+  /** seam mesh를 재빌드한다. blockDividers=true면 제거만 한다. */
+  rebuildSeamMesh(colorOverride: number | null): void {
+    disposeSeamGroup(this.seamGroup, this.group);
+    this.seamGroup = null;
+
+    if (!GraphicsSettings.blockDividers && this.levelBlocks.length > 0) {
+      this.seamGroup = buildSeamMesh(this.levelBlocks, colorOverride);
+      this.group.add(this.seamGroup);
+    }
   }
 
   /**
@@ -488,6 +509,10 @@ export class Level {
   }
 
   dispose(): void {
+    disposeSeamGroup(this.seamGroup, this.group);
+    this.seamGroup   = null;
+    this.levelBlocks = [];
+
     // 포탈 링 GSAP 트윈 먼저 정리 (scale: Group, opacity: MeshBasicMaterial)
     for (const pg of this.portalGroups) {
       pg.traverse(child => {

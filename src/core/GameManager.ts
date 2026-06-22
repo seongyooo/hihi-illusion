@@ -242,7 +242,10 @@ export class GameManager {
 
     this.settingsScreen.onBlockDividersChange = (val) => {
       GraphicsSettings.blockDividers = val;
-      this.level?.regeometryAllBlocks();
+      const override = GraphicsSettings.blockColorOverride
+        ? parseInt(GraphicsSettings.blockColorOverride.replace('#', ''), 16)
+        : null;
+      this.level?.rebuildSeamMesh(override);
     };
 
     this.settingsScreen.onCharBodyColorChange = (hexStr) => {
