@@ -4,61 +4,61 @@
   "backgroundColor": "#E8EEF5",
   "blocks": [
     {
-      "id": "b001",
+      "id": "b005",
       "position": [
         6.5,
-        0.25,
+        0.5,
         6.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
     },
     {
-      "id": "b002",
+      "id": "b006",
       "position": [
         9.5,
-        1.75,
+        2.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
     },
     {
-      "id": "b003",
+      "id": "b007",
       "position": [
         10.5,
-        1.75,
+        2.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
     },
     {
-      "id": "b004",
+      "id": "b008",
       "position": [
         10.5,
-        1.75,
+        2.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -100,15 +100,15 @@
     }
   ],
   "character": {
-    "startNodeId": "b001"
+    "startNodeId": "b005"
   },
   "goal": {
-    "blockId": "b004"
+    "blockId": "b008"
   },
   "initialCamera": {
-    "azimuth": -90,
-    "polar": 69,
-    "distance": 26,
+    "azimuth": 45,
+    "polar": 33,
+    "distance": 14,
     "targetY": 0
   }
 }
