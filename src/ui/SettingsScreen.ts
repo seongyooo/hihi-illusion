@@ -31,6 +31,8 @@ export class SettingsScreen {
   private rotateRow!:         SliderRow;
   private dampingRow!:        SliderRow;
 
+  private dividersCheckbox!:  HTMLInputElement;
+
   private tapCount  = 0;
   private tapTimer: ReturnType<typeof setTimeout> | null = null;
   private graphicsTapCount  = 0;
@@ -49,6 +51,7 @@ export class SettingsScreen {
   onCharacterTypeChange:  (type: string)            => void = () => {};
   onBlockRadiusChange:    (val: number)             => void = () => {};
   onBlockXZChange:        (val: number)             => void = () => {};
+  onBlockDividersChange:  (val: boolean)            => void = () => {};
   onRotateSpeedChange:    (val: number)             => void = () => {};
   onDampingFactorChange:  (val: number)             => void = () => {};
   onWorldMapModeChange:   (v: boolean)              => void = () => {};
@@ -129,6 +132,14 @@ export class SettingsScreen {
       },
     );
     body.appendChild(wmRow.el);
+
+    const dividersRow = this.makeToggleRow(
+      'Block Dividers',
+      GraphicsSettings.blockDividers,
+      (val) => { this.onBlockDividersChange(val); this.preview.refresh(); },
+    );
+    this.dividersCheckbox = dividersRow.checkbox;
+    body.appendChild(dividersRow.el);
 
     // — COLORS —
     body.appendChild(this.makeSection('COLORS'));
@@ -621,6 +632,10 @@ export class SettingsScreen {
     // Star Background
     GraphicsSettings.starBackground = false;
     this.onStarBgChange(false);
+
+    // Block Dividers
+    this.dividersCheckbox.checked = true;
+    this.onBlockDividersChange(true);
 
     // Colors
     GraphicsSettings.resetColors();

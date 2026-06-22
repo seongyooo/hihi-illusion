@@ -23,6 +23,7 @@ const KEY_EXPOSURE       = 'hihi_exposure';
 const KEY_ROTATE_SPEED   = 'hihi_rotate_speed';
 const KEY_DAMPING_FACTOR = 'hihi_damping_factor';
 const KEY_WORLD_MAP      = 'hihi_world_map_mode';
+const KEY_BLOCK_DIVIDERS = 'hihi_block_dividers';
 
 export const EXPOSURE_DEFAULT       = 0.48; // Enhanced 모드 기본 노출값
 export const BLOCK_RADIUS_DEFAULT  = 0.04; // 블록 모서리 반지름 비율 기본값
@@ -150,6 +151,14 @@ export class GraphicsSettings {
   }
   static set dampingFactor(val: number) { setNum(KEY_DAMPING_FACTOR, val === DAMPING_FACTOR_DEFAULT ? null : val); }
 
+  // 구분선(블록 간 이음새) 표시 여부 — false면 XZ 팽창으로 이음새 제거
+  static get blockDividers(): boolean {
+    return localStorage.getItem(KEY_BLOCK_DIVIDERS) !== 'false'; // 기본값 true
+  }
+  static set blockDividers(val: boolean) {
+    localStorage.setItem(KEY_BLOCK_DIVIDERS, val ? 'true' : 'false');
+  }
+
   static get worldMapMode(): boolean {
     return localStorage.getItem(KEY_WORLD_MAP) === 'true';
   }
@@ -180,6 +189,7 @@ export class GraphicsSettings {
     localStorage.removeItem(KEY_BLOCK_VARIANT);
     localStorage.removeItem(KEY_BLOCK_RADIUS);
     localStorage.removeItem(KEY_BLOCK_XZ);
+    localStorage.removeItem(KEY_BLOCK_DIVIDERS);
     localStorage.removeItem(KEY_CHAR_BODY);
     localStorage.removeItem(KEY_CHAR_HEAD);
     localStorage.removeItem(KEY_CHAR_TYPE);

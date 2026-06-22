@@ -240,6 +240,11 @@ export class GameManager {
       this.level?.regeometryAllBlocks();
     };
 
+    this.settingsScreen.onBlockDividersChange = (val) => {
+      GraphicsSettings.blockDividers = val;
+      this.level?.regeometryAllBlocks();
+    };
+
     this.settingsScreen.onCharBodyColorChange = (hexStr) => {
       GraphicsSettings.characterBodyColor = hexStr;
       this.character?.setBodyColor(hexStr);
