@@ -674,8 +674,10 @@ export class GameManager {
           onRotateUpdate: () => {
             if (this.graph) this.illusionMgr?.update(this.graph);
           },
-          onRotateComplete: () => {
-            // PathGraph는 WorldRotateManager 내부에서 refresh() 완료
+          onRotateComplete: (up: THREE.Vector3) => {
+            // PathGraph는 WorldRotateManager 내부에서 refresh(up) 완료
+            // 캐릭터 중력 방향 업데이트
+            this.controller?.setGravityUp(up);
             // 착시 연결 재계산
             if (this.illusionMgr && this.graph && this._levelData) {
               const newConns = this._buildIllusionConnsWorldSpace(this._levelData);

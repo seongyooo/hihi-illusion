@@ -512,6 +512,45 @@ canvas {
   border-color: rgba(245, 240, 232, 0.35);
 }
 
+/* ── 스테이지 미리보기 툴팁 ───────────────────────────────────────────────── */
+.stage-preview-tooltip {
+  position: absolute;
+  width: 256px;
+  background: rgba(14, 14, 28, 0.96);
+  border: 1px solid rgba(245, 240, 232, 0.22);
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.93) translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+
+.stage-preview-tooltip.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.stage-preview-tooltip__img {
+  display: block;
+  width: 256px;
+  height: 192px;
+  object-fit: cover;
+  background: rgba(26, 26, 46, 0.8);
+}
+
+.stage-preview-tooltip__label {
+  font-family: 'Georgia', serif;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  color: rgba(245, 240, 232, 0.5);
+  text-align: center;
+  padding: 7px 0 8px;
+  text-transform: uppercase;
+}
+
 .stage-select__page-nav {
   display: flex;
   align-items: center;
@@ -586,6 +625,41 @@ canvas {
   touch-action: manipulation;
 }
 .editor-panel-toggle:hover { background: rgba(42, 42, 80, 0.9); }
+
+/* Drag-select rectangle */
+.editor-drag-select {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px solid rgba(68, 136, 255, 0.85);
+  background: rgba(68, 136, 255, 0.10);
+  display: none;
+  border-radius: 2px;
+}
+
+/* Multi-select action bar */
+.editor-multi-bar {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 14, 36, 0.92);
+  border: 1px solid rgba(68, 136, 255, 0.4);
+  border-radius: 8px;
+  padding: 7px 14px;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+.editor-multi-bar.visible { display: flex; }
+.editor-multi-bar__count {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(68, 136, 255, 0.9);
+  min-width: 90px;
+}
+
 .editor-angle-overlay {
   position: absolute;
   bottom: 16px;
@@ -1268,6 +1342,15 @@ canvas {
   user-select: none;
   padding: 0 4px;
   flex-shrink: 0;
+}
+.editor-lobby__card-thumb {
+  width: 80px;
+  height: 60px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #0e0e1e;
+  border: 1px solid #2a2a4a;
 }
 .editor-lobby__card-num {
   font-family: 'Courier New', monospace;

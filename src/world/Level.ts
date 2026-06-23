@@ -195,12 +195,12 @@ export interface LevelData {
     distance: number;
     duration: number;
   }>;
-  stars?: Array<{ nodeId: string; flipped?: boolean }>;
+  stars?: Array<{ nodeId: string; flipped?: boolean; face?: [number, number, number] }>;
   mapRotateBlocks?: Array<{
     nodeId:  string;
-    axis:    'x' | 'y';
+    axis:    'x' | 'z';
     angle:   number;   // degrees (예: 180, 90)
-    pivotY?: number;   // X축 회전 전용 피벗 Y (미지정 시 맵 중심)
+    pivotY?: number;   // X·Z축 회전 전용 피벗 Y (미지정 시 맵 중심)
   }>;
   enemies?: EnemyDef[];
   lasers?: LaserDef[];

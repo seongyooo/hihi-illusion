@@ -20,6 +20,7 @@ export class CharacterController {
   private onDepart?:    (nodeId: string) => void;
   private shouldBlock?: () => boolean;
   private readonly _wp = new THREE.Vector3();
+  private _gravityUp = new THREE.Vector3(0, 1, 0);
 
   // 남은 경로 (한 스텝씩 소비)
   private _movePath: PathNode[] = [];
@@ -43,6 +44,11 @@ export class CharacterController {
     character.setPosition(x, y, z);
   }
 
+  /** 맵 회전 후 중력 방향 업데이트 */
+  setGravityUp(up: THREE.Vector3): void {
+    this._gravityUp.copy(up).normalize();
+  }
+
   moveTo(target: PathNode): void {
     if (target === this.currentNode) return;
     if (this.isMoving) {
@@ -60,8 +66,8 @@ export class CharacterController {
 
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
-    node.mesh.getWorldPosition(this._wp);
-    this.character.setPosition(this._wp.x, this._wp.y + node.halfHeight, this._wp.z);
+    // node.position is already the correct face position (from PathGraph)
+    this.character.setPosition(node.position.x, node.position.y, node.position.z);
     this.currentNode = node;
   }
 
@@ -88,12 +94,14 @@ export class CharacterController {
     gsap.killTweensOf(this.character.mesh.rotation);
     this.character.stopWalk();
     this.isMoving = false;
-    // 현재 노드 위치로 스냅
+    // 현재 노드 위치로 스냅 (gravity-aware)
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const u = this._gravityUp;
+    const h = this.currentNode.halfHeight;
     this.character.setPosition(
-      this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
-      this._wp.z,
+      this._wp.x + u.x * h,
+      this._wp.y + u.y * h,
+      this._wp.z + u.z * h,
     );
   }
 
@@ -124,12 +132,14 @@ export class CharacterController {
     this.isMoving     = false;
     this.pendingTarget = null;
     this._movePath    = [];
-    // 현재 노드 위치로 즉시 스냅
+    // 현재 노드 위치로 즉시 스냅 (gravity-aware)
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const u = this._gravityUp;
+    const h = this.currentNode.halfHeight;
     char.setPosition(
-      this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
-      this._wp.z,
+      this._wp.x + u.x * h,
+      this._wp.y + u.y * h,
+      this._wp.z + u.z * h,
     );
   }
 
@@ -197,16 +207,19 @@ export class CharacterController {
 
     this.onDepart?.(prev.id);
 
+    const u = this._gravityUp;
+
     const tl = gsap.timeline({
       onComplete: () => {
         this.currentNode = node;
         // 이동 블록(패트롤 등): 0.25s 애니메이션 동안 블록이 이동했을 수 있으므로
         // 트위닝이 끝난 직후 실제 현재 위치로 스냅해 update()의 한 프레임 지연 없앰
         node.mesh.getWorldPosition(this._wp);
+        const h = node.halfHeight;
         this.character.setPosition(
-          this._wp.x,
-          this._wp.y + node.halfHeight,
-          this._wp.z,
+          this._wp.x + u.x * h,
+          this._wp.y + u.y * h,
+          this._wp.z + u.z * h,
         );
         // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
         // (QA-06: 이중 발동 방지 — 마지막 노드에서 tl.onComplete + 경로소진 양쪽 호출되던 문제)
@@ -242,10 +255,12 @@ export class CharacterController {
   update(): void {
     if (this.isMoving) return;
     this.currentNode.mesh.getWorldPosition(this._wp);
+    const u = this._gravityUp;
+    const h = this.currentNode.halfHeight;
     this.character.setPosition(
-      this._wp.x,
-      this._wp.y + this.currentNode.halfHeight,
-      this._wp.z,
+      this._wp.x + u.x * h,
+      this._wp.y + u.y * h,
+      this._wp.z + u.z * h,
     );
   }
 

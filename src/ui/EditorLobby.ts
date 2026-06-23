@@ -2,6 +2,7 @@ import { CustomLevelStore } from '../editor/CustomLevelStore';
 import { ProgressStore }    from '../core/ProgressStore';
 import { CUSTOM_STAGE_NUMS, customModules } from '../levels/registry';
 import type { LevelData } from '../world/Level';
+import { renderStagePreview } from './StagePreviewRenderer';
 
 export class EditorLobby {
   private el: HTMLElement;
@@ -182,6 +183,11 @@ export class EditorLobby {
       dragHandle.textContent = '⠿';
       dragHandle.title = '드래그해서 순서 변경';
 
+      const thumb = document.createElement('img');
+      thumb.className = 'editor-lobby__card-thumb';
+      thumb.draggable = false;
+      renderStagePreview(level.stageNum).then(url => { thumb.src = url; }).catch(() => {});
+
       const num = document.createElement('span');
       num.className = 'editor-lobby__card-num';
       num.textContent = `Stage ${level.stageNum}`;
@@ -231,6 +237,7 @@ export class EditorLobby {
       btnRow.appendChild(delBtn);
 
       card.appendChild(dragHandle);
+      card.appendChild(thumb);
       card.appendChild(num);
       card.appendChild(name);
       card.appendChild(btnRow);
@@ -281,6 +288,11 @@ export class EditorLobby {
       dragHandle.className = 'editor-lobby__card-handle';
       dragHandle.textContent = '⠿';
 
+      const thumbEl = document.createElement('img');
+      thumbEl.className = 'editor-lobby__card-thumb';
+      thumbEl.draggable = false;
+      renderStagePreview(num).then(url => { thumbEl.src = url; }).catch(() => {});
+
       const numEl = document.createElement('span');
       numEl.className = 'editor-lobby__card-num';
       numEl.textContent = `Stage ${num}`;
@@ -292,6 +304,7 @@ export class EditorLobby {
       editBtn.addEventListener('click', () => this.onEditBuiltin(num));
 
       card.appendChild(dragHandle);
+      card.appendChild(thumbEl);
       card.appendChild(numEl);
       card.appendChild(editBtn);
       gridEl.appendChild(card);

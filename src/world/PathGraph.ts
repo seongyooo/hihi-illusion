@@ -8,6 +8,7 @@ export interface PathNode {
   neighbors: PathNode[];
   mesh: THREE.Object3D;
   halfHeight: number;
+  halfSize: THREE.Vector3;  // full half-extents for all 3 axes
 }
 
 const XZ_THRESHOLD    = 1.1;
@@ -26,21 +27,35 @@ export class PathGraph {
   // 조건부 사다리: switchNodeId → 엣지 쌍 목록 (활성화된 것만 저장)
   private conditionalLadderGroups: Map<string, Array<[string, string]>> = new Map();
 
+  // Current gravity-up direction (may change after world rotation)
+  private _gravityUp = new THREE.Vector3(0, 1, 0);
+  // Pre-allocated temp vectors for buildEdges() (avoids GC pressure)
+  private readonly _da   = new THREE.Vector3();
+  private readonly _perp = new THREE.Vector3();
+
   build(blocks: BlockData[], getMesh: (id: string) => THREE.Object3D | undefined): void {
     this.nodes.clear();
+    this._gravityUp.set(0, 1, 0);
     for (const block of blocks) {
       if (!block.walkable) continue;
       const mesh = getMesh(block.id);
       if (!mesh) continue;
       const wp = new THREE.Vector3();
       mesh.getWorldPosition(wp);
-      const halfH = block.size[1] / 2;
+      const [w, h, d] = block.size;
+      const halfH = h / 2;
+      const u     = this._gravityUp;
       this.nodes.set(block.id, {
         id: block.id,
-        position: new THREE.Vector3(wp.x, wp.y + halfH, wp.z),
+        position: new THREE.Vector3(
+          wp.x + u.x * halfH,
+          wp.y + u.y * halfH,
+          wp.z + u.z * halfH,
+        ),
         neighbors: [],
         mesh,
         halfHeight: halfH,
+        halfSize: new THREE.Vector3(w / 2, halfH, d / 2),
       });
     }
     this.buildEdges();
@@ -48,25 +63,38 @@ export class PathGraph {
 
   addSectionNodes(entries: SectionNodeEntry[]): void {
     const wp = new THREE.Vector3();
+    const u  = this._gravityUp;
     for (const { id, mesh, halfHeight } of entries) {
       mesh.getWorldPosition(wp);
       this.nodes.set(id, {
         id,
-        position: new THREE.Vector3(wp.x, wp.y + halfHeight, wp.z),
+        position: new THREE.Vector3(
+          wp.x + u.x * halfHeight,
+          wp.y + u.y * halfHeight,
+          wp.z + u.z * halfHeight,
+        ),
         neighbors: [],
         mesh,
         halfHeight,
+        halfSize: new THREE.Vector3(0.5, halfHeight, 0.5),
       });
     }
     this.buildEdges();
   }
 
-  // Call after any section rotation to update dynamic positions
-  refresh(): void {
+  // Call after any world rotation to update positions with new gravity direction
+  refresh(up?: THREE.Vector3): void {
+    if (up) this._gravityUp.copy(up).normalize();
     const wp = new THREE.Vector3();
+    const u  = this._gravityUp;
     for (const node of this.nodes.values()) {
       node.mesh.getWorldPosition(wp);
-      node.position.set(wp.x, wp.y + node.halfHeight, wp.z);
+      const h = node.halfHeight;
+      node.position.set(
+        wp.x + u.x * h,
+        wp.y + u.y * h,
+        wp.z + u.z * h,
+      );
     }
     this.buildEdges();
   }
@@ -130,19 +158,27 @@ export class PathGraph {
   private buildEdges(): void {
     for (const node of this.nodes.values()) node.neighbors = [];
     const list = Array.from(this.nodes.values()).filter(n => !this.disabledNodes.has(n.id));
+    const u = this._gravityUp;
+    const da   = this._da;
+    const perp = this._perp;
 
-    // 천장 막힘 계산: 같은 X/Z(MIN_XZ_DIST 미만)에 바로 위층 블록이 있으면 이동 불가.
-    // b의 바닥면(b.position.y - 2*b.halfHeight)이 a의 윗면(a.position.y)에
-    // 붙어 있을 때만 막힘 — 멀리 떨어진 위층 블록은 무시.
-    const CEILING_GAP = 0.3; // 바닥면과 윗면 사이 허용 간격 (부동소수점 여유 포함)
+    // 천장 막힘 계산: 같은 XZ(MIN_XZ_DIST 미만)에 바로 위층 블록이 있으면 이동 불가.
+    const CEILING_GAP = 0.3;
     const ceilingBlocked = new Set<string>();
+
     for (const a of list) {
       for (const b of list) {
         if (a === b) continue;
-        const xzDist = Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z);
-        if (xzDist >= MIN_XZ_DIST) continue;
-        const bBottom = b.position.y - 2 * b.halfHeight; // b의 바닥면 Y
-        const gap     = bBottom - a.position.y;           // b 바닥 - a 윗면
+        da.subVectors(b.position, a.position);
+        const upComp = da.dot(u);
+        // perpendicular component (floor-plane distance)
+        perp.copy(da).addScaledVector(u, -upComp);
+        const perpDist = perp.length();
+        if (perpDist >= MIN_XZ_DIST) continue;
+        // b의 바닥면 along-up = b.position.dot(u) - 2*halfH
+        const bBottomAlongUp = b.position.dot(u) - 2 * b.halfHeight;
+        const aTopAlongUp    = a.position.dot(u);
+        const gap = bBottomAlongUp - aTopAlongUp;
         if (gap >= -0.05 && gap < CEILING_GAP) {
           ceilingBlocked.add(a.id);
           break;
@@ -156,11 +192,14 @@ export class PathGraph {
         const b = list[j];
         // 천장 막힘 노드는 수평 이동 불가
         if (ceilingBlocked.has(a.id) || ceilingBlocked.has(b.id)) continue;
-        const xzDist = Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z);
-        const yDiff  = Math.abs(a.position.y - b.position.y);
+        da.subVectors(b.position, a.position);
+        const upComp = da.dot(u);
+        perp.copy(da).addScaledVector(u, -upComp);
+        const perpDist = perp.length();
+        const upDiff   = Math.abs(upComp);
 
         // 같은 층: XZ 인접이면 자유 이동 (수직 적층 블록은 제외)
-        if (xzDist >= MIN_XZ_DIST && xzDist <= XZ_THRESHOLD && yDiff < SAME_FLOOR_Y) {
+        if (perpDist >= MIN_XZ_DIST && perpDist <= XZ_THRESHOLD && upDiff < SAME_FLOOR_Y) {
           // hold+spawn 게이트: 타겟 노드는 지정된 스위치 방향 엣지만 허용
           const aGate = this.switchGatedNodes.get(a.id);
           const bGate = this.switchGatedNodes.get(b.id);
@@ -182,10 +221,7 @@ export class PathGraph {
       if (bGate !== undefined && bGate !== aId) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
-      if (a && b) {
-        a.neighbors.push(b);
-        b.neighbors.push(a);
-      }
+      if (a && b) { a.neighbors.push(b); b.neighbors.push(a); }
     }
 
     // 조건부 사다리 엣지 (스위치 활성화 시에만 적용)
@@ -195,10 +231,7 @@ export class PathGraph {
         if (ceilingBlocked.has(aId) || ceilingBlocked.has(bId)) continue;
         const a = this.nodes.get(aId);
         const b = this.nodes.get(bId);
-        if (a && b) {
-          a.neighbors.push(b);
-          b.neighbors.push(a);
-        }
+        if (a && b) { a.neighbors.push(b); b.neighbors.push(a); }
       }
     }
 
@@ -212,10 +245,7 @@ export class PathGraph {
       if (bGate !== undefined && bGate !== aId) continue;
       const a = this.nodes.get(aId);
       const b = this.nodes.get(bId);
-      if (a && b) {
-        a.neighbors.push(b);
-        b.neighbors.push(a);
-      }
+      if (a && b) { a.neighbors.push(b); b.neighbors.push(a); }
     }
 
     // 순간이동 엣지는 경로탐색에 포함하지 않음.
@@ -226,31 +256,29 @@ export class PathGraph {
   addWalkableNode(id: string, mesh: THREE.Object3D, halfHeight: number): void {
     const wp = new THREE.Vector3();
     mesh.getWorldPosition(wp);
+    const u = this._gravityUp;
     this.nodes.set(id, {
       id,
-      position: new THREE.Vector3(wp.x, wp.y + halfHeight, wp.z),
+      position: new THREE.Vector3(
+        wp.x + u.x * halfHeight,
+        wp.y + u.y * halfHeight,
+        wp.z + u.z * halfHeight,
+      ),
       neighbors: [],
       mesh,
       halfHeight,
+      halfSize: new THREE.Vector3(0.5, halfHeight, 0.5),
     });
     this.buildEdges();
   }
 
   /** 스위치/소환 게이트: 노드를 경로탐색에서 제외 (mesh는 유지) */
-  disableNode(id: string): void {
-    this.disabledNodes.add(id);
-    this.buildEdges();
-  }
+  disableNode(id: string): void { this.disabledNodes.add(id); this.buildEdges(); }
 
   /** 스위치/소환 게이트: 노드를 경로탐색에 재포함 */
-  enableNode(id: string): void {
-    this.disabledNodes.delete(id);
-    this.buildEdges();
-  }
+  enableNode(id: string): void { this.disabledNodes.delete(id); this.buildEdges(); }
 
-  isNodeDisabled(id: string): boolean {
-    return this.disabledNodes.has(id);
-  }
+  isNodeDisabled(id: string): boolean { return this.disabledNodes.has(id); }
 
   /**
    * hold+spawn 전용: 타겟 노드를 스위치 노드 방향으로만 진입 가능하도록 제한.
@@ -265,13 +293,8 @@ export class PathGraph {
     this.switchGatedNodes.delete(targetNodeId);
   }
 
-  getNode(id: string): PathNode | undefined {
-    return this.nodes.get(id);
-  }
-
-  getAllNodes(): PathNode[] {
-    return Array.from(this.nodes.values());
-  }
+  getNode(id: string): PathNode | undefined { return this.nodes.get(id); }
+  getAllNodes(): PathNode[] { return Array.from(this.nodes.values()); }
 
   findPath(start: PathNode, end: PathNode): PathNode[] {
     if (start === end) return [start];

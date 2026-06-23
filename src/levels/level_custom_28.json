@@ -969,12 +969,12 @@
     },
     {
       "nodeId": "b058",
-      "axis": "y",
+      "axis": "z",
       "angle": 180
     },
     {
       "nodeId": "b040",
-      "axis": "y",
+      "axis": "z",
       "angle": 180
     },
     {

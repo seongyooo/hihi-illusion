@@ -18,22 +18,24 @@ export class StarManager {
   }
 
   setup(
-    stars: Array<{ nodeId: string; flipped?: boolean }>,
+    stars: Array<{ nodeId: string; flipped?: boolean; face?: [number, number, number] }>,
     getNode: (id: string) => PathNode | undefined,
   ): void {
     this.total = stars.length;
-    for (const { nodeId, flipped } of stars) {
-      const node = getNode(nodeId);
+    for (const star of stars) {
+      const node = getNode(star.nodeId);
       if (!node) continue;
-      if (flipped) this.flippedStarIds.add(nodeId);
-      this._createStarMesh(nodeId, node, !!flipped);
+      if (star.flipped) this.flippedStarIds.add(star.nodeId);
+      this._createStarMesh(star.nodeId, node, !!star.flipped, star.face);
     }
   }
 
-  private _createStarMesh(nodeId: string, node: PathNode, flipped = false): void {
-    // flipped=true 별은 블록 아랫면에 배치 (X축 180° 회전 후 접근 가능)
-    const localY = flipped ? -(node.halfHeight + 0.38) : (node.halfHeight + 0.38);
-
+  private _createStarMesh(
+    nodeId: string,
+    node: PathNode,
+    flipped = false,
+    face?: [number, number, number],
+  ): void {
     const geo = new THREE.OctahedronGeometry(0.17, 0);
     const mat = new THREE.MeshLambertMaterial({
       color:            0xFFD700,
@@ -41,7 +43,30 @@ export class StarManager {
       emissiveIntensity: 0.45,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(0, localY, 0);
+
+    const HOVER = 0.38; // distance above face surface
+
+    // Determine local offset direction and magnitude
+    let lx = 0, ly = 0, lz = 0;
+    if (face) {
+      // Explicit face normal — normalize and scale by halfSize along that axis
+      const [fx, fy, fz] = face;
+      const len = Math.sqrt(fx*fx + fy*fy + fz*fz) || 1;
+      const nx = fx/len, ny = fy/len, nz = fz/len;
+      const hs = node.halfSize;
+      const halfOnFace = Math.abs(nx)*hs.x + Math.abs(ny)*hs.y + Math.abs(nz)*hs.z;
+      lx = nx * (halfOnFace + HOVER);
+      ly = ny * (halfOnFace + HOVER);
+      lz = nz * (halfOnFace + HOVER);
+    } else if (flipped) {
+      // Bottom face (gravity flip mechanic)
+      ly = -(node.halfHeight + HOVER);
+    } else {
+      // Default: top face
+      ly = node.halfHeight + HOVER;
+    }
+
+    mesh.position.set(lx, ly, lz);
     node.mesh.add(mesh);  // scene 직접 추가 대신 블록 메시의 자식으로 부모화
     this.starMeshes.set(nodeId, mesh);
 
@@ -52,9 +77,14 @@ export class StarManager {
       repeat:   -1,
       ease:     'none',
     });
-    // 둥실 떠오르기/내려가기 (flipped면 아래 방향으로)
+
+    // 둥실 떠오르기/내려가기 (face 방향 또는 기본 Y 방향)
+    const mag = Math.hypot(lx, ly, lz) || 1;
+    const floatDir = face
+      ? { x: lx + (lx/mag)*0.15, y: ly + (ly/mag)*0.15, z: lz + (lz/mag)*0.15 }
+      : { y: ly + (flipped ? -0.15 : 0.15) };
     gsap.to(mesh.position, {
-      y:        localY + (flipped ? -0.15 : 0.15),
+      ...floatDir,
       duration: 1.0,
       yoyo:     true,
       repeat:   -1,

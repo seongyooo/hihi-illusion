@@ -6,6 +6,7 @@ import { Block, recolorBlockGroup, makeWedgeGeo } from '../world/Block';
 import type { WedgeDirection } from '../world/Block';
 import { CustomLevelStore } from './CustomLevelStore';
 import { CUSTOM_STAGE_NUMS } from '../levels/registry';
+import { invalidatePreviewCache } from '../ui/StagePreviewRenderer';
 
 const FACE_BRIGHTNESS = [0.82, 0.65, 1.0, 0.45, 0.70, 0.55];
 
@@ -162,8 +163,9 @@ export class LevelEditor {
   private ladderConns: Array<{ nodeA: string; nodeB: string }> = [];
   private conditionalLadderConns: Array<{ switchNodeId: string; nodeA: string; nodeB: string }> = [];
   private teleporterConns: Array<{ nodeA: string; nodeB: string }> = [];
-  private starEntries: Array<{ nodeId: string; flipped: boolean }> = [];
-  private mapRotateEntries: Array<{ nodeId: string; axis: 'x'|'y'; angle: number; pivotY?: number }> = [];
+  private starEntries: Array<{ nodeId: string; flipped: boolean; face?: [number, number, number] }> = [];
+  private starFaceSelect: HTMLSelectElement | null = null;
+  private mapRotateEntries: Array<{ nodeId: string; axis: 'x'|'z'; angle: number; pivotY?: number }> = [];
   private switchConns:      SwitchConn[] = [];
   private swPendingTargets: SwitchTarget[] = [];   // 폼에서 임시로 쌓아두는 타깃 목록
   private patrolConns:        PatrolDef[] = [];
@@ -206,7 +208,26 @@ export class LevelEditor {
 
   // Mouse drag detection
   private mouseDownPos = new THREE.Vector2();
-  private isDragging = false;
+  private isDragging   = false;
+  private isMouseDown  = false;
+  private lastPaintedCell: { x: number; z: number } | null = null;
+
+  // Undo / Redo
+  private _undoStack: LevelData[] = [];
+  private _redoStack: LevelData[] = [];
+  private readonly _MAX_UNDO = 60;
+  private _undoPushedThisDrag = false; // 드래그당 한 번만 push
+
+  // Multi-select
+  private selectedBlocks: Set<EditorBlock> = new Set();
+  // Drag-select (shift+drag in select tool)
+  private dragSelectActive       = false;
+  private dragSelectStartScreen  = { x: 0, y: 0 };
+  private dragSelectCurrentScreen = { x: 0, y: 0 };
+  private dragSelectOverlay!: HTMLElement;
+  // Multi-select action bar (floating in viewport)
+  private multiBarEl!:      HTMLElement;
+  private multiBarCount!:   HTMLSpanElement;
 
   // Callbacks
   onClose: () => void = () => {};
@@ -390,6 +411,50 @@ export class LevelEditor {
     this.renderer.domElement.addEventListener('mousedown', this.onMouseDown);
     this.renderer.domElement.addEventListener('mouseup', this.onMouseUp);
 
+    // Drag-select overlay
+    this.dragSelectOverlay = document.createElement('div');
+    this.dragSelectOverlay.className = 'editor-drag-select';
+    this.viewportEl.appendChild(this.dragSelectOverlay);
+
+    // Multi-select action bar
+    this.multiBarEl = document.createElement('div');
+    this.multiBarEl.className = 'editor-multi-bar';
+    this.multiBarCount = document.createElement('span');
+    this.multiBarCount.className = 'editor-multi-bar__count';
+    this.multiBarEl.appendChild(this.multiBarCount);
+
+    const mbUpBtn = document.createElement('button');
+    mbUpBtn.className = 'editor-btn';
+    mbUpBtn.textContent = '▲ Floor';
+    mbUpBtn.title = '선택된 블록을 한 층 위로';
+    mbUpBtn.addEventListener('click', () => this._moveSelectedFloor(1));
+
+    const mbDownBtn = document.createElement('button');
+    mbDownBtn.className = 'editor-btn';
+    mbDownBtn.textContent = '▼ Floor';
+    mbDownBtn.title = '선택된 블록을 한 층 아래로';
+    mbDownBtn.addEventListener('click', () => this._moveSelectedFloor(-1));
+
+    const mbDelBtn = document.createElement('button');
+    mbDelBtn.className = 'editor-btn danger';
+    mbDelBtn.textContent = '🗑 Delete';
+    mbDelBtn.addEventListener('click', () => this._deleteSelected());
+
+    const mbColorBtn = document.createElement('button');
+    mbColorBtn.className = 'editor-btn';
+    mbColorBtn.textContent = '🎨 Color';
+    mbColorBtn.title = '현재 컬러를 선택된 블록에 모두 적용';
+    mbColorBtn.addEventListener('click', () => this._applyColorToSelected());
+
+    this.multiBarEl.appendChild(mbUpBtn);
+    this.multiBarEl.appendChild(mbDownBtn);
+    this.multiBarEl.appendChild(mbDelBtn);
+    this.multiBarEl.appendChild(mbColorBtn);
+    this.viewportEl.appendChild(this.multiBarEl);
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', this._onKeyDown);
+
     // ResizeObserver
     this.resizeObserver = new ResizeObserver(() => this.onResize());
     this.resizeObserver.observe(this.viewportEl);
@@ -473,6 +538,10 @@ export class LevelEditor {
       this.colorInput.style.border = 'none';
       this.colorInput.style.background = 'none';
       this.colorInput.style.cursor = 'pointer';
+      // mousedown: 피커 열기 전 스냅샷 (input 이벤트보다 먼저 발생)
+      this.colorInput.addEventListener('mousedown', () => {
+        if (this.selectedBlock) this._pushUndo();
+      });
       this.colorInput.addEventListener('input', () => {
         this.currentColor = this.colorInput.value;
         if (this.selectedBlock) {
@@ -507,6 +576,7 @@ export class LevelEditor {
           `background:${preset.color}`, `padding:0`, `flex-shrink:0`,
         ].join(';');
         swatch.addEventListener('click', () => {
+          if (this.selectedBlock) this._pushUndo();
           this.currentColor = preset.color;
           this.colorInput.value = preset.color;
           if (this.selectedBlock) {
@@ -651,7 +721,7 @@ export class LevelEditor {
       this.walkableInput.type = 'checkbox';
       this.walkableInput.checked = true;
       this.walkableInput.addEventListener('change', () => {
-        if (this.selectedBlock) this.selectedBlock.walkable = this.walkableInput.checked;
+        if (this.selectedBlock) { this._pushUndo(); this.selectedBlock.walkable = this.walkableInput.checked; }
       });
       walkRow.appendChild(walkLabel);
       walkRow.appendChild(this.walkableInput);
@@ -666,6 +736,7 @@ export class LevelEditor {
       this.spikeInput.checked = false;
       this.spikeInput.addEventListener('change', () => {
         if (this.selectedBlock) {
+          this._pushUndo();
           this.selectedBlock.isSpike = this.spikeInput.checked;
           this._setSpikeIndicator(this.selectedBlock, this.spikeInput.checked);
         }
@@ -709,6 +780,7 @@ export class LevelEditor {
       this.cubeInput.addEventListener('change', () => {
         const b = this.selectedBlock;
         if (!b) return;
+        this._pushUndo();
         b.isCube = this.cubeInput.checked;
         const newSize: [number, number, number] = b.isCube ? [1, 1, 1] : [1, 0.5, 1];
         const newY = b.isCube ? b.floor * 1.0 + 0.5 : b.floor * 0.5 + 0.25;
@@ -745,6 +817,7 @@ export class LevelEditor {
       const applyWedgeChange = () => {
         const b = this.selectedBlock;
         if (!b) return;
+        this._pushUndo();
         b.shape          = this.wedgeInput.checked ? 'wedge' : 'default';
         b.wedgeDirection = this.wedgeDirSelSel.value as WedgeDirection;
         b.isCube         = b.shape === 'wedge' ? false : b.isCube;
@@ -858,7 +931,7 @@ export class LevelEditor {
 
       this.mrAxisSel = document.createElement('select');
       this.mrAxisSel.style.cssText = 'background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
-      for (const v of ['x','y']) {
+      for (const v of ['x','z']) {
         const o = document.createElement('option'); o.value = v; o.textContent = `${v.toUpperCase()}-axis`; this.mrAxisSel.appendChild(o);
       }
 
@@ -870,7 +943,7 @@ export class LevelEditor {
       this.mrPivotInput = document.createElement('input');
       this.mrPivotInput.type = 'number'; this.mrPivotInput.placeholder = 'pivotY'; this.mrPivotInput.step = '0.5';
       this.mrPivotInput.style.cssText = 'width:52px;background:#222;color:#fff;border:1px solid #444;padding:2px;font-size:11px;';
-      this.mrPivotInput.title = 'X축 회전 전용 pivotY (비워두면 맵 중심)';
+      this.mrPivotInput.title = 'X·Z축 회전 전용 pivotY (비워두면 맵 중심)';
 
       mrRow.appendChild(this.mrAxisSel);
       mrRow.appendChild(this.mrAngleInput);
@@ -890,7 +963,7 @@ export class LevelEditor {
         const idx = this.mapRotateEntries.findIndex(e => e.nodeId === id);
         const entry = {
           nodeId: id,
-          axis:   this.mrAxisSel.value as 'x'|'y',
+          axis:   this.mrAxisSel.value as 'x'|'z',
           angle:  parseFloat(this.mrAngleInput.value) || 180,
           ...(this.mrPivotInput.value !== '' ? { pivotY: parseFloat(this.mrPivotInput.value) } : {}),
         };
@@ -1211,30 +1284,67 @@ export class LevelEditor {
         .addEventListener('click', () => this.startPick(b => {
           (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = b.id;
         }));
+      // Face selector
+      const faceRow = document.createElement('div');
+      faceRow.className = 'editor-row';
+      faceRow.style.cssText = 'align-items:center;gap:6px;margin-top:4px;';
+      const faceLabel = document.createElement('label');
+      faceLabel.style.minWidth = '60px';
+      faceLabel.textContent = 'Face:';
+      this.starFaceSelect = document.createElement('select');
+      this.starFaceSelect.style.cssText = 'flex:1;background:#222;color:#eee;border:1px solid #555;padding:2px 4px;font-size:11px;';
+      const faceOptions: Array<[string, string]> = [
+        ['0,1,0',  '+Y (Top)'],
+        ['0,-1,0', '-Y (Bottom)'],
+        ['1,0,0',  '+X'],
+        ['-1,0,0', '-X'],
+        ['0,0,1',  '+Z'],
+        ['0,0,-1', '-Z'],
+      ];
+      for (const [val, label] of faceOptions) {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        this.starFaceSelect.appendChild(opt);
+      }
+      faceRow.appendChild(faceLabel);
+      faceRow.appendChild(this.starFaceSelect);
+      this.starFormEl.appendChild(faceRow);
+
+      const _parseFace = (): { flipped: boolean; face?: [number, number, number] } => {
+        const val = this.starFaceSelect!.value;
+        if (val === '0,1,0')  return { flipped: false };
+        if (val === '0,-1,0') return { flipped: true };
+        const [x, y, z] = val.split(',').map(Number);
+        return { flipped: false, face: [x, y, z] };
+      };
+
       const starAddBtn = document.createElement('button');
       starAddBtn.className = 'editor-btn primary';
       starAddBtn.textContent = 'Add';
       starAddBtn.style.marginTop = '6px';
       starAddBtn.addEventListener('click', () => {
         const nodeId  = (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value.trim();
-        const flipped = (this.starFormEl.querySelector('#star-flipped') as HTMLInputElement).checked;
-        if (nodeId && !this.starEntries.some(e => e.nodeId === nodeId && e.flipped === flipped)) {
-          this.starEntries.push({ nodeId, flipped });
+        if (!nodeId) return;
+        const { flipped, face } = _parseFace();
+        if (!this.starEntries.some(e => e.nodeId === nodeId && e.flipped === flipped)) {
+          this.starEntries.push({ nodeId, flipped, ...(face ? { face } : {}) });
           this.rebuildStarList();
           (this.starFormEl.querySelector('#star-nodeId') as HTMLInputElement).value = '';
         }
       });
-      // 선택된 블록을 바로 추가하는 버튼 (일반 / 반전)
+      // 선택된 블록을 바로 추가하는 버튼 (face selector 사용)
       const starAddSelectedBtn = document.createElement('button');
       starAddSelectedBtn.className = 'editor-btn';
-      starAddSelectedBtn.textContent = '★ Add Selected (상단)';
+      starAddSelectedBtn.textContent = '★ Add Selected (Face)';
       starAddSelectedBtn.style.marginTop = '4px';
       starAddSelectedBtn.style.width = '100%';
       starAddSelectedBtn.addEventListener('click', () => {
         if (!this.selectedBlock) return;
         const id = this.selectedBlock.id;
-        if (!this.starEntries.some(e => e.nodeId === id && !e.flipped)) {
-          this.starEntries.push({ nodeId: id, flipped: false });
+        const { flipped, face } = _parseFace();
+        if (!this.starEntries.some(e => e.nodeId === id && e.flipped === flipped && JSON.stringify(e.face) === JSON.stringify(face))) {
+          this.starEntries.push({ nodeId: id, flipped, ...(face ? { face } : {}) });
           this.rebuildStarList();
         }
       });
@@ -2332,6 +2442,7 @@ export class LevelEditor {
       saveBtn.style.marginBottom = '6px';
       saveBtn.addEventListener('click', () => {
         CustomLevelStore.save({ stageNum: this.stageNum, data: this.toLevel() });
+        invalidatePreviewCache(this.stageNum);
         saveBtn.textContent = 'Saved!';
         setTimeout(() => { saveBtn.textContent = 'Save to localStorage'; }, 1500);
       });
@@ -2374,6 +2485,7 @@ export class LevelEditor {
             const data = JSON.parse(e.target!.result as string) as LevelData;
             this.loadFromLevelData(data);
             CustomLevelStore.save({ stageNum: this.stageNum, data });
+            invalidatePreviewCache(this.stageNum);
           } catch {
             alert('Invalid JSON file');
           }
@@ -3379,6 +3491,7 @@ export class LevelEditor {
   }
 
   private updateSelectedPanel(): void {
+    this._updateMultiSelectBar();
     const b = this.selectedBlock;
     if (b) {
       this.selIdEl.textContent = b.id;
@@ -3430,6 +3543,212 @@ export class LevelEditor {
       this.mrSetBtn.style.background = '#664400';
       this.mrRemoveBtn.style.display = 'none';
     }
+  }
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────────
+
+  private _pushUndo(): void {
+    this._undoStack.push(this.toLevel());
+    if (this._undoStack.length > this._MAX_UNDO) this._undoStack.shift();
+    this._redoStack = []; // redo 스택은 새 action 시 항상 초기화
+  }
+
+  private _loadSnapshot(data: LevelData): void {
+    // undo/redo 스택을 보존한 채로 상태를 복원
+    const u = this._undoStack;
+    const r = this._redoStack;
+    this.loadFromLevelData(data);
+    this._undoStack = u;
+    this._redoStack = r;
+    // 다중 선택 해제
+    this.selectedBlocks.clear();
+    this._updateMultiSelectBar();
+  }
+
+  private _undo(): void {
+    if (this._undoStack.length === 0) return;
+    this._redoStack.push(this.toLevel());
+    this._loadSnapshot(this._undoStack.pop()!);
+  }
+
+  private _redo(): void {
+    if (this._redoStack.length === 0) return;
+    this._undoStack.push(this.toLevel());
+    this._loadSnapshot(this._redoStack.pop()!);
+  }
+
+  // ── Keyboard ──────────────────────────────────────────────────────────────
+
+  private _onKeyDown = (e: KeyboardEvent): void => {
+    if (!this.el.classList.contains('visible')) return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+    if (e.ctrlKey && e.key === 'z' && !e.shiftKey) { e.preventDefault(); this._undo(); return; }
+    if (e.ctrlKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); this._redo(); return; }
+
+    if (e.key === 'ArrowUp')   { e.preventDefault(); this.changeFloor(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); this.changeFloor(-1); }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && (this.selectedBlocks.size > 0 || this.selectedBlock)) {
+      e.preventDefault();
+      this._deleteSelected();
+    }
+  };
+
+  // ── Multi-select helpers ──────────────────────────────────────────────────
+
+  private _toggleMultiSelect(block: EditorBlock): void {
+    if (this.selectedBlocks.has(block)) {
+      this.selectedBlocks.delete(block);
+      const isPrimary = block === this.selectedBlock;
+      this.setBlockEmissive(block, 0x000000);
+      if (isPrimary) {
+        this.selectedBlock = null;
+        // 남은 선택 중 마지막을 primary로
+        const last = [...this.selectedBlocks].at(-1) ?? null;
+        if (last) { this.selectedBlock = last; this.setBlockEmissive(last, 0x222244); }
+      }
+    } else {
+      // 기존 primary는 multi 색으로 강도 낮춤
+      if (this.selectedBlock) this.setBlockEmissive(this.selectedBlock, 0x111133);
+      this.selectedBlocks.add(block);
+      this.selectedBlock = block;
+      this.setBlockEmissive(block, 0x222244);
+    }
+    this._updateMultiSelectBar();
+    this.updateSelectedPanel();
+  }
+
+  private _clearMultiSelect(): void {
+    for (const b of this.selectedBlocks) {
+      if (b !== this.selectedBlock) this.setBlockEmissive(b, 0x000000);
+    }
+    this.selectedBlocks.clear();
+    this._updateMultiSelectBar();
+  }
+
+  private _updateMultiSelectBar(): void {
+    const count = this.selectedBlocks.size;
+    if (count > 1) {
+      this.multiBarCount.textContent = `${count} blocks selected`;
+      this.multiBarEl.classList.add('visible');
+    } else {
+      this.multiBarEl.classList.remove('visible');
+    }
+  }
+
+  private _deleteSelected(): void {
+    const toDelete = this.selectedBlocks.size > 0
+      ? [...this.selectedBlocks]
+      : this.selectedBlock ? [this.selectedBlock] : [];
+    if (toDelete.length === 0) return;
+    this._pushUndo();
+    for (const b of toDelete) this.eraseBlock(b);
+    this.selectedBlocks.clear();
+    this._updateMultiSelectBar();
+  }
+
+  private _moveSelectedFloor(delta: number): void {
+    const toMove = this.selectedBlocks.size > 0
+      ? [...this.selectedBlocks]
+      : this.selectedBlock ? [this.selectedBlock] : [];
+    if (toMove.length === 0) return;
+    this._pushUndo();
+    const MIN_FLOOR = -3;
+    for (const block of toMove) {
+      const newFloor = Math.max(MIN_FLOOR, block.floor + delta);
+      if (newFloor === block.floor) continue;
+      // 목표 위치에 다른 블록이 있으면 스킵
+      const occupant = this.getBlockAt(block.gridX, newFloor, block.gridZ);
+      if (occupant && occupant !== block) continue;
+      block.floor = newFloor;
+      const isCubelike = block.isCube || block.shape === 'wedge';
+      block.mesh.position.y = isCubelike ? newFloor * 1.0 + 0.5 : newFloor * 0.5 + 0.25;
+    }
+    // 현재 floor 레이블도 업데이트
+    this.floorLabel.textContent = `Floor: ${this.currentFloor}`;
+    this.updateMarkers();
+    this.updateSelectedPanel();
+  }
+
+  private _applyColorToSelected(): void {
+    const toColor = this.selectedBlocks.size > 0
+      ? [...this.selectedBlocks]
+      : this.selectedBlock ? [this.selectedBlock] : [];
+    if (toColor.length === 0) return;
+    this._pushUndo();
+    for (const b of toColor) this.applyBlockColor(b, this.currentColor);
+  }
+
+  private _tryPaintBlock(): void {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const hits = this.raycaster.intersectObject(this.floorPlane);
+    if (hits.length === 0) return;
+    const pt = hits[0].point;
+    const gx = Math.floor(pt.x);
+    const gz = Math.floor(pt.z);
+    if (this.lastPaintedCell?.x === gx && this.lastPaintedCell?.z === gz) return;
+    if (!this._undoPushedThisDrag && !this.getBlockAt(gx, this.currentFloor, gz)) {
+      this._pushUndo(); this._undoPushedThisDrag = true;
+    }
+    this.lastPaintedCell = { x: gx, z: gz };
+    this.placeBlock(gx, gz);
+  }
+
+  private _tryEraseAtCursor(): void {
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const hits = this.raycaster.intersectObjects(this.blocks.map(b => b.mesh), true);
+    if (hits.length === 0) return;
+    const id = hits[0].object.userData.editorBlockId as string;
+    const block = this.blocks.find(b => b.id === id);
+    if (block) {
+      if (!this._undoPushedThisDrag) { this._pushUndo(); this._undoPushedThisDrag = true; }
+      this.eraseBlock(block);
+    }
+  }
+
+  private _updateDragSelectOverlay(): void {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x0 = Math.min(this.dragSelectStartScreen.x, this.dragSelectCurrentScreen.x) - rect.left;
+    const y0 = Math.min(this.dragSelectStartScreen.y, this.dragSelectCurrentScreen.y) - rect.top;
+    const w  = Math.abs(this.dragSelectCurrentScreen.x - this.dragSelectStartScreen.x);
+    const h  = Math.abs(this.dragSelectCurrentScreen.y - this.dragSelectStartScreen.y);
+    this.dragSelectOverlay.style.left    = `${x0}px`;
+    this.dragSelectOverlay.style.top     = `${y0}px`;
+    this.dragSelectOverlay.style.width   = `${w}px`;
+    this.dragSelectOverlay.style.height  = `${h}px`;
+    this.dragSelectOverlay.style.display = 'block';
+  }
+
+  private _finalizeDragSelect(): void {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x0 = Math.min(this.dragSelectStartScreen.x, this.dragSelectCurrentScreen.x) - rect.left;
+    const x1 = Math.max(this.dragSelectStartScreen.x, this.dragSelectCurrentScreen.x) - rect.left;
+    const y0 = Math.min(this.dragSelectStartScreen.y, this.dragSelectCurrentScreen.y) - rect.top;
+    const y1 = Math.max(this.dragSelectStartScreen.y, this.dragSelectCurrentScreen.y) - rect.top;
+
+    // 기존 선택 해제 (shift 드래그지만 rectangle은 새로운 selection으로 대체)
+    this._clearMultiSelect();
+    if (this.selectedBlock) { this.setBlockEmissive(this.selectedBlock, 0x000000); this.selectedBlock = null; }
+
+    const proj = new THREE.Vector3();
+    for (const block of this.blocks) {
+      proj.copy(block.mesh.position);
+      proj.project(this.camera);
+      const sx = (proj.x * 0.5 + 0.5) * rect.width;
+      const sy = (1 - (proj.y * 0.5 + 0.5)) * rect.height;
+      if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) {
+        this.selectedBlocks.add(block);
+        this.setBlockEmissive(block, 0x111133);
+      }
+    }
+
+    // 마지막 선택 블록을 primary로
+    const last = [...this.selectedBlocks].at(-1) ?? null;
+    if (last) { this.selectedBlock = last; this.setBlockEmissive(last, 0x222244); }
+
+    this._updateMultiSelectBar();
+    this.updateSelectedPanel();
   }
 
   // ── Floor / tool ──────────────────────────────────────────────────────────
@@ -3543,6 +3862,8 @@ export class LevelEditor {
       .filter(sw => sw.switchNodeId !== block.id && sw.targets.length > 0);
     // 구역은 격자 범위 기반이므로 별도 제거 불필요
     if (this.selectedBlock === block) this.selectedBlock = null;
+    this.selectedBlocks.delete(block);
+    this._updateMultiSelectBar();
     this.updateMarkers();
     this.updateSelectedPanel();
     this.hoveredBlock = null;
@@ -3596,6 +3917,7 @@ export class LevelEditor {
       this.setBlockEmissive(this.selectedBlock, 0x000000);
       this.selectedBlock = null;
     }
+    this._clearMultiSelect();
     this.updateSelectedPanel();
   }
 
@@ -3651,21 +3973,43 @@ export class LevelEditor {
 
     if (this.currentTool === 'place') {
       this.updateGhost();
+      if (this.isMouseDown) this._tryPaintBlock();
     } else if (this.currentTool === 'erase') {
       this.updateEraseHover();
+      if (this.isMouseDown) this._tryEraseAtCursor();
     } else if (this.currentTool === 'select') {
-      this.updateSelectHover();
+      if (this.isMouseDown && e.shiftKey) {
+        // Shift+drag → drag-select rectangle
+        this.orbit.enabled = false;
+        this.dragSelectCurrentScreen = { x: e.clientX, y: e.clientY };
+        const dx = e.clientX - this.mouseDownPos.x;
+        const dy = e.clientY - this.mouseDownPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 6) {
+          this.dragSelectActive = true;
+          this._updateDragSelectOverlay();
+        }
+      } else {
+        this.updateSelectHover();
+      }
     }
   };
 
   private onMouseDown = (e: MouseEvent): void => {
     if (e.button !== 0) return;
     this.mouseDownPos.set(e.clientX, e.clientY);
-    this.isDragging = false;
+    this.isDragging           = false;
+    this.isMouseDown          = true;
+    this.lastPaintedCell      = null;
+    this._undoPushedThisDrag  = false;
 
     // Disable orbit while placing/erasing so mouse clicks don't pan
     if (this.currentTool === 'place' || this.currentTool === 'erase') {
       this.orbit.enabled = false;
+    }
+    // Shift+drag select — record start
+    if (this.currentTool === 'select' && e.shiftKey) {
+      this.dragSelectStartScreen   = { x: e.clientX, y: e.clientY };
+      this.dragSelectCurrentScreen = { x: e.clientX, y: e.clientY };
     }
   };
 
@@ -3674,15 +4018,26 @@ export class LevelEditor {
     const dx = e.clientX - this.mouseDownPos.x;
     const dy = e.clientY - this.mouseDownPos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    this.isDragging = dist > 5;
+
+    this.isMouseDown = false;
     this.orbit.enabled = true;
 
+    if (this.dragSelectActive) {
+      // Finalize drag-select rectangle
+      this._finalizeDragSelect();
+      this.dragSelectActive = false;
+      this.dragSelectOverlay.style.display = 'none';
+      this.isDragging = true; // suppress handleClick
+    } else {
+      this.isDragging = dist > 5;
+    }
+
     if (!this.isDragging) {
-      this.handleClick();
+      this.handleClick(e);
     }
   };
 
-  private handleClick(): void {
+  private handleClick(e?: MouseEvent): void {
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
     // Pick 모드: 뷰포트 블록 클릭으로 폼 필드를 채운다
@@ -3705,6 +4060,7 @@ export class LevelEditor {
         const pt = hits[0].point;
         const gridX = Math.floor(pt.x);
         const gridZ = Math.floor(pt.z);
+        if (!this.getBlockAt(gridX, this.currentFloor, gridZ)) this._pushUndo();
         this.placeBlock(gridX, gridZ);
       }
     } else if (this.currentTool === 'erase') {
@@ -3712,16 +4068,26 @@ export class LevelEditor {
       if (hits.length > 0) {
         const id = hits[0].object.userData.editorBlockId as string;
         const block = this.blocks.find(b => b.id === id);
-        if (block) this.eraseBlock(block);
+        if (block) { this._pushUndo(); this.eraseBlock(block); }
       }
     } else if (this.currentTool === 'select') {
       const hits = this.raycaster.intersectObjects(this.blocks.map(b => b.mesh), true);
       if (hits.length > 0) {
         const id = hits[0].object.userData.editorBlockId as string;
         const block = this.blocks.find(b => b.id === id);
-        if (block) this.selectBlock(block);
+        if (block) {
+          if (e?.shiftKey) {
+            this._toggleMultiSelect(block);
+          } else {
+            this._clearMultiSelect();
+            this.selectBlock(block);
+          }
+        }
       } else {
-        this.deselectBlock();
+        if (!e?.shiftKey) {
+          this._clearMultiSelect();
+          this.deselectBlock();
+        }
       }
     }
   }
@@ -3760,8 +4126,10 @@ export class LevelEditor {
 
   private clearHoverHighlight(): void {
     if (this.hoveredBlock) {
-      // 선택된 블록이면 선택 색으로 복원, 아니면 끔
-      const restore = this.hoveredBlock === this.selectedBlock ? 0x222244 : 0x000000;
+      // 선택 색 복원: primary > multi > none
+      const isPrimary = this.hoveredBlock === this.selectedBlock;
+      const isMulti   = this.selectedBlocks.has(this.hoveredBlock);
+      const restore   = isPrimary ? 0x222244 : isMulti ? 0x111133 : 0x000000;
       this.setBlockEmissive(this.hoveredBlock, restore);
       this.hoveredBlock = null;
     }
@@ -3794,8 +4162,9 @@ export class LevelEditor {
       if (block && block !== this.hoveredBlock) {
         this.clearHoverHighlight();
         this.hoveredBlock = block;
-        // 이미 선택된 블록이면 더 밝게, 아니면 옅은 청록으로 표시
-        this.setBlockEmissive(block, block === this.selectedBlock ? 0x4444AA : 0x224444);
+        const isPrimary = block === this.selectedBlock;
+        const isMulti   = this.selectedBlocks.has(block);
+        this.setBlockEmissive(block, isPrimary || isMulti ? 0x4444AA : 0x224444);
       }
     } else {
       this.clearHoverHighlight();
@@ -3964,7 +4333,7 @@ export class LevelEditor {
           : undefined;
       })(),
       teleporters: this.teleporterConns.length > 0 ? this.teleporterConns : undefined,
-      stars: this.starEntries.length > 0 ? this.starEntries.map(e => ({ nodeId: e.nodeId, ...(e.flipped ? { flipped: true } : {}) })) : undefined,
+      stars: this.starEntries.length > 0 ? this.starEntries.map(e => ({ nodeId: e.nodeId, ...(e.flipped ? { flipped: true } : {}), ...(e.face ? { face: e.face } : {}) })) : undefined,
       mapRotateBlocks: this.mapRotateEntries.length > 0 ? this.mapRotateEntries : undefined,
       // 각 SwitchConn을 targetNodeId 하나씩의 SwitchDef로 펼쳐 내보냄
       switches: this.switchConns.length > 0 ? this.switchConns.flatMap(sw =>
@@ -4158,7 +4527,7 @@ export class LevelEditor {
       cl.pairs.map(p => ({ switchNodeId: cl.switchNodeId, nodeA: p.nodeA, nodeB: p.nodeB }))
     );
     this.teleporterConns = data.teleporters ?? [];
-    this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false }));
+    this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false, ...(s.face ? { face: s.face } : {}) }));
     this.goalFlipped          = data.goal.flipped ?? false;
     this.mapRotateEntries     = (data.mapRotateBlocks   ?? []).map(d => ({ ...d }));
 
@@ -4351,6 +4720,7 @@ export class LevelEditor {
 
   dispose(): void {
     this.hide();
+    window.removeEventListener('keydown', this._onKeyDown);
     this.resizeObserver.disconnect();
     this.renderer.domElement.removeEventListener('mousemove', this.onMouseMove);
     this.renderer.domElement.removeEventListener('mousedown', this.onMouseDown);
