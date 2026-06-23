@@ -238,8 +238,9 @@ export class Level {
   private blinkIsActive  = false; // 현재 사이클에서 가시가 위험 상태인가
   private scene: THREE.Scene;
 
-  private levelBlocks: BlockData[] = [];   // seam mesh 재빌드용 원본 BlockData
+  private levelBlocks: BlockData[] = [];       // seam mesh 재빌드용 원본 BlockData
   private seamGroup: THREE.Group | null = null; // 구분선 제거 merged mesh
+  private dynamicBlockIds: Set<string> = new Set(); // 애니메이션 블록 (seam mesh 제외)
 
   // blinking 속도 설정 (dev에서 조절 가능)
   blinkOnDuration  = 1.5; // 가시 올라와 있는 시간(초)
@@ -347,6 +348,7 @@ export class Level {
 
     // seam mesh 빌드 (blockDividers=false 시)
     this.levelBlocks = data.blocks;
+    this.dynamicBlockIds = this._computeDynamicBlockIds(data);
     this.rebuildSeamMesh(null);
   }
 
@@ -448,7 +450,7 @@ export class Level {
     this.seamGroup = null;
 
     if (!GraphicsSettings.blockDividers && this.levelBlocks.length > 0) {
-      this.seamGroup = buildSeamMesh(this.levelBlocks, colorOverride);
+      this.seamGroup = buildSeamMesh(this.levelBlocks, colorOverride, this.dynamicBlockIds);
       this.group.add(this.seamGroup);
       this._setBlockMeshesVisible(false);
     } else {
@@ -456,16 +458,38 @@ export class Level {
     }
   }
 
+  /** 이동·엘리베이터·패트롤 블록 ID를 수집한다 (seam mesh에서 제외). */
+  private _computeDynamicBlockIds(data: LevelData): Set<string> {
+    const ids = new Set<string>();
+    // 모든 스위치 대상 블록 (spawn은 removeFromParent로 숨겨지므로 seam mesh 제외 필수)
+    for (const sw of data.switches ?? []) {
+      ids.add(sw.targetNodeId);
+    }
+    // 엘리베이터 블록
+    for (const elev of data.elevators ?? []) {
+      ids.add(elev.nodeId);
+    }
+    // 패트롤 블록
+    for (const patrol of data.patrols ?? []) {
+      ids.add(patrol.nodeId);
+    }
+    return ids;
+  }
+
   /**
    * seam mesh에 포함되는 블록의 지오메트리 메시 visibility를 일괄 설정.
    * block.mesh 그룹 자체가 아닌 isBlock=true 자식 메시만 숨겨
    * 별·마커 등 그룹에 부착된 자식 오브젝트는 유지한다.
-   * wedge / spike 는 seam mesh에서 제외되므로 항상 visible 유지.
+   * wedge / spike / dynamic 블록은 seam mesh에서 제외되므로 항상 visible 유지.
    */
   private _setBlockMeshesVisible(visible: boolean): void {
     const skipSet = new Set(
       this.levelBlocks.filter(b => b.isSpike || b.shape === 'wedge').map(b => b.id),
     );
+    // 동적 블록(이동/엘리베이터/패트롤)은 숨길 때도 제외
+    if (!visible) {
+      this.dynamicBlockIds.forEach(id => skipSet.add(id));
+    }
     this.blocks.forEach((block, id) => {
       if (skipSet.has(id)) return;
       block.mesh.traverse(child => {

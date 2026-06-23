@@ -116,6 +116,7 @@ export class GameManager {
   private goalClearTimeout:         ReturnType<typeof setTimeout> | null = null;
   private goalClearInnerTimeout:    ReturnType<typeof setTimeout> | null = null;
   private starHintTimeout:          ReturnType<typeof setTimeout> | null = null;
+  private goalMeshScaleTween:       gsap.core.Tween | null = null;
 
   // ── Zone camera system ────────────────────────────────────────────────
   private zoneDefs:         ZoneDef[] = [];
@@ -1175,6 +1176,11 @@ export class GameManager {
       clearTimeout(this.starHintTimeout);
       this.starHintTimeout = null;
     }
+    // BUG-15-01: 골 블록 팽창 트윈 취소
+    if (this.goalMeshScaleTween) {
+      this.goalMeshScaleTween.kill();
+      this.goalMeshScaleTween = null;
+    }
 
     // NEW-04: cam/orbit 직접 tween이 있을 경우도 대비해 유지
     gsap.killTweensOf(this.renderer.camera.position);
@@ -1879,13 +1885,28 @@ export class GameManager {
       goalMesh.getWorldPosition(wp);
       this.particles.burst(wp, 0xFFD700, 40, 2.5, 1.2);
 
-      gsap.to(goalMesh.scale, {
+      // blockDividers=false 시 geometry mesh가 hidden 상태 → 애니메이션 동안만 노출
+      if (!GraphicsSettings.blockDividers) {
+        goalMesh.traverse(child => {
+          if ((child as THREE.Mesh).isMesh && child.userData.isBlock) child.visible = true;
+        });
+      }
+
+      this.goalMeshScaleTween = gsap.to(goalMesh.scale, {
         x: 1.4, y: 1.8, z: 1.4,
         duration: 0.25,
         ease: 'power2.out',
         yoyo: true,
         repeat: 1,
-        onComplete: () => { goalMesh.scale.set(1, 1, 1); },
+        onComplete: () => {
+          this.goalMeshScaleTween = null;
+          goalMesh.scale.set(1, 1, 1);
+          if (!GraphicsSettings.blockDividers) {
+            goalMesh.traverse(child => {
+              if ((child as THREE.Mesh).isMesh && child.userData.isBlock) child.visible = false;
+            });
+          }
+        },
       });
     }
 

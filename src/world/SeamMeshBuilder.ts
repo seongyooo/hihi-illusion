@@ -113,18 +113,20 @@ function buildFaceGeo(f: FaceSpec): THREE.BufferGeometry {
  * blocks 배열로부터 이음새-제거 메시 그룹을 생성한다.
  * 인접 같은 색 블록 간 공유 면은 완전히 제거하여 조명 불연속을 없앤다.
  *
- * @param blocks       레벨의 BlockData 배열
- * @param colorOverride  null이면 원본 색상별 그룹화, 숫자면 전체 단색
+ * @param blocks        레벨의 BlockData 배열
+ * @param colorOverride null이면 원본 색상별 그룹화, 숫자면 전체 단색
+ * @param skipIds       이동·엘리베이터·패트롤 등 동적 블록 ID (seam mesh에서 제외)
  */
 export function buildSeamMesh(
   blocks: BlockData[],
   colorOverride: number | null,
+  skipIds?: Set<string>,
 ): THREE.Group {
   const group = new THREE.Group();
   group.userData.isSeamGroup = true;
 
-  // 스파이크·웨지 제외
-  const candidates = blocks.filter(b => !b.isSpike && b.shape !== 'wedge');
+  // 스파이크·웨지·동적 블록 제외
+  const candidates = blocks.filter(b => !b.isSpike && b.shape !== 'wedge' && !skipIds?.has(b.id));
   if (candidates.length === 0) return group;
 
   const buildMeshForGroup = (colorBlocks: BlockData[], hex: number) => {

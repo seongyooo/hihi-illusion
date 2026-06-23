@@ -1,7 +1,73 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-15  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + 13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화) + **14차 QA (mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치)**
+> 최종 업데이트: 2026-06-23  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + 13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화) + 14차 QA (mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치) + **15차 QA (Block Dividers seam mesh / 동적 블록 제외 / 골 팽창 애니메이션)**
+
+---
+
+## 15차 QA (2026-06-23) — Block Dividers seam mesh / 동적 블록 제외 / 골 팽창 애니메이션
+
+### 점검 범위
+- `SeamMeshBuilder.ts` — seam mesh 생성 로직
+- `Level.ts` — `rebuildSeamMesh`, `_setBlockMeshesVisible`, `_computeDynamicBlockIds`
+- `GraphicsSettings.ts` — `blockDividers` 설정
+- `SettingsScreen.ts` — Block Dividers 토글 UI
+- `GameManager.ts` — `onBlockDividersChange`, `onGoalReached` 애니메이션, `unloadCurrent`
+- `SwitchManager.ts` — spawn/move 블록 visibility
+
+### 결과 요약
+
+| 등급 | 건수 |
+|------|------|
+| BUG (수정 필요) | 1 |
+| WARN (잠재적 문제) | 1 |
+| PASS | 12 |
+
+---
+
+### BUG-15-01 — goalMesh.scale 트윈이 unloadCurrent()에서 kill되지 않음
+**심각도:** MEDIUM  
+**파일:** `src/core/GameManager.ts` (onGoalReached, ~line 1889)
+
+**현상:**  
+`onGoalReached()`에서 골 블록 팽창 애니메이션(`gsap.to(goalMesh.scale, ...)`)의 `goalMesh`가 로컬 변수로만 존재하고 인스턴스에 저장되지 않는다. `unloadCurrent()`에서 `goalGlow`, `goalMarker`의 트윈은 kill하지만, `goalMesh.scale` 트윈은 kill할 수단이 없다.
+
+**위험 시나리오:**  
+골 도달 후 0.5초 이내에 타이틀로 강제 복귀 시, `onComplete` 콜백이 dispose된 goalMesh에 대해 `traverse()`를 호출한다.
+
+**수정 방향:**  
+`private goalMeshScaleTween: gsap.core.Tween | null = null` 인스턴스 변수로 트윈을 저장하고 `unloadCurrent()`에서 `this.goalMeshScaleTween?.kill()`을 추가한다.
+
+---
+
+### WARN-15-01 — 골 블록 일시 노출 시 seam mesh와 z-fighting 가능성
+**심각도:** LOW  
+**파일:** `src/core/GameManager.ts` (onGoalReached, ~line 1882)
+
+**현상:**  
+`blockDividers=false`에서 골 도달 시 개별 블록 geometry를 `visible=true`로 일시 설정한다. seam mesh에도 골 블록 면이 bake되어 있어 동일 위치에 두 geometry가 겹친다.
+
+**실제 영향:**  
+GSAP이 즉시 scale을 1.4x로 애니메이션하므로 z-fighting 구간은 1프레임 미만. 시각적으로 거의 인지 불가.
+
+---
+
+### PASS 항목 (12건)
+
+| ID | 항목 | 파일:위치 |
+|----|------|-----------|
+| P-01 | `_computeDynamicBlockIds` 호출이 `rebuildSeamMesh` 이전 | `Level.ts:350` |
+| P-02 | spawn · move 모두 dynamicBlockIds 포함 | `Level.ts:465` |
+| P-03 | `visible=true` 복원 시 spawn 블록(removeFromParent 상태) 미노출 확인 | `Level.ts:485` |
+| P-04 | elevator · patrol 블록 동적 제외 | `Level.ts:469-475` |
+| P-05 | `Level.dispose()`에서 seamGroup dispose 및 parent 제거 | `Level.ts:~565` |
+| P-06 | `recolorAllBlocks` 후 seam mesh 갱신 | `Level.ts:~428` |
+| P-07 | `revariantAllBlocks` 후 seam mesh 갱신 (`blockDividers=false`만) | `Level.ts:~434` |
+| P-08 | Block Dividers 체크박스 초기화 및 resetAll 동작 | `SettingsScreen.ts` |
+| P-09 | `blockDividers` 기본값 `true` (미설정 시 구분선 표시) | `GraphicsSettings.ts` |
+| P-10 | `goalClearTimeout` · `goalClearInnerTimeout` unload 시 취소 | `GameManager.ts:1163` |
+| P-11 | spawn 블록 spawn/despawn 동작 — seam mesh와 충돌 없음 | `SwitchManager.ts:111` |
+| P-12 | `goalGlow` · `goalMarker` 트윈 unload 시 kill | `GameManager.ts:1190,1196` |
 
 ---
 
