@@ -457,7 +457,9 @@ export class Level {
   }
 
   /**
-   * seam mesh에 포함되는 블록 메시의 visibility를 일괄 설정.
+   * seam mesh에 포함되는 블록의 지오메트리 메시 visibility를 일괄 설정.
+   * block.mesh 그룹 자체가 아닌 isBlock=true 자식 메시만 숨겨
+   * 별·마커 등 그룹에 부착된 자식 오브젝트는 유지한다.
    * wedge / spike 는 seam mesh에서 제외되므로 항상 visible 유지.
    */
   private _setBlockMeshesVisible(visible: boolean): void {
@@ -465,7 +467,12 @@ export class Level {
       this.levelBlocks.filter(b => b.isSpike || b.shape === 'wedge').map(b => b.id),
     );
     this.blocks.forEach((block, id) => {
-      if (!skipSet.has(id)) block.mesh.visible = visible;
+      if (skipSet.has(id)) return;
+      block.mesh.traverse(child => {
+        if ((child as THREE.Mesh).isMesh && child.userData.isBlock) {
+          child.visible = visible;
+        }
+      });
     });
   }
 
