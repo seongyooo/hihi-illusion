@@ -429,6 +429,12 @@ export class Level {
   /** Apply a global material variant to all blocks. */
   revariantAllBlocks(variant: import('./Block').BlockVariant): void {
     this.blocks.forEach(block => block.revariant(variant));
+    if (!GraphicsSettings.blockDividers) {
+      const hex = GraphicsSettings.blockColorOverride
+        ? parseInt(GraphicsSettings.blockColorOverride.replace('#', ''), 16)
+        : null;
+      this.rebuildSeamMesh(hex);
+    }
   }
 
   /** Rebuild geometry for all blocks (called when block radius changes). */
