@@ -7,13 +7,13 @@
       "id": "b001",
       "position": [
         5.5,
-        0.25,
+        0.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -22,13 +22,13 @@
       "id": "b002",
       "position": [
         5.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -37,13 +37,13 @@
       "id": "b003",
       "position": [
         6.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -52,13 +52,13 @@
       "id": "b004",
       "position": [
         6.5,
-        0.25,
+        0.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -67,13 +67,13 @@
       "id": "b005",
       "position": [
         10.5,
-        1.25,
+        2.5,
         6.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -82,13 +82,13 @@
       "id": "b006",
       "position": [
         10.5,
-        1.25,
+        2.5,
         5.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -97,13 +97,13 @@
       "id": "b007",
       "position": [
         10.5,
-        1.25,
+        2.5,
         4.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -112,13 +112,13 @@
       "id": "b008",
       "position": [
         10.5,
-        1.25,
+        2.5,
         3.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -127,13 +127,13 @@
       "id": "b009",
       "position": [
         10.5,
-        1.25,
+        2.5,
         2.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -142,13 +142,13 @@
       "id": "b010",
       "position": [
         10.5,
-        2.25,
+        4.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -157,13 +157,13 @@
       "id": "b011",
       "position": [
         10.5,
-        2.25,
+        4.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -172,13 +172,13 @@
       "id": "b012",
       "position": [
         11.5,
-        2.25,
+        4.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -187,13 +187,13 @@
       "id": "b013",
       "position": [
         12.5,
-        2.25,
+        4.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -202,13 +202,13 @@
       "id": "b014",
       "position": [
         10.5,
-        2.25,
+        4.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -217,13 +217,13 @@
       "id": "b015",
       "position": [
         11.5,
-        2.25,
+        4.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -232,13 +232,13 @@
       "id": "b016",
       "position": [
         12.5,
-        2.25,
+        4.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -247,13 +247,13 @@
       "id": "b017",
       "position": [
         12.5,
-        2.25,
+        4.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -262,13 +262,13 @@
       "id": "b018",
       "position": [
         10.5,
-        2.75,
+        5.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -277,13 +277,13 @@
       "id": "b019",
       "position": [
         10.5,
-        2.75,
+        5.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -292,13 +292,13 @@
       "id": "b020",
       "position": [
         12.5,
-        2.75,
+        5.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -307,13 +307,13 @@
       "id": "b021",
       "position": [
         12.5,
-        2.75,
+        5.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -322,13 +322,13 @@
       "id": "b022",
       "position": [
         10.5,
-        3.25,
+        6.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -337,13 +337,13 @@
       "id": "b023",
       "position": [
         10.5,
-        3.25,
+        6.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -352,13 +352,13 @@
       "id": "b024",
       "position": [
         12.5,
-        3.25,
+        6.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -367,13 +367,13 @@
       "id": "b025",
       "position": [
         12.5,
-        3.25,
+        6.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -382,13 +382,13 @@
       "id": "b026",
       "position": [
         10.5,
-        3.75,
+        7.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -397,13 +397,13 @@
       "id": "b027",
       "position": [
         10.5,
-        3.75,
+        7.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -412,13 +412,13 @@
       "id": "b028",
       "position": [
         10.5,
-        3.75,
+        7.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -427,13 +427,13 @@
       "id": "b029",
       "position": [
         11.5,
-        3.75,
+        7.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -442,13 +442,13 @@
       "id": "b030",
       "position": [
         12.5,
-        3.75,
+        7.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -457,13 +457,13 @@
       "id": "b031",
       "position": [
         12.5,
-        3.75,
+        7.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -472,13 +472,13 @@
       "id": "b032",
       "position": [
         12.5,
-        3.75,
+        7.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -487,13 +487,13 @@
       "id": "b033",
       "position": [
         11.5,
-        3.75,
+        7.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -502,13 +502,13 @@
       "id": "b034",
       "position": [
         4.5,
-        2.75,
+        5.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -517,13 +517,13 @@
       "id": "b035",
       "position": [
         4.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -532,13 +532,13 @@
       "id": "b036",
       "position": [
         5.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -547,13 +547,13 @@
       "id": "b037",
       "position": [
         6.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -562,13 +562,13 @@
       "id": "b038",
       "position": [
         7.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -577,13 +577,13 @@
       "id": "b039",
       "position": [
         8.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -592,13 +592,13 @@
       "id": "b040",
       "position": [
         10.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -607,13 +607,13 @@
       "id": "b041",
       "position": [
         9.5,
-        2.75,
+        5.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -622,13 +622,13 @@
       "id": "b042",
       "position": [
         2.5,
-        4.25,
+        8.5,
         10.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -637,13 +637,13 @@
       "id": "b043",
       "position": [
         2.5,
-        4.25,
+        8.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -652,13 +652,13 @@
       "id": "b044",
       "position": [
         2.5,
-        4.25,
+        8.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -667,13 +667,13 @@
       "id": "b045",
       "position": [
         2.5,
-        4.25,
+        8.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -682,13 +682,13 @@
       "id": "b046",
       "position": [
         4.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -697,13 +697,13 @@
       "id": "b047",
       "position": [
         2.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -712,13 +712,13 @@
       "id": "b048",
       "position": [
         3.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -727,13 +727,13 @@
       "id": "b049",
       "position": [
         4.5,
-        5.25,
+        10.5,
         2.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -742,13 +742,13 @@
       "id": "b050",
       "position": [
         5.5,
-        5.25,
+        10.5,
         2.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -757,13 +757,13 @@
       "id": "b051",
       "position": [
         5.5,
-        5.25,
+        10.5,
         1.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -772,13 +772,13 @@
       "id": "b052",
       "position": [
         4.5,
-        5.25,
+        10.5,
         1.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -787,13 +787,13 @@
       "id": "b053",
       "position": [
         4.5,
-        5.75,
+        11.5,
         1.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -802,13 +802,13 @@
       "id": "b054",
       "position": [
         5.5,
-        5.75,
+        11.5,
         1.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -817,13 +817,13 @@
       "id": "b055",
       "position": [
         4.5,
-        6.25,
+        12.5,
         1.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -832,13 +832,13 @@
       "id": "b056",
       "position": [
         6.5,
-        0.25,
+        0.5,
         9.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -847,13 +847,13 @@
       "id": "b057",
       "position": [
         6.5,
-        0.25,
+        0.5,
         10.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -862,13 +862,13 @@
       "id": "b058",
       "position": [
         6.5,
-        0.25,
+        0.5,
         11.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -877,13 +877,13 @@
       "id": "b059",
       "position": [
         7.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -892,13 +892,13 @@
       "id": "b060",
       "position": [
         8.5,
-        0.25,
+        0.5,
         7.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -907,13 +907,13 @@
       "id": "b061",
       "position": [
         6.5,
-        0.25,
+        0.5,
         6.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -922,13 +922,13 @@
       "id": "b062",
       "position": [
         6.5,
-        0.25,
+        0.5,
         5.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true

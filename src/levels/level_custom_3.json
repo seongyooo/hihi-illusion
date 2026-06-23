@@ -7,13 +7,13 @@
       "id": "b001",
       "position": [
         3.5,
-        0.25,
+        0.5,
         6.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -22,13 +22,13 @@
       "id": "b004",
       "position": [
         6.5,
-        1.25,
+        2.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -37,13 +37,13 @@
       "id": "b005",
       "position": [
         8.5,
-        2.25,
+        4.5,
         4.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true

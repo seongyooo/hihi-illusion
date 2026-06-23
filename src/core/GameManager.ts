@@ -1880,6 +1880,7 @@ export class GameManager {
       this.level?.blocks.get(this.goalBlockId)?.mesh ??
       this.graph?.getNode(this.goalBlockId)?.mesh
     ) ?? null;
+
     if (goalMesh) {
       const wp = new THREE.Vector3();
       goalMesh.getWorldPosition(wp);

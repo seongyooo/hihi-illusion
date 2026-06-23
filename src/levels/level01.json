@@ -2,24 +2,197 @@
   "id": "level_01",
   "name": "Tutorial",
   "backgroundColor": "#EDF4F8",
-
   "blocks": [
-    { "id": "s0",      "position": [7, 0, 0], "color": "#70ACC4", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s1",      "position": [6, 0, 0], "color": "#78B0C8", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s2",      "position": [5, 0, 0], "color": "#80B4CC", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s3",      "position": [4, 0, 0], "color": "#88B8D0", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "mid",     "position": [3, 0, 0], "color": "#90BCD4", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s5",      "position": [2, 0, 0], "color": "#98C0D8", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s6",      "position": [1, 0, 0], "color": "#A0C4DC", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s7",      "position": [0, 0, 0], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "star_c1", "position": [1, 0, 1], "color": "#A0C4DC", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "star_c2", "position": [1, 0, 2], "color": "#A0C4DC", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "star_b",  "position": [1, 0, 3], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true },
-    { "id": "s8",      "position": [0, 0.5, -2], "color": "#A8C8E0", "size": [1, 0.5, 1], "walkable": true }
+    {
+      "id": "s0",
+      "position": [
+        7,
+        0,
+        0
+      ],
+      "color": "#70ACC4",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s1",
+      "position": [
+        6,
+        0,
+        0
+      ],
+      "color": "#78B0C8",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s2",
+      "position": [
+        5,
+        0,
+        0
+      ],
+      "color": "#80B4CC",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s3",
+      "position": [
+        4,
+        0,
+        0
+      ],
+      "color": "#88B8D0",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "mid",
+      "position": [
+        3,
+        0,
+        0
+      ],
+      "color": "#90BCD4",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s5",
+      "position": [
+        2,
+        0,
+        0
+      ],
+      "color": "#98C0D8",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s6",
+      "position": [
+        1,
+        0,
+        0
+      ],
+      "color": "#A0C4DC",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s7",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "color": "#A8C8E0",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "star_c1",
+      "position": [
+        1,
+        0,
+        1
+      ],
+      "color": "#A0C4DC",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "star_c2",
+      "position": [
+        1,
+        0,
+        2
+      ],
+      "color": "#A0C4DC",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "star_b",
+      "position": [
+        1,
+        0,
+        3
+      ],
+      "color": "#A8C8E0",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "s8",
+      "position": [
+        0,
+        1.0,
+        -2
+      ],
+      "color": "#A8C8E0",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    }
   ],
-
-  "stars": [{ "nodeId": "star_b" }],
-
-  "character": { "startNodeId": "s0" },
-  "goal": { "blockId": "s8" }
+  "stars": [
+    {
+      "nodeId": "star_b"
+    }
+  ],
+  "character": {
+    "startNodeId": "s0"
+  },
+  "goal": {
+    "blockId": "s8"
+  }
 }

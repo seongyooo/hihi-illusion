@@ -7,13 +7,13 @@
       "id": "b001",
       "position": [
         6.5,
-        0.25,
+        0.5,
         13.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -22,13 +22,13 @@
       "id": "b002",
       "position": [
         6.5,
-        0.25,
+        0.5,
         12.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -37,13 +37,13 @@
       "id": "b009",
       "position": [
         6.5,
-        0.75,
+        1.5,
         10.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -52,13 +52,13 @@
       "id": "b010",
       "position": [
         6.5,
-        1.25,
+        2.5,
         8.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -67,13 +67,13 @@
       "id": "b011",
       "position": [
         6.5,
-        1.75,
+        3.5,
         6.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -82,13 +82,13 @@
       "id": "b012",
       "position": [
         6.5,
-        2.25,
+        4.5,
         4.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -97,13 +97,13 @@
       "id": "b013",
       "position": [
         6.5,
-        2.75,
+        5.5,
         2.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -112,13 +112,13 @@
       "id": "b014",
       "position": [
         6.5,
-        3.25,
+        6.5,
         0.5
       ],
       "color": "#A8C5DA",
       "size": [
         1,
-        0.5,
+        1,
         1
       ],
       "walkable": true
@@ -133,7 +133,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        0.75,
+        1.5,
         11.5
       ]
     },
@@ -144,7 +144,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        1.25,
+        2.5,
         10.5
       ]
     },
@@ -155,7 +155,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        1.75,
+        3.5,
         9.5
       ]
     },
@@ -166,7 +166,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        2.25,
+        4.5,
         8.5
       ]
     },
@@ -177,7 +177,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        2.75,
+        5.5,
         7.5
       ]
     },
@@ -188,7 +188,7 @@
       "type": "move",
       "moveTarget": [
         6.5,
-        3.25,
+        6.5,
         6.5
       ]
     }
