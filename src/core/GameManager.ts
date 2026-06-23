@@ -1894,7 +1894,7 @@ export class GameManager {
       }
 
       this.goalMeshScaleTween = gsap.to(goalMesh.scale, {
-        x: 1.4, y: 1.8, z: 1.4,
+        x: 1.5, y: 1.5, z: 1.5,
         duration: 0.25,
         ease: 'power2.out',
         yoyo: true,
