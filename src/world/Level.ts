@@ -444,7 +444,23 @@ export class Level {
     if (!GraphicsSettings.blockDividers && this.levelBlocks.length > 0) {
       this.seamGroup = buildSeamMesh(this.levelBlocks, colorOverride);
       this.group.add(this.seamGroup);
+      this._setBlockMeshesVisible(false);
+    } else {
+      this._setBlockMeshesVisible(true);
     }
+  }
+
+  /**
+   * seam mesh에 포함되는 블록 메시의 visibility를 일괄 설정.
+   * wedge / spike 는 seam mesh에서 제외되므로 항상 visible 유지.
+   */
+  private _setBlockMeshesVisible(visible: boolean): void {
+    const skipSet = new Set(
+      this.levelBlocks.filter(b => b.isSpike || b.shape === 'wedge').map(b => b.id),
+    );
+    this.blocks.forEach((block, id) => {
+      if (!skipSet.has(id)) block.mesh.visible = visible;
+    });
   }
 
   /**
