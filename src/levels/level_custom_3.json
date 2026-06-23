@@ -7,7 +7,7 @@
       "id": "b001",
       "position": [
         3.5,
-        -2.5,
+        0.5,
         6.5
       ],
       "color": "#A8C5DA",
@@ -22,7 +22,7 @@
       "id": "b004",
       "position": [
         6.5,
-        -0.5,
+        2.5,
         8.5
       ],
       "color": "#A8C5DA",
@@ -37,7 +37,7 @@
       "id": "b005",
       "position": [
         8.5,
-        1.5,
+        4.5,
         4.5
       ],
       "color": "#A8C5DA",
@@ -113,6 +113,6 @@
     "azimuth": -34,
     "polar": 76,
     "distance": 26,
-    "targetY": -3.0
+    "targetY": 0.0
   }
 }

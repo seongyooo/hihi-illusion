@@ -109,12 +109,12 @@ const DEFAULT_COLOR = '#A8C5DA';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function blockWorldPos(gridX: number, floor: number, gridZ: number, cube = false): THREE.Vector3 {
-  const y = cube ? floor * 1.0 - 2.5 : floor * 0.5 + 0.25;
+  const y = cube ? floor * 1.0 + 0.5 : floor * 0.5 + 0.25;
   return new THREE.Vector3(gridX + 0.5, y, gridZ + 0.5);
 }
 
 function floorY(floor: number): number {
-  return floor * 1.0 - 3.0;
+  return floor * 1.0;
 }
 
 // ── LevelEditor ───────────────────────────────────────────────────────────────
@@ -711,7 +711,7 @@ export class LevelEditor {
         if (!b) return;
         b.isCube = this.cubeInput.checked;
         const newSize: [number, number, number] = b.isCube ? [1, 1, 1] : [1, 0.5, 1];
-        const newY = b.isCube ? b.floor * 1.0 - 2.5 : b.floor * 0.5 + 0.25;
+        const newY = b.isCube ? b.floor * 1.0 + 0.5 : b.floor * 0.5 + 0.25;
         // mesh 재생성
         const colorHex = parseInt(b.color.replace('#', ''), 16);
         const newInst = new Block({ position: [b.mesh.position.x, newY, b.mesh.position.z], color: colorHex, size: newSize });
@@ -751,7 +751,7 @@ export class LevelEditor {
         this.cubeInput.checked = b.isCube;
         const isCubelike = b.shape === 'wedge' || b.isCube;
         const newSize: [number, number, number] = isCubelike ? [1, 1, 1] : [1, 0.5, 1];
-        const newY = isCubelike ? b.floor * 1.0 - 2.5 : b.floor * 0.5 + 0.25;
+        const newY = isCubelike ? b.floor * 1.0 + 0.5 : b.floor * 0.5 + 0.25;
         const colorHex = parseInt(b.color.replace('#', ''), 16);
         const newInst = new Block({
           position: [b.mesh.position.x, newY, b.mesh.position.z],
@@ -3435,7 +3435,7 @@ export class LevelEditor {
   // ── Floor / tool ──────────────────────────────────────────────────────────
 
   private changeFloor(delta: number): void {
-    this.currentFloor = Math.max(0, this.currentFloor + delta);
+    this.currentFloor = Math.max(-3, this.currentFloor + delta);
     this.floorLabel.textContent = `Floor: ${this.currentFloor}`;
     const y = floorY(this.currentFloor);
     this.gridHelper.position.y = y;
@@ -3943,7 +3943,7 @@ export class LevelEditor {
         const isCubelike = b.isCube || b.shape === 'wedge';
         return {
           id: b.id,
-          position: [b.gridX + 0.5, isCubelike ? b.floor * 1.0 - 2.5 : b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
+          position: [b.gridX + 0.5, isCubelike ? b.floor * 1.0 + 0.5 : b.floor * 0.5 + 0.25, b.gridZ + 0.5] as [number, number, number],
           color: b.color,
           size: (isCubelike ? [1, 1, 1] : [1, 0.5, 1]) as [number, number, number],
           walkable: b.walkable,
@@ -4102,7 +4102,7 @@ export class LevelEditor {
       const isCube     = !isWedge && bd.size[1] >= 0.9;
       const isCubelike = isCube || isWedge;
       const floor = isCubelike
-        ? Math.round((bd.position[1] + 2.5) / 1.0)
+        ? Math.round((bd.position[1] - 0.5) / 1.0)
         : Math.round((bd.position[1] - 0.25) / 0.5);
       const gridX = Math.round(bd.position[0] - 0.5);
       const gridZ = Math.round(bd.position[2] - 0.5);
