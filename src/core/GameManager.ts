@@ -686,6 +686,7 @@ export class GameManager {
             // goalGlow / goalMarker / midpointMarker / 텔레포터 링 위치 갱신
             this._refreshWorldElements();
             this.enemyMgr?.resume();
+
           },
         },
       );

@@ -66,8 +66,14 @@ export class CharacterController {
 
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
-    // node.position is already the correct face position (from PathGraph)
-    this.character.setPosition(node.position.x, node.position.y, node.position.z);
+    node.mesh.getWorldPosition(this._wp);
+    const u = this._gravityUp;
+    const h = node.halfHeight;
+    this.character.setPosition(
+      this._wp.x + u.x * h,
+      this._wp.y + h,   // 중력 반전 시에도 world +Y면으로 배치
+      this._wp.z + u.z * h,
+    );
     this.currentNode = node;
   }
 
@@ -100,7 +106,7 @@ export class CharacterController {
     const h = this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x + u.x * h,
-      this._wp.y + u.y * h,
+      this._wp.y + h,   // 중력 반전 시에도 world +Y면으로 배치
       this._wp.z + u.z * h,
     );
   }
@@ -138,7 +144,7 @@ export class CharacterController {
     const h = this.currentNode.halfHeight;
     char.setPosition(
       this._wp.x + u.x * h,
-      this._wp.y + u.y * h,
+      this._wp.y + h,   // 중력 반전 시에도 world +Y면으로 배치
       this._wp.z + u.z * h,
     );
   }
@@ -218,7 +224,7 @@ export class CharacterController {
         const h = node.halfHeight;
         this.character.setPosition(
           this._wp.x + u.x * h,
-          this._wp.y + u.y * h,
+          this._wp.y + h,   // 중력 반전 시에도 world +Y면으로 배치
           this._wp.z + u.z * h,
         );
         // 중간 노드에만 발동. 마지막 노드는 _advance()의 '경로 소진' 분기에서 처리.
@@ -237,7 +243,9 @@ export class CharacterController {
       });
     }
 
-    const targetY = node.position.y;
+    // node.position = blockCenter + u*halfH → world +Y face = blockCenter.y + halfH
+    // = node.position.y + (1 - u.y) * halfH (중력 반전 시 윗면 사용)
+    const targetY = node.position.y + (1 - u.y) * node.halfHeight;
     tl.to(this.character.mesh.position, {
       x: node.position.x,
       y: targetY + 0.08,
@@ -259,7 +267,7 @@ export class CharacterController {
     const h = this.currentNode.halfHeight;
     this.character.setPosition(
       this._wp.x + u.x * h,
-      this._wp.y + u.y * h,
+      this._wp.y + h,   // 중력 반전 시에도 world +Y면으로 배치
       this._wp.z + u.z * h,
     );
   }
