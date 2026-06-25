@@ -89,8 +89,10 @@ export class GameManager {
   private midpointMarker:   THREE.Mesh | null = null;
   private goalBlockId              = '';
   private _goalFlipped             = false;
+  private _goalFace: [number,number,number] | null = null;
   private midpointBlockId          = '';
   private _midpointFlipped         = false;
+  private _midpointFace: [number,number,number] | null = null;
   private midpointReached          = false;
   private goalReached       = false;
 
@@ -496,16 +498,19 @@ export class GameManager {
     // Goal / midpoint setup
     this.goalBlockId        = data.goal.blockId;
     this._goalFlipped       = data.goal.flipped ?? false;
+    this._goalFace          = data.goal.face ?? null;
     this.midpointBlockId    = data.midpoint?.blockId ?? '';
     this._midpointFlipped   = data.midpoint?.flipped ?? false;
+    this._midpointFace      = data.midpoint?.face ?? null;
     this.midpointReached    = false;
     this.goalGlow        = new THREE.PointLight(0xFFD700, 1.5, 3.5);
     const goalMesh       = this.level.blocks.get(this.goalBlockId)?.mesh;
     if (goalMesh) {
       const wp = new THREE.Vector3();
       goalMesh.getWorldPosition(wp);
-      const glowOffsetY = this._goalFlipped ? -1.5 : 1.5;
-      this.goalGlow.position.set(wp.x, wp.y + glowOffsetY, wp.z);
+      const glowDir = this._getMarkerDir(this._goalFace, this._goalFlipped);
+      const glowPos = wp.clone().addScaledVector(glowDir, 1.5);
+      this.goalGlow.position.set(glowPos.x, glowPos.y, glowPos.z);
     }
     this.level.getGroup().add(this.goalGlow);
 
@@ -815,20 +820,20 @@ export class GameManager {
                 this.audio.playStarCollect();
               }
               // QA-03: 도착지에 대한 goal/midpoint 판정도 수행
-              if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId && effectiveFlipped === this._midpointFlipped) {
+              if (this.midpointBlockId && !this.midpointReached && teleportDest === this.midpointBlockId && (this._midpointFace !== null || effectiveFlipped === this._midpointFlipped)) {
                 this.onMidpointReached();
               }
-              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
+              if (teleportDest === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this._goalFace !== null || effectiveFlipped === this._goalFlipped)) {
                 this._tryGoalReached();
               }
               return;
             }
           }
 
-          if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId && effectiveFlipped === this._midpointFlipped) {
+          if (this.midpointBlockId && !this.midpointReached && nodeId === this.midpointBlockId && (this._midpointFace !== null || effectiveFlipped === this._midpointFlipped)) {
             this.onMidpointReached();
           }
-          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && effectiveFlipped === this._goalFlipped) {
+          if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this._goalFace !== null || effectiveFlipped === this._goalFlipped)) {
             this._tryGoalReached();
           }
           if (this.isTutorial && !this.tutorialMoved) {
@@ -1220,8 +1225,10 @@ export class GameManager {
     }
     this.midpointBlockId          = '';
     this._midpointFlipped         = false;
+    this._midpointFace            = null;
     this.goalBlockId              = '';
     this._goalFlipped             = false;
+    this._goalFace                = null;
     this.midpointReached          = false;
     this.orbit.rotateSpeed = GraphicsSettings.rotateSpeed;
 
@@ -1325,39 +1332,21 @@ export class GameManager {
     const toLocal = (wx: number, wy: number, wz: number) =>
       group.worldToLocal(new THREE.Vector3(wx, wy, wz));
 
-    // 현재 중력 방향 (맵 회전 후 업데이트됨)
-    const flipPivot = this.level.getFlipPivot();
-    flipPivot.updateMatrixWorld(true);
-    const gravQ = new THREE.Quaternion().setFromEuler(flipPivot.rotation);
-    const gravUp = new THREE.Vector3(0, 1, 0).applyQuaternion(gravQ);
-
-    // X축 회전으로 맵이 뒤집힌 상태이면 flipped 요소의 중력 방향 반전
-    const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
-
-    // 마커를 중력 방향으로 offset하는 헬퍼
-    const applyGravOffset = (base: THREE.Vector3, offset: number): THREE.Vector3 =>
-      new THREE.Vector3(
-        base.x + gravUp.x * offset,
-        base.y + gravUp.y * offset,
-        base.z + gravUp.z * offset,
-      );
-
     // goalGlow 재배치
     const goalMesh = this.level.blocks.get(this.goalBlockId)?.mesh;
     if (goalMesh && this.goalGlow) {
       goalMesh.getWorldPosition(wp);
-      const glowOff = (this._goalFlipped !== effectiveFlipped) ? -1.5 : 1.5;
-      const gwp = applyGravOffset(wp, glowOff);
+      const dir = this._getMarkerDir(this._goalFace, this._goalFlipped);
+      const gwp = wp.clone().addScaledVector(dir, 1.5);
       this.goalGlow.position.copy(toLocal(gwp.x, gwp.y, gwp.z));
     }
 
     // goalMarker 재배치 (GSAP 재시작)
     if (goalMesh && this.goalMarker) {
       goalMesh.getWorldPosition(wp);
-      const offset    = (this._goalFlipped !== effectiveFlipped) ? -0.55 : 0.55;
-      const floatDelt = (this._goalFlipped !== effectiveFlipped) ? -0.3  : 0.3;
-      const startWp   = applyGravOffset(wp, offset);
-      const floatWp   = applyGravOffset(wp, offset + floatDelt);
+      const dir      = this._getMarkerDir(this._goalFace, this._goalFlipped);
+      const startWp  = wp.clone().addScaledVector(dir, 0.55);
+      const floatWp  = wp.clone().addScaledVector(dir, 0.85);
       const localStart = toLocal(startWp.x, startWp.y, startWp.z);
       const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
       gsap.killTweensOf(this.goalMarker.position);
@@ -1373,10 +1362,9 @@ export class GameManager {
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) {
         midMesh.getWorldPosition(wp);
-        const midOffset = (this._midpointFlipped !== effectiveFlipped) ? -0.55 : 0.55;
-        const midFloat  = (this._midpointFlipped !== effectiveFlipped) ? -0.3  : 0.3;
-        const startWp   = applyGravOffset(wp, midOffset);
-        const floatWp   = applyGravOffset(wp, midOffset + midFloat);
+        const dir      = this._getMarkerDir(this._midpointFace, this._midpointFlipped);
+        const startWp  = wp.clone().addScaledVector(dir, 0.55);
+        const floatWp  = wp.clone().addScaledVector(dir, 0.85);
         const localStart = toLocal(startWp.x, startWp.y, startWp.z);
         const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
         gsap.killTweensOf(this.midpointMarker.position);
@@ -1582,10 +1570,42 @@ export class GameManager {
     // 메시가 올라온 뒤 호출되므로 glow 위치를 현재 메시 위치로 갱신
     const wp = new THREE.Vector3();
     goalMesh.getWorldPosition(wp);
-    this.goalGlow.position.set(wp.x, wp.y + 1.5, wp.z);
+    const glowDir = this._getMarkerDir(this._goalFace, this._goalFlipped);
+    const glowPos = wp.clone().addScaledVector(glowDir, 1.5);
+    this.goalGlow.position.set(glowPos.x, glowPos.y, glowPos.z);
 
     gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.setupGoalMarker(goalMesh);
+  }
+
+  /** 현재 flipPivot 회전 기준 중력 방향 (+Y를 현재 회전으로 변환) */
+  private _currentGravUp(): THREE.Vector3 {
+    const flipPivot = this.level?.getFlipPivot();
+    if (!flipPivot) return new THREE.Vector3(0, 1, 0);
+    flipPivot.updateMatrixWorld(true);
+    const q = new THREE.Quaternion().setFromEuler(flipPivot.rotation);
+    return new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+  }
+
+  /**
+   * 마커(goal/midpoint ring) 배치 방향 벡터를 반환한다.
+   * face 지정 시 로컬 face normal을 현재 맵 회전으로 변환.
+   * face 미지정 시 중력 방향 또는 반전 방향.
+   */
+  private _getMarkerDir(face: [number,number,number] | null, flipped: boolean): THREE.Vector3 {
+    if (face) {
+      const flipPivot = this.level?.getFlipPivot();
+      const q = new THREE.Quaternion();
+      if (flipPivot) {
+        flipPivot.updateMatrixWorld(true);
+        q.setFromEuler(flipPivot.rotation);
+      }
+      return new THREE.Vector3(...face).normalize().applyQuaternion(q);
+    }
+    const gravUp = this._currentGravUp();
+    const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
+    const below = flipped !== effectiveFlipped;
+    return below ? gravUp.negate() : gravUp;
   }
 
   /** 조건부 사다리 메시 렌더링용: 블록의 최종 위치(moveTarget 있으면 반영) 반환 */
@@ -1603,25 +1623,21 @@ export class GameManager {
     const wp = new THREE.Vector3();
     goalMesh.getWorldPosition(wp);
 
-    // 현재 flip 상태를 반영 — XOR: 뒤집힌 상태에서 flipped 골은 위에 위치
-    const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
-    const below  = this._goalFlipped !== effectiveFlipped;
+    const dir = this._getMarkerDir(this._goalFace, this._goalFlipped);
 
     const geo = new THREE.TorusGeometry(0.28, 0.055, 8, 24);
     const mat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
     this.goalMarker = new THREE.Mesh(geo, mat);
-    this.goalMarker.rotation.x = Math.PI / 2;
-    const offsetY = below ? -0.55 : 0.55;
-    const floatY  = below ? wp.y - 0.85 : wp.y + 0.85;
-    this.goalMarker.position.set(wp.x, wp.y + offsetY, wp.z);
+    this.goalMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+    const startPos = wp.clone().addScaledVector(dir, 0.55);
+    const floatPos = wp.clone().addScaledVector(dir, 0.85);
+    this.goalMarker.position.copy(startPos);
     this.level!.getGroup().add(this.goalMarker);
 
     gsap.to(this.goalMarker.position, {
-      y: floatY,
-      duration: 1.1,
-      yoyo: true,
-      repeat: -1,
-      ease: 'sine.inOut',
+      x: floatPos.x, y: floatPos.y, z: floatPos.z,
+      duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut',
     });
   }
 
@@ -1629,21 +1645,21 @@ export class GameManager {
     const wp = new THREE.Vector3();
     midMesh.getWorldPosition(wp);
 
+    const dir = this._getMarkerDir(this._midpointFace, flipped);
+
     const geo = new THREE.TorusGeometry(0.28, 0.055, 8, 24);
     const mat = new THREE.MeshLambertMaterial({ color: 0x44DDBB });
     this.midpointMarker = new THREE.Mesh(geo, mat);
-    this.midpointMarker.rotation.x = Math.PI / 2;
-    const offsetY = flipped ? -0.55 : 0.55;
-    const floatY  = flipped ? wp.y - 0.85 : wp.y + 0.85;
-    this.midpointMarker.position.set(wp.x, wp.y + offsetY, wp.z);
+    this.midpointMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+    const startPos = wp.clone().addScaledVector(dir, 0.55);
+    const floatPos = wp.clone().addScaledVector(dir, 0.85);
+    this.midpointMarker.position.copy(startPos);
     this.level!.getGroup().add(this.midpointMarker);
 
     gsap.to(this.midpointMarker.position, {
-      y: floatY,
-      duration: 1.1,
-      yoyo: true,
-      repeat: -1,
-      ease: 'sine.inOut',
+      x: floatPos.x, y: floatPos.y, z: floatPos.z,
+      duration: 1.3, yoyo: true, repeat: -1, ease: 'sine.inOut',
     });
   }
 

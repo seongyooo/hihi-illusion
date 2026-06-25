@@ -213,8 +213,8 @@ export interface LevelData {
   icicles?: IcicleDef[];
   zones?: ZoneDef[];
   character: { startNodeId: string };
-  midpoint?: { blockId: string; flipped?: boolean };
-  goal: { blockId: string; flipped?: boolean };
+  midpoint?: { blockId: string; flipped?: boolean; face?: [number, number, number] };
+  goal: { blockId: string; flipped?: boolean; face?: [number, number, number] };
   initialCamera?: {
     azimuth:  number;   // Y축 회전 각도 (degrees, 0 = +Z 방향)
     polar:    number;   // 수직 각도 (degrees, 0 = 정수리, 90 = 수평)

@@ -200,6 +200,8 @@ export class LevelEditor {
   private midpointBlockId: string | null = null;
   private goalBlockId:    string | null = null;
   private goalFlipped                  = false;
+  private goalFace: [number, number, number] | null = null;
+  private goalFaceSelect: HTMLSelectElement | null = null;
   private stageName = 'Custom Level';
   private stageNum = 4;
   private bgColor = '#E8EEF5';
@@ -890,6 +892,31 @@ export class LevelEditor {
       sec.appendChild(clearMidBtn);
 
       {
+        // Goal face select
+        const goalFaceRow = document.createElement('div');
+        goalFaceRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:2px;';
+        const goalFaceLabel = document.createElement('label');
+        goalFaceLabel.style.minWidth = '60px';
+        goalFaceLabel.textContent = 'Goal Face:';
+        this.goalFaceSelect = document.createElement('select');
+        this.goalFaceSelect.style.cssText = 'flex:1;background:#222;color:#eee;border:1px solid #555;padding:2px 4px;font-size:11px;';
+        const goalFaceOptions: Array<[string, string]> = [
+          ['0,1,0',  '+Y (Top)'],
+          ['0,-1,0', '-Y (Bottom)'],
+          ['1,0,0',  '+X'],
+          ['-1,0,0', '-X'],
+          ['0,0,1',  '+Z'],
+          ['0,0,-1', '-Z'],
+        ];
+        for (const [val, label] of goalFaceOptions) {
+          const opt = document.createElement('option');
+          opt.value = val; opt.textContent = label;
+          this.goalFaceSelect.appendChild(opt);
+        }
+        goalFaceRow.appendChild(goalFaceLabel);
+        goalFaceRow.appendChild(this.goalFaceSelect);
+        sec.appendChild(goalFaceRow);
+
         const goalRow = document.createElement('div');
         goalRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:2px;';
         const goalBtn = document.createElement('button');
@@ -899,23 +926,14 @@ export class LevelEditor {
         goalBtn.addEventListener('click', () => {
           if (!this.selectedBlock) return;
           this.goalBlockId = this.selectedBlock.id;
-          this.goalFlipped = false;
-          this.updateMarkers(); this.updateSelectedPanel();
-        });
-        const flippedGoalBtn = document.createElement('button');
-        flippedGoalBtn.className = 'editor-btn';
-        flippedGoalBtn.textContent = 'Set as Goal (하단)';
-        flippedGoalBtn.style.cssText = 'flex:1;background:#224466;';
-        flippedGoalBtn.addEventListener('click', () => {
-          if (!this.selectedBlock) return;
-          this.goalBlockId = this.selectedBlock.id;
-          this.goalFlipped = true;
+          const parsed = this._parseGoalFace();
+          this.goalFlipped = parsed.flipped;
+          this.goalFace = parsed.face ?? null;
           this.updateMarkers(); this.updateSelectedPanel();
         });
         this.selGoalLabel = document.createElement('span');
         this.selGoalLabel.style.cssText = 'font-size:10px;color:#FFD700;display:none;white-space:nowrap;';
         goalRow.appendChild(goalBtn);
-        goalRow.appendChild(flippedGoalBtn);
         goalRow.appendChild(this.selGoalLabel);
         sec.appendChild(goalRow);
       }
@@ -3510,8 +3528,9 @@ export class LevelEditor {
 
       const isGoal = b.id === this.goalBlockId;
       if (isGoal) {
-        this.selGoalLabel.textContent  = this.goalFlipped ? '✓ GOAL (하단)' : '✓ GOAL';
-        this.selGoalLabel.style.color  = this.goalFlipped ? '#44CCFF' : '#FFD700';
+        const faceLabel = this.goalFace ? ` (${this.goalFace.join(',')})` : (this.goalFlipped ? ' (하단)' : '');
+        this.selGoalLabel.textContent  = `✓ GOAL${faceLabel}`;
+        this.selGoalLabel.style.color  = (this.goalFlipped || this.goalFace) ? '#44CCFF' : '#FFD700';
         this.selGoalLabel.style.display = 'inline';
       } else {
         this.selGoalLabel.style.display = 'none';
@@ -3847,7 +3866,7 @@ export class LevelEditor {
 
     if (this.startNodeId    === block.id) this.startNodeId    = this.blocks[0]?.id ?? null;
     if (this.midpointBlockId === block.id) this.midpointBlockId = null;
-    if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; }
+    if (this.goalBlockId    === block.id) { this.goalBlockId = this.blocks[this.blocks.length - 1]?.id ?? null; this.goalFlipped = false; this.goalFace = null; }
     this.starEntries        = this.starEntries.filter(e => e.nodeId !== block.id);
     this.mapRotateEntries   = this.mapRotateEntries.filter(e => e.nodeId !== block.id);
     this.enemyEntries       = this.enemyEntries
@@ -4404,9 +4423,21 @@ export class LevelEditor {
         : undefined,
       character: { startNodeId: this.startNodeId ?? this.blocks[0]?.id ?? '' },
       midpoint:  this.midpointBlockId ? { blockId: this.midpointBlockId } : undefined,
-      goal: { blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '', ...(this.goalFlipped ? { flipped: true } : {}) },
+      goal: {
+        blockId: this.goalBlockId ?? this.blocks[this.blocks.length - 1]?.id ?? '',
+        ...(this.goalFlipped ? { flipped: true } : {}),
+        ...(this.goalFace    ? { face: this.goalFace } : {}),
+      },
       ...(this.initCam ? { initialCamera: this.initCam } : {}),
     };
+  }
+
+  private _parseGoalFace(): { flipped: boolean; face?: [number, number, number] } {
+    const val = this.goalFaceSelect?.value ?? '0,1,0';
+    if (val === '0,1,0')  return { flipped: false };
+    if (val === '0,-1,0') return { flipped: true };
+    const [x, y, z] = val.split(',').map(Number);
+    return { flipped: false, face: [x, y, z] };
   }
 
   // ── loadFromLevelData ─────────────────────────────────────────────────────
@@ -4459,6 +4490,7 @@ export class LevelEditor {
     this.midpointBlockId = data.midpoint?.blockId ?? null;
     this.goalBlockId     = data.goal.blockId;
     this.goalFlipped     = data.goal.flipped ?? false;
+    this.goalFace        = data.goal.face ?? null;
 
     // Extract stageNum from id if possible
     const match = data.id.match(/(\d+)$/);
@@ -4529,6 +4561,7 @@ export class LevelEditor {
     this.teleporterConns = data.teleporters ?? [];
     this.starEntries          = (data.stars ?? []).map(s => ({ nodeId: s.nodeId, flipped: s.flipped ?? false, ...(s.face ? { face: s.face } : {}) }));
     this.goalFlipped          = data.goal.flipped ?? false;
+    this.goalFace             = data.goal.face ?? null;
     this.mapRotateEntries     = (data.mapRotateBlocks   ?? []).map(d => ({ ...d }));
 
     // 특수 블록 색상 복원 (로드 시 메시 재색칠)
