@@ -67,12 +67,11 @@ export class CharacterController {
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
     node.mesh.getWorldPosition(this._wp);
-    const u = this._gravityUp;
     const h = node.halfHeight;
     this.character.setPosition(
-      this._wp.x + u.x * h,
-      this._wp.y + h,   // 중력 방향 무관, 항상 world +Y면으로 배치 (카메라가 +Y에서 내려다봄)
-      this._wp.z + u.z * h,
+      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
+      this._wp.y + h,   // 항상 world +Y 윗면
+      this._wp.z,        // 항상 블록 중심 Z
     );
     this.currentNode = node;
   }
@@ -100,14 +99,13 @@ export class CharacterController {
     gsap.killTweensOf(this.character.mesh.rotation);
     this.character.stopWalk();
     this.isMoving = false;
-    // 현재 노드 위치로 스냅 (gravity-aware)
+    // 현재 노드 위치로 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const u = this._gravityUp;
     const h = this.currentNode.halfHeight;
     this.character.setPosition(
-      this._wp.x + u.x * h,
-      this._wp.y + h,   // 중력 방향 무관, 항상 world +Y면으로 배치 (카메라가 +Y에서 내려다봄)
-      this._wp.z + u.z * h,
+      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
+      this._wp.y + h,   // 항상 world +Y 윗면
+      this._wp.z,        // 항상 블록 중심 Z
     );
   }
 
@@ -138,14 +136,13 @@ export class CharacterController {
     this.isMoving     = false;
     this.pendingTarget = null;
     this._movePath    = [];
-    // 현재 노드 위치로 즉시 스냅 (gravity-aware)
+    // 현재 노드 위치로 즉시 스냅
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const u = this._gravityUp;
     const h = this.currentNode.halfHeight;
     char.setPosition(
-      this._wp.x + u.x * h,
-      this._wp.y + h,   // 중력 방향 무관, 항상 world +Y면으로 배치 (카메라가 +Y에서 내려다봄)
-      this._wp.z + u.z * h,
+      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
+      this._wp.y + h,   // 항상 world +Y 윗면
+      this._wp.z,        // 항상 블록 중심 Z
     );
   }
 
@@ -208,6 +205,7 @@ export class CharacterController {
       return;
     }
 
+    // 이동 방향: 블록 중심 기준 (gravity 오프셋 상쇄 — u.x*h, u.z*h는 양쪽 같으므로 차이에서 상쇄됨)
     const dx = node.position.x - prev.position.x;
     const dz = node.position.z - prev.position.z;
 
@@ -243,13 +241,16 @@ export class CharacterController {
       });
     }
 
-    // node.position = blockCenter + u*halfH → world +Y face = blockCenter.y + halfH
-    // = node.position.y + (1 - u.y) * halfH (중력 반전 시 윗면 사용)
-    const targetY = node.position.y + (1 - u.y) * node.halfHeight;
+    // node.position = blockCenter + u*halfH
+    // 캐릭터 시각 위치: 블록 중심 X/Z, world +Y 윗면 Y (XZ gravity 오프셋 제거)
+    const h        = node.halfHeight;
+    const targetX  = node.position.x - u.x * h;   // = blockCenter X
+    const targetY  = node.position.y + (1 - u.y) * h; // = blockCenter.y + h (항상 +Y 윗면)
+    const targetZ  = node.position.z - u.z * h;   // = blockCenter Z
     tl.to(this.character.mesh.position, {
-      x: node.position.x,
+      x: targetX,
       y: targetY + 0.08,
-      z: node.position.z,
+      z: targetZ,
       duration: 0.15,
       ease: 'power1.out',
     }).to(this.character.mesh.position, {
@@ -263,12 +264,11 @@ export class CharacterController {
   update(): void {
     if (this.isMoving) return;
     this.currentNode.mesh.getWorldPosition(this._wp);
-    const u = this._gravityUp;
     const h = this.currentNode.halfHeight;
     this.character.setPosition(
-      this._wp.x + u.x * h,
-      this._wp.y + h,   // 중력 방향 무관, 항상 world +Y면으로 배치 (카메라가 +Y에서 내려다봄)
-      this._wp.z + u.z * h,
+      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
+      this._wp.y + h,   // 항상 world +Y 윗면
+      this._wp.z,        // 항상 블록 중심 Z
     );
   }
 
