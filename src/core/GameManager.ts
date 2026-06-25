@@ -1325,24 +1325,41 @@ export class GameManager {
     const toLocal = (wx: number, wy: number, wz: number) =>
       group.worldToLocal(new THREE.Vector3(wx, wy, wz));
 
-    // X축 회전으로 맵이 뒤집힌 상태이면 flipped 요소의 월드 Y 방향도 반전
+    // 현재 중력 방향 (맵 회전 후 업데이트됨)
+    const flipPivot = this.level.getFlipPivot();
+    flipPivot.updateMatrixWorld(true);
+    const gravQ = new THREE.Quaternion().setFromEuler(flipPivot.rotation);
+    const gravUp = new THREE.Vector3(0, 1, 0).applyQuaternion(gravQ);
+
+    // X축 회전으로 맵이 뒤집힌 상태이면 flipped 요소의 중력 방향 반전
     const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
+
+    // 마커를 중력 방향으로 offset하는 헬퍼
+    const applyGravOffset = (base: THREE.Vector3, offset: number): THREE.Vector3 =>
+      new THREE.Vector3(
+        base.x + gravUp.x * offset,
+        base.y + gravUp.y * offset,
+        base.z + gravUp.z * offset,
+      );
 
     // goalGlow 재배치
     const goalMesh = this.level.blocks.get(this.goalBlockId)?.mesh;
     if (goalMesh && this.goalGlow) {
       goalMesh.getWorldPosition(wp);
-      const glowOffsetY = (this._goalFlipped !== effectiveFlipped) ? -1.5 : 1.5;
-      this.goalGlow.position.copy(toLocal(wp.x, wp.y + glowOffsetY, wp.z));
+      const glowOff = (this._goalFlipped !== effectiveFlipped) ? -1.5 : 1.5;
+      const gwp = applyGravOffset(wp, glowOff);
+      this.goalGlow.position.copy(toLocal(gwp.x, gwp.y, gwp.z));
     }
 
     // goalMarker 재배치 (GSAP 재시작)
     if (goalMesh && this.goalMarker) {
       goalMesh.getWorldPosition(wp);
-      const offsetY     = (this._goalFlipped !== effectiveFlipped) ? -0.55 : 0.55;
-      const floatDeltaY = (this._goalFlipped !== effectiveFlipped) ? -0.3  : 0.3;
-      const localStart  = toLocal(wp.x, wp.y + offsetY,            wp.z);
-      const localFloat  = toLocal(wp.x, wp.y + offsetY + floatDeltaY, wp.z);
+      const offset    = (this._goalFlipped !== effectiveFlipped) ? -0.55 : 0.55;
+      const floatDelt = (this._goalFlipped !== effectiveFlipped) ? -0.3  : 0.3;
+      const startWp   = applyGravOffset(wp, offset);
+      const floatWp   = applyGravOffset(wp, offset + floatDelt);
+      const localStart = toLocal(startWp.x, startWp.y, startWp.z);
+      const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
       gsap.killTweensOf(this.goalMarker.position);
       this.goalMarker.position.copy(localStart);
       gsap.to(this.goalMarker.position, {
@@ -1356,10 +1373,12 @@ export class GameManager {
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) {
         midMesh.getWorldPosition(wp);
-        const midOffsetY = (this._midpointFlipped !== effectiveFlipped) ? -0.55 : 0.55;
-        const midFloatDY = (this._midpointFlipped !== effectiveFlipped) ? -0.3  : 0.3;
-        const localStart = toLocal(wp.x, wp.y + midOffsetY,            wp.z);
-        const localFloat = toLocal(wp.x, wp.y + midOffsetY + midFloatDY, wp.z);
+        const midOffset = (this._midpointFlipped !== effectiveFlipped) ? -0.55 : 0.55;
+        const midFloat  = (this._midpointFlipped !== effectiveFlipped) ? -0.3  : 0.3;
+        const startWp   = applyGravOffset(wp, midOffset);
+        const floatWp   = applyGravOffset(wp, midOffset + midFloat);
+        const localStart = toLocal(startWp.x, startWp.y, startWp.z);
+        const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
         gsap.killTweensOf(this.midpointMarker.position);
         this.midpointMarker.position.copy(localStart);
         gsap.to(this.midpointMarker.position, {
