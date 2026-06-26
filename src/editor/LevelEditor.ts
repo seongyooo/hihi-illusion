@@ -381,7 +381,7 @@ export class LevelEditor {
     this.scene.add(this.floorPlane);
 
     // Ghost mesh
-    const ghostGeo = new THREE.BoxGeometry(1, 0.5, 1);
+    const ghostGeo = new THREE.BoxGeometry(1, 1, 1);
     const ghostMat = new THREE.MeshLambertMaterial({
       color: 0x4488ff,
       transparent: true,
