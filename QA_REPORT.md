@@ -1,7 +1,96 @@
 # QA 리포트 — Monument Valley Clone
 
-> 최종 업데이트: 2026-06-23  
-> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + 13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화) + 14차 QA (mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치) + **15차 QA (Block Dividers seam mesh / 동적 블록 제외 / 골 팽창 애니메이션)**
+> 최종 업데이트: 2026-06-27  
+> QA 범위: Phase 1 ~ Phase 5 + 2차 QA (전체 코드 재검토) + 3차 QA (GameManager 신규 코드 전체 검토) + 신규 블록 메커닉 기획 + 4차 QA (TeleportManager 포함 전체 재검토) + 5차 QA (텔레포트 미동작 버그 추적) + 6차 QA (StarManager 신규 구현 검토) + 7차 QA (Stage 11 / 반응형 UI / EditorLobby 삭제 버튼) + 8차 QA (GraphicsSettings / SettingsScreen / SettingsPreview / 품질 전환 전체 검토) + 9차 QA (Pressure Switch Type A spawn gate / Stage 12 / LevelEditor SWITCHES 섹션) + 10차 QA (Stage 13 / Stage 15 "Double Key" / StageSelectUI 리팩터 / SwitchManager 내부 버그 수정) + 11차 QA (QA-SP1/SP2 dispose 수정 검증) + 12차 QA (registry auto-discovery / initialCamera / Stage 15 리디자인 / LevelEditor 스위치 per-target moveTarget) + 13차 QA (PatrolManager 신규 / 음수 방향 / CharacterController 인접성 검사 / StarManager 블록 부모화) + 14차 QA (mapRotateBlocks / 에디터 상태 표시 / gravity flip 착시 / 요소 재배치) + 15차 QA (Block Dividers seam mesh / 동적 블록 제외 / 골 팽창 애니메이션) + **16차 QA (전체 코드베이스 정적 분석)**
+
+---
+
+## 16차 QA (2026-06-27) — 전체 코드베이스 정적 분석
+
+### 점검 범위
+- `GameManager.ts` 전체 — 타이머/트윈 라이프사이클, 골·중간지점 마커, 시네마틱, 레벨 언로드
+- `SwitchManager.ts` — move/spawn 타입 별 위치 처리
+- `StarManager.ts` — refreshPositions, repositionStar 호출 시점
+- `LevelEditor.ts` — 이벤트 핸들러, 리사이즈, export 좌표 계산
+
+### 결과 요약
+
+| 등급 | 건수 |
+|------|------|
+| HIGH | 0 |
+| MEDIUM | 2 |
+| LOW | 3 |
+| PASS (False Positive 제거) | 7 |
+
+---
+
+### ~~BUG-16-01~~ → FALSE POSITIVE (2026-06-27 재검토)
+**원래 주장:** move 스위치 이동 후 별 메시 위치 미갱신  
+**실제:** `StarManager._createStarMesh()`에서 별은 `node.mesh.add(starMesh)`로 블록 메시의 자식으로 부모화된다(`StarManager.ts:70`). `PathGraph.build()`가 동일한 `level.blocks.get(bid)?.mesh`를 사용하므로 `state.targetMesh === node.mesh`. 블록 메시가 이동하면 자식인 별도 Three.js 계층에 의해 자동으로 따라간다. 수정 불필요. ✅
+
+---
+
+### BUG-16-02 — 중간지점 시네마틱 후 골 마커 float 방향이 월드 Y 고정
+**심각도:** MEDIUM  
+**파일:** `src/core/GameManager.ts:1852-1858`  
+**현상:** `onMidpointReached()` Phase 2에서 골 링 float 트윈이 `y: floatY + floatDY`만 변경한다. 맵이 X축 90° 회전한 상태에서는 중력 방향이 월드 Y가 아니므로 마커가 잘못된 방향으로 떠다닌다. 일반 레벨(midpoint 없는 경우)의 `setupGoalMarker`는 `dir` 벡터 기반으로 `x/y/z` 모두 트윈해 일관성이 없다.  
+**수정 방향:** Phase 2 float 트윈을 `setupGoalMarker`처럼 `dir` 벡터를 구해 `floatPos = startPos + dir * 0.3`으로 트윈하도록 통일.
+
+---
+
+### ~~BUG-16-03~~ → FALSE POSITIVE (2026-06-27 재검토)
+**원래 주장:** spawn 스위치 despawn 후 별이 공중에 남음  
+**실제:** 별은 블록 메시의 자식이므로 `despawnTarget()`의 `mesh.removeFromParent()` 시 별도 씬에서 함께 제거된다. `spawnTarget()`에서 블록 메시를 다시 씬에 추가하면 별도 함께 복원된다. 수정 불필요. ✅
+
+---
+
+### BUG-16-04 — 에디터 `sw-pick-move` moveTarget Y값이 flat 블록 기준으로 계산됨
+**심각도:** MEDIUM  
+**파일:** `src/editor/LevelEditor.ts:1466-1469`  
+**현상:** `sw-pick-move` 버튼으로 픽한 블록의 moveTarget 좌표를 `blockWorldPos(b.gridX, b.floor, b.gridZ)` — cube 인수 없이 — 호출해 항상 flat(0.5 높이) 기준 Y값을 저장한다. 픽한 블록이 cube이면 Y가 0.25 낮게 저장된다.  
+**수정 방향:** `blockWorldPos(b.gridX, b.floor, b.gridZ, b.isCubelike)`로 블록 종류를 반영.
+
+---
+
+### BUG-16-05 — 에디터 패널 토글 빠른 반복 시 resize 이벤트 중복 큐
+**심각도:** LOW  
+**파일:** `src/editor/LevelEditor.ts` (togglePanel)  
+**현상:** 패널 토글마다 `setTimeout(() => this.onResize(), 300)` 타이머 ID를 저장하지 않아, 빠른 반복 토글 시 여러 resize 콜백이 누적 실행된다.  
+**수정 방향:** 타이머 ID를 멤버 변수에 저장하고, 새 토글 시 `clearTimeout` 후 재등록.
+
+---
+
+### BUG-16-06 — JSON 레벨 파일 내 중복 블록 ID 무검증
+**심각도:** LOW  
+**파일:** `src/world/Level.ts`, `src/world/PathGraph.ts`  
+**현상:** `blocks` 배열에 동일 `id`가 두 번 들어오면 Map에 마지막 항목으로 덮어써지고, 경고 없이 블록 하나가 사라진다. 에디터 export 시에는 중복이 생기지 않지만 수동 JSON 편집 시 사고 가능.  
+**수정 방향:** Level 로드 초기에 ID 중복 감지 후 `console.warn` 출력.
+
+---
+
+### PASS 항목 (False Positive 검토 완료)
+
+| 항목 | 파일 | 결론 |
+|------|------|------|
+| LevelEditor 마우스 이벤트 `this` 바인딩 | `LevelEditor.ts:3988` | ✅ arrow function class property — 정상 |
+| LevelEditor `keydown` / `ResizeObserver` 미제거 | `LevelEditor.ts:4756-4757` | ✅ `dispose()`에서 올바르게 제거 |
+| `goalGlow` intensity tween 미취소 | `GameManager.ts:1204` | ✅ `gsap.killTweensOf(goalGlow)`가 intensity 포함 kill |
+| `goalClearTimeout` / `goalClearInnerTimeout` 레이스 | `GameManager.ts:1173-1179` | ✅ 두 타이머 모두 `unloadCurrent()`에서 취소 |
+| `orbit.enabled` 언로드 시 미복구 | `GameManager.ts:1196` | ✅ `unloadCurrent()`에서 `orbit.enabled = true` 처리 |
+| BUG-16-01: move 스위치 별 위치 미갱신 | `SwitchManager.ts` | ✅ 별이 블록 메시 자식 — Three.js 계층으로 자동 추적 |
+| BUG-16-03: despawn 후 별 공중 부양 | `SwitchManager.ts` | ✅ 별이 블록 메시 자식 — `removeFromParent()` 시 함께 제거 |
+
+---
+
+### 우선순위 요약
+
+| 순위 | ID | 영향 |
+|------|----|------|
+| 1 | BUG-16-02 | 맵 회전 + 중간지점 조합 레벨 시각 오류 |
+| 2 | BUG-16-04 | 에디터 moveTarget Y 미세 오차 |
+| 3 | BUG-16-05 | 에디터 UX 사소한 성능 낭비 |
+| 4 | BUG-16-06 | 데이터 안정성 (수동 편집 시에만 발생) |
+| 6 | BUG-16-06 | 데이터 안정성 (수동 편집 시에만 발생) |
 
 ---
 
