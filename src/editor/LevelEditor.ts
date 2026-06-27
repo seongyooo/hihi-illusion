@@ -127,6 +127,7 @@ export class LevelEditor {
   private panelEl: HTMLElement;
   private panelToggleBtn!: HTMLButtonElement;
   private panelVisible = true;
+  private _panelResizeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Three.js
   private renderer: THREE.WebGLRenderer;
@@ -471,8 +472,12 @@ export class LevelEditor {
     this.panelVisible = !this.panelVisible;
     this.panelEl.classList.toggle('editor-panel--hidden', !this.panelVisible);
     this.panelToggleBtn.innerHTML = this.panelVisible ? '&#10005;' : '&#9776;';
-    // 패널 숨김 시 뷰포트 리사이즈 트리거
-    setTimeout(() => this.onResize(), 300);
+    // BUG-16-05: 이전 타이머 취소 후 재등록 (빠른 반복 토글 시 중복 실행 방지)
+    if (this._panelResizeTimeout !== null) clearTimeout(this._panelResizeTimeout);
+    this._panelResizeTimeout = setTimeout(() => {
+      this._panelResizeTimeout = null;
+      this.onResize();
+    }, 300);
   }
 
   // ── Panel construction ────────────────────────────────────────────────────
@@ -1463,7 +1468,9 @@ export class LevelEditor {
       // Pick: moveTarget 좌표 → 해당 타깃의 XYZ 입력
       (this.switchFormEl.querySelector('#sw-pick-move') as HTMLButtonElement)
         .addEventListener('click', () => this.startPick(b => {
-          const wp = blockWorldPos(b.gridX, b.floor, b.gridZ);
+          // BUG-16-04: cube/wedge 여부를 반영해 Y값을 올바르게 계산
+          const isCubelike = b.isCube || b.shape === 'wedge';
+          const wp = blockWorldPos(b.gridX, b.floor, b.gridZ, isCubelike);
           (this.switchFormEl.querySelector('#sw-mx') as HTMLInputElement).value = String(wp.x);
           (this.switchFormEl.querySelector('#sw-my') as HTMLInputElement).value = String(wp.y);
           (this.switchFormEl.querySelector('#sw-mz') as HTMLInputElement).value = String(wp.z);

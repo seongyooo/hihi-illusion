@@ -294,6 +294,10 @@ export class Level {
         child.userData.blockTopY = blockTopY;
       });
 
+      // BUG-16-06: 중복 블록 ID 감지
+      if (this.blocks.has(bd.id)) {
+        console.warn(`[Level] 중복 블록 ID 감지: "${bd.id}" — 마지막 블록으로 덮어씁니다.`);
+      }
       this.blocks.set(bd.id, block);
       this.group.add(block.mesh);
       if (bd.walkable) this.walkableMeshes.push(block.mesh);

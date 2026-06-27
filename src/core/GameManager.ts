@@ -1835,10 +1835,10 @@ export class GameManager {
         this.setupGoalMarker(goalMesh);
 
         if (this.goalMarker) {
-          const ring   = this.goalMarker;
-          const floatY = ring.position.y;  // setupGoalMarker 이 설정한 시작 Y
-          const ef     = this.worldRotateMgr?.isMapFlipped() ?? false;
-          const floatDY = (this._goalFlipped !== ef) ? -0.3 : 0.3;
+          const ring = this.goalMarker;
+          // BUG-16-02: dir 벡터 기반으로 floatPos 계산 — 맵 회전 후에도 올바른 방향으로 떠다님
+          const dir      = this._getMarkerDir(this._goalFace, this._goalFlipped);
+          const floatPos = ring.position.clone().addScaledVector(dir, 0.3);
 
           // 이미 시작된 float 트윈을 멈추고 scale-in 후 재시작
           gsap.killTweensOf(ring.position);
@@ -1850,7 +1850,7 @@ export class GameManager {
             ease: 'back.out(2.5)',
             onComplete: () => {
               gsap.to(ring.position, {
-                y: floatY + floatDY,
+                x: floatPos.x, y: floatPos.y, z: floatPos.z,
                 duration: 1.1,
                 yoyo: true,
                 repeat: -1,
