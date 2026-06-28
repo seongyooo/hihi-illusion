@@ -918,6 +918,12 @@ export class LevelEditor {
           opt.value = val; opt.textContent = label;
           this.goalFaceSelect.appendChild(opt);
         }
+        // 로드된 레벨의 goalFace 값으로 드롭다운 초기화
+        if (this.goalFace) {
+          this.goalFaceSelect.value = this.goalFace.join(',');
+        } else {
+          this.goalFaceSelect.value = this.goalFlipped ? '0,-1,0' : '0,1,0';
+        }
         goalFaceRow.appendChild(goalFaceLabel);
         goalFaceRow.appendChild(this.goalFaceSelect);
         sec.appendChild(goalFaceRow);

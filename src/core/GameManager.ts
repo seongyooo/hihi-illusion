@@ -1351,6 +1351,7 @@ export class GameManager {
       const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
       gsap.killTweensOf(this.goalMarker.position);
       this.goalMarker.position.copy(localStart);
+      this.goalMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
       gsap.to(this.goalMarker.position, {
         x: localFloat.x, y: localFloat.y, z: localFloat.z,
         duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut',
@@ -1369,6 +1370,7 @@ export class GameManager {
         const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
         gsap.killTweensOf(this.midpointMarker.position);
         this.midpointMarker.position.copy(localStart);
+        this.midpointMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
         gsap.to(this.midpointMarker.position, {
           x: localFloat.x, y: localFloat.y, z: localFloat.z,
           duration: 1.3, yoyo: true, repeat: -1, ease: 'sine.inOut',
@@ -1572,7 +1574,8 @@ export class GameManager {
     goalMesh.getWorldPosition(wp);
     const glowDir = this._getMarkerDir(this._goalFace, this._goalFlipped);
     const glowPos = wp.clone().addScaledVector(glowDir, 1.5);
-    this.goalGlow.position.set(glowPos.x, glowPos.y, glowPos.z);
+    const glowLocal = this.level!.getGroup().worldToLocal(glowPos);
+    this.goalGlow.position.copy(glowLocal);
 
     gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.setupGoalMarker(goalMesh);
