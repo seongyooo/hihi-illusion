@@ -16,6 +16,7 @@ import { HUD }                from '../ui/HUD';
 import { BlockLabels }        from '../ui/BlockLabels';
 import { StageSelectUI }      from '../ui/StageSelectUI';
 import { ChapterSelectUI }    from '../ui/ChapterSelectUI';
+import { getWorldByStage }    from '../levels/worlds';
 import { WorldMapScene }      from '../ui/WorldMapScene';
 import { TitleScreen }        from '../ui/TitleScreen';
 import { TutorialHint }       from '../ui/TutorialHint';
@@ -1073,8 +1074,8 @@ export class GameManager {
     this._initLevelObjects(data);
     this.hud.enableSkip(() => {
       if (onExit) { onExit(); return; }
-      const chapter = Math.ceil(this.currentStageNum / 30) || 1;
-      this.stageSelect.show(chapter);
+      const worldId = getWorldByStage(this.currentStageNum)?.id ?? 1;
+      this.stageSelect.show(worldId);
     });
     this._startCameraFlyIn(data);
   }

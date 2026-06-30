@@ -358,6 +358,15 @@ canvas {
   text-indent: 0.25em;
 }
 
+.chapter-select__card-subtitle {
+  font-family: 'Georgia', serif;
+  font-size: clamp(9px, 1.8vw, 10px);
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: rgba(245, 240, 232, 0.5);
+  margin-bottom: 2px;
+}
+
 .chapter-select__card-range {
   font-family: 'Georgia', serif;
   font-size: clamp(10px, 2vw, 11px);
@@ -435,6 +444,22 @@ canvas {
 .stage-select__back:hover {
   color: #f5f0e8;
   border-color: rgba(245, 240, 232, 0.5);
+}
+
+.stage-select__world-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stage-select__subtitle {
+  font-family: 'Georgia', serif;
+  font-size: clamp(10px, 2vw, 11px);
+  font-style: italic;
+  letter-spacing: 0.12em;
+  color: rgba(245, 240, 232, 0.45);
+  margin: 0;
 }
 
 .stage-select__title {

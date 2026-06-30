@@ -2,8 +2,8 @@ import { CustomLevelStore } from '../editor/CustomLevelStore';
 import { CUSTOM_STAGE_NUMS } from '../levels/registry';
 import { ProgressStore }     from '../core/ProgressStore';
 import { renderStagePreview } from './StagePreviewRenderer';
+import { WORLDS, getWorldById } from '../levels/worlds';
 
-const PAGE_SIZE          = 30;
 const BUILTIN_STAGE_NUMS = new Set(CUSTOM_STAGE_NUMS);
 
 export class StageSelectUI {
@@ -12,7 +12,7 @@ export class StageSelectUI {
   private tooltipImg: HTMLImageElement;
   private tooltipLabel: HTMLElement;
   private hideTooltipTimer = 0;
-  private currentChapter = 1;
+  private currentWorldId = 1;
   onSelect:   (stageNum: number) => void = () => {};
   onBack:     () => void = () => {};
   onTutorial: () => void = () => {};
@@ -50,18 +50,27 @@ export class StageSelectUI {
     if (back) this.el.appendChild(back);
     this.el.appendChild(this.tooltip); // 툴팁 재부착
 
+    const world = getWorldById(this.currentWorldId) ?? WORLDS[0];
+
+    const header = document.createElement('div');
+    header.className = 'stage-select__world-header';
+
     const title = document.createElement('h2');
     title.className = 'stage-select__title';
-    title.textContent = `CHAPTER ${this.currentChapter}`;
-    this.el.appendChild(title);
+    title.textContent = world.name;
+
+    const subtitle = document.createElement('p');
+    subtitle.className = 'stage-select__subtitle';
+    subtitle.textContent = world.subtitle;
+
+    header.appendChild(title);
+    header.appendChild(subtitle);
+    this.el.appendChild(header);
 
     const grid = document.createElement('div');
     grid.className = 'stage-select__grid';
 
-    const startStage = (this.currentChapter - 1) * PAGE_SIZE + 1;
-    const endStage   = this.currentChapter * PAGE_SIZE;
-
-    for (let i = startStage; i <= endStage; i++) {
+    for (let i = world.startStage; i <= world.endStage; i++) {
       const btn = document.createElement('button');
       btn.className = 'stage-select__cell';
       btn.textContent = String(i);
@@ -93,7 +102,7 @@ export class StageSelectUI {
     this.el.appendChild(grid);
 
     // 튜토리얼 다시하기 버튼
-    if (this.currentChapter === 1 && ProgressStore.isTutorialDone()) {
+    if (world.hasTutorial && ProgressStore.isTutorialDone()) {
       const tutorialBtn = document.createElement('button');
       tutorialBtn.className = 'stage-select__tutorial-btn';
       tutorialBtn.textContent = '튜토리얼 다시하기';
@@ -157,8 +166,8 @@ export class StageSelectUI {
     this.tooltip.style.top  = `${top}px`;
   }
 
-  show(chapter = 1): void {
-    this.currentChapter = chapter;
+  show(worldId = 1): void {
+    this.currentWorldId = worldId;
     this.buildGrid();
     requestAnimationFrame(() => this.el.classList.add('visible'));
   }
