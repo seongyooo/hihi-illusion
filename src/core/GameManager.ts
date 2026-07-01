@@ -41,6 +41,7 @@ import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSett
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
 import { ProgressStore }      from './ProgressStore';
+import { NarrationUI }        from '../ui/NarrationUI';
 
 export class GameManager {
   // ── Engine singletons (shared across levels) ──────────────────────────
@@ -61,6 +62,7 @@ export class GameManager {
   private editor:         LevelEditor;
   private settingsScreen:   SettingsScreen;
   private starBackground:   StarBackground;
+  private narrationUI:      NarrationUI;
   private readonly debug: boolean;
 
   // ── Per-level state (null when unloaded) ──────────────────────────────
@@ -150,6 +152,7 @@ export class GameManager {
 
     this.cameraCtrl   = new CameraController(this.renderer.camera, this.orbit.target);
     this.blockLabels  = new BlockLabels(container, this.renderer.camera);
+    this.narrationUI  = new NarrationUI(container);
     this.stageSelect   = new StageSelectUI(container);
     this.chapterSelect = new ChapterSelectUI(container);
     this.titleScreen   = new TitleScreen(container);
@@ -1058,6 +1061,7 @@ export class GameManager {
 
     // Intro camera fly-in
     this._startCameraFlyIn(data);
+    this._showStageNarration();
   }
 
   private async loadCustomLevel(data: LevelData, onExit?: () => void): Promise<void> {
@@ -1078,6 +1082,16 @@ export class GameManager {
       this.stageSelect.show(worldId);
     });
     this._startCameraFlyIn(data);
+    this._showStageNarration();
+  }
+
+  private _showStageNarration(): void {
+    if (this.currentStageNum <= 0) return;
+    const world = getWorldByStage(this.currentStageNum);
+    if (!world) return;
+    const idx = this.currentStageNum - world.startStage;
+    const text = world.stageNarrations[idx];
+    if (text) this.narrationUI.show(text);
   }
 
   /** initialCamera 설정 또는 기본값으로 인트로 카메라 플라이-인 실행 */
@@ -1156,6 +1170,9 @@ export class GameManager {
     if (this.worldMapScene) {
       this.worldMapScene.hide();
     }
+
+    // 나레이션 취소
+    this.narrationUI.cancel();
 
     // fly-in 취소 및 이벤트 리스너 정리
     this.flyInCancelFn?.();

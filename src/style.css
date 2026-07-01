@@ -23,6 +23,41 @@ canvas {
   touch-action: none; /* 브라우저 기본 터치 동작 차단 — 핀치줌/스크롤 방지 */
 }
 
+/* ── Narration subtitle ────────────────────────────────────────────── */
+.narration-subtitle {
+  display: none;
+  position: absolute;
+  bottom: max(52px, env(safe-area-inset-bottom, 52px));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(680px, 90vw);
+  width: max-content;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 60;
+}
+
+.narration-subtitle__text {
+  font-family: 'Georgia', 'Nanum Myeongjo', serif;
+  font-size: clamp(14px, 2vw, 18px);
+  line-height: 1.7;
+  color: #f0ead8;
+  text-align: center;
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 1px 12px rgba(0, 0, 0, 0.9),
+    0 0 32px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.45) 30%,
+    rgba(0, 0, 0, 0.45) 70%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  padding: 10px 28px 12px;
+  border-radius: 4px;
+}
+
 /* HUD */
 .block-label {
   position: absolute;
