@@ -18,12 +18,6 @@ export const CUSTOM_STAGE_NUMS: number[] = Object.keys(customModules)
   .sort((a, b) => a - b);
 
 export const LEVELS: LevelMeta[] = [
-  {
-    id:              'level_01',
-    title:           'Tutorial',
-    backgroundColor: '#F5F0E8',
-    file:            () => import('./level01.json') as unknown as Promise<{ default: LevelData }>,
-  },
   ...CUSTOM_STAGE_NUMS.map(num => ({
     id:              `custom_stage_${num}`,
     title:           `Stage ${num}`,

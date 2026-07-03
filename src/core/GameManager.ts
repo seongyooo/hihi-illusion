@@ -37,7 +37,7 @@ import { CannonManager }   from '../world/CannonManager';
 import { IcicleManager }  from '../world/IcicleManager';
 import { TutorialSequencer }  from './TutorialSequencer';
 import { LEVELS, CUSTOM_STAGE_NUMS } from '../levels/registry';
-import { GraphicsSettings, COLOR_DEFAULTS, isMobileDevice } from './GraphicsSettings';
+import { GraphicsSettings, isMobileDevice } from './GraphicsSettings';
 import { SettingsScreen }     from '../ui/SettingsScreen';
 import { StarBackground }     from '../world/StarBackground';
 import { ProgressStore }      from './ProgressStore';
@@ -99,12 +99,10 @@ export class GameManager {
   private midpointReached          = false;
   private goalReached       = false;
 
-  // ── Tutorial state ────────────────────────────────────────────────────
-  private isTutorial      = false;
   private tutorialMoved   = false;
 
   // ── Stage tracking ────────────────────────────────────────────────────
-  private currentStageNum = 0;  // 0 = tutorial, 1+ = actual stages
+  private currentStageNum = 0;  // 1+ = actual stages
 
   // ── Current level reload info (for respawn-restart) ──────────────────
   private _currentLevelId:    string    | null = null;  // 빌트인 레벨 id
@@ -148,6 +146,8 @@ export class GameManager {
     this.orbit.maxDistance   = 25;
     this.orbit.minPolarAngle = Math.PI / 6;  // elevation 최대 60° 제한
     this.orbit.maxPolarAngle = Math.PI / 2 - 0.0873;  // elevation 최소 5° 제한 (수평 착시 방지)
+    this.orbit.minZoom = 0.4;   // OrthographicCamera 줌 아웃 한계
+    this.orbit.maxZoom = 3.0;   // OrthographicCamera 줌 인 한계
     this.orbit.target.set(-1, 0, -1);
 
     this.cameraCtrl   = new CameraController(this.renderer.camera, this.orbit.target);
@@ -229,12 +229,12 @@ export class GameManager {
     this.settingsScreen.onBlockColorChange = (hexStr) => {
       GraphicsSettings.blockColorOverride = hexStr;
       const override = hexStr ? parseInt(hexStr.replace('#', ''), 16) : null;
-      if (!this.isTutorial) this.level?.recolorAllBlocks(override);
+      this.level?.recolorAllBlocks(override);
     };
 
     this.settingsScreen.onBlockVariantChange = (variant) => {
       GraphicsSettings.blockVariant = variant;
-      if (!this.isTutorial) this.level?.revariantAllBlocks(variant as import('../world/Block').BlockVariant);
+      this.level?.revariantAllBlocks(variant as import('../world/Block').BlockVariant);
     };
 
     this.settingsScreen.onBlockRadiusChange = (val) => {
@@ -296,13 +296,8 @@ export class GameManager {
 
       // 새 캐릭터 생성
       const next = new Character(type as CharacterType);
-      if (this.isTutorial) {
-        next.setBodyColor(COLOR_DEFAULTS.charBody);
-        next.setHeadColor(COLOR_DEFAULTS.charHead);
-      } else {
-        next.setBodyColor(GraphicsSettings.characterBodyColor);
-        next.setHeadColor(GraphicsSettings.characterHeadColor);
-      }
+      next.setBodyColor(GraphicsSettings.characterBodyColor);
+      next.setHeadColor(GraphicsSettings.characterHeadColor);
 
       // 씬에서 구 캐릭터 제거 + 신 캐릭터 추가
       this.renderer.scene.remove(this.character.mesh);
@@ -370,25 +365,12 @@ export class GameManager {
         this.chapterSelect.show();
       }
     };
-    this.stageSelect.onTutorial = () => {
-      this.audio.playClick();
-      this.stageSelect.hide();
-      this.currentStageNum = 0;
-      this.loadLevel('level_01');
-    };
     this.animate = this.animate.bind(this);
   }
 
   start(): void {
     requestAnimationFrame(this.animate);
-    if (ProgressStore.isTutorialDone()) {
-      // 튜토리얼 완료된 유저: 배경용 튜토리얼 레벨 로드 후 바로 타이틀 표시
-      this.currentStageNum = 0;
-      this.loadLevelForTitle('level_01');
-    } else {
-      this.currentStageNum = 0;
-      this.loadLevel('level_01');
-    }
+    this.titleScreen.show();
   }
 
   // ── Stage select helper ───────────────────────────────────────────────
@@ -451,23 +433,17 @@ export class GameManager {
     this._levelData = data;
     // Level
     this.level = new Level(this.renderer.scene);
-    // 튜토리얼은 variant 오버라이드 미적용 (JSON 원본 유지), 나머지는 settings 값 사용
-    this.level.load(data, this.isTutorial ? undefined : GraphicsSettings.blockVariant);
+    this.level.load(data, GraphicsSettings.blockVariant);
     this.hud.setLevelName(data.name);
 
-    // 배경색 적용:
-    // - Level.load()가 scene.background를 교체하므로 반드시 그 이후에 호출
-    // - 튜토리얼은 색상 설정 영향을 받지 않음 → 레벨 JSON 색상 그대로 사용
+    // 배경색 적용: Level.load()가 scene.background를 교체하므로 반드시 그 이후에 호출
     if (GraphicsSettings.starBackground) {
       // 별 배경 모드: 레벨/커스텀 배경색 무시하고 항상 우주 다크 컬러 유지
       this.renderer.applyBackgroundColor(GraphicsSettings.getEffectiveBgColor());
-    } else if (this.isTutorial) {
-      this.renderer.applyBackgroundColor(data.backgroundColor || GraphicsSettings.getEffectiveBgColor());
     } else {
       const customBg = GraphicsSettings.backgroundColor;
       this.renderer.applyBackgroundColor(customBg || data.backgroundColor || GraphicsSettings.getEffectiveBgColor());
 
-      // 블록 색상 오버라이드 (튜토리얼 제외 — 각 블록의 JSON 색상 그라데이션 유지)
       const blockOverride = GraphicsSettings.blockColorOverride;
       if (blockOverride) {
         this.level.recolorAllBlocks(parseInt(blockOverride.replace('#', ''), 16));
@@ -522,9 +498,6 @@ export class GameManager {
       this.goalGlow.intensity = 0;
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) this.setupMidpointMarker(midMesh, this._midpointFlipped);
-    } else if (this.isTutorial) {
-      // 튜토리얼: 경로 블록이 올라온 뒤 _revealTutorialGoal()에서 활성화
-      this.goalGlow.intensity = 0;
     } else if (goalMesh) {
       this.setupGoalMarker(goalMesh);
       gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
@@ -701,12 +674,7 @@ export class GameManager {
       );
     }
 
-    // Character — 타입은 항상 settings 값 사용, 튜토리얼은 색상만 기본값 유지
     this.character = new Character(GraphicsSettings.characterType as CharacterType);
-    if (this.isTutorial) {
-      this.character.setBodyColor(COLOR_DEFAULTS.charBody);
-      this.character.setHeadColor(COLOR_DEFAULTS.charHead);
-    }
     const startNode   = this.graph.getNode(data.character.startNodeId);
     if (!startNode) throw new Error(`Start node "${data.character.startNodeId}" not found`);
 
@@ -840,7 +808,7 @@ export class GameManager {
           if (nodeId === this.goalBlockId && (!this.midpointBlockId || this.midpointReached) && (this._goalFace !== null || effectiveFlipped === this._goalFlipped)) {
             this._tryGoalReached();
           }
-          if (this.isTutorial && !this.tutorialMoved) {
+          if (this.currentStageNum === 1 && !this.tutorialMoved) {
             this.tutorialMoved = true;
             this.tutorialHint.showStep(2);
           }
@@ -957,63 +925,6 @@ export class GameManager {
     }
   }
 
-  /** 튜토리얼 완료 유저용: 레벨을 배경으로만 로드하고 타이틀 화면을 즉시 표시 */
-  private async loadLevelForTitle(id: string): Promise<void> {
-    this.unloadCurrent();
-
-    const meta = LEVELS.find(l => l.id === id);
-    if (!meta) throw new Error(`Level not found: ${id}`);
-    const mod  = await meta.file();
-    const data = mod.default as unknown as LevelData;
-
-    this.isTutorial    = false; // 튜토리얼 시퀀서 비활성화
-    this.goalReached   = false;
-    this.tutorialMoved = false;
-
-    this._initLevelObjects(data);
-
-    // 타이틀 화면을 플라이인 완료 시 표시
-    this._startCameraFlyInThenTitle(data);
-  }
-
-  private _startCameraFlyInThenTitle(data: LevelData): void {
-    let cx: number;
-    let cz: number;
-    if (data.zones && data.zones.length > 0) {
-      const z0 = data.zones[0];
-      cx = z0.gridX + z0.width  / 2;
-      cz = z0.gridZ + z0.depth  / 2;
-    } else {
-      cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
-      cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
-    }
-
-    let finalPos: [number, number, number];
-    let targetY = 0;
-
-    if (data.initialCamera) {
-      const { azimuth, polar, distance, targetY: ty } = data.initialCamera;
-      targetY = ty;
-      const az = azimuth * Math.PI / 180;
-      const po = polar   * Math.PI / 180;
-      finalPos = [
-        cx + distance * Math.sin(po) * Math.sin(az),
-        targetY + distance * Math.cos(po),
-        cz + distance * Math.sin(po) * Math.cos(az),
-      ];
-    } else {
-      finalPos = [cx + 12, 8, cz + 6];
-    }
-
-    // 애니메이션 없이 즉시 최종 위치로 이동 후 타이틀 표시
-    this.orbit.target.set(cx, targetY, cz);
-    this.renderer.camera.position.set(...finalPos);
-    this.renderer.camera.lookAt(cx, targetY, cz);
-    this.orbit.update();
-    this.orbit.enabled = true;
-    this.titleScreen.show();
-  }
-
   private async loadLevel(id: string): Promise<void> {
     this.unloadCurrent();
 
@@ -1024,39 +935,16 @@ export class GameManager {
 
     this._currentLevelId    = id;
     this._currentCustomData = null;
-    this.isTutorial    = this.currentStageNum === 0;
     this.goalReached   = false;
     this.tutorialMoved = false;
 
     this._initLevelObjects(data);
 
-    // Tutorial hints / sequencer
-    if (this.isTutorial) {
-      this.tutorialInputLocked = false;
-      this.tutorialSequencer = new TutorialSequencer({
-        scene:               this.renderer.scene,
-        graph:               this.graph!,
-        hintUI:              this.tutorialHint,
-        onInputLock:         (locked) => {
-          this.tutorialInputLocked = locked;
-          if (locked) this.controller?.stop();
-        },
-        onAddInteractTarget: (mesh) => { this.input?.addTarget(mesh); },
-        onPathRevealed:      () => { this._revealTutorialGoal(); },
-        onStarBlockHidden:   (nodeId) => { this.starMgr?.hideStarMesh(nodeId); },
-        onStarBlockRevealed: (nodeId) => {
-          const node = this.graph?.getNode(nodeId);
-          if (node) this.starMgr?.repositionStar(nodeId, node);
-        },
-      });
+    this.hud.enableSkip(() => { this.chapterSelect.show(); });
 
-      // s1 블록 mesh를 넘겨 화살표 위치 결정
-      const s1Mesh = this.level!.blocks.get('s1')?.mesh;
-      if (s1Mesh) this.tutorialSequencer.start(s1Mesh);
-
-      this.hud.enableSkip(() => { this.titleScreen.show(); });
-    } else {
-      this.hud.enableSkip(() => { this.chapterSelect.show(); });
+    // Stage 1 진입 힌트: 블록 탭 안내 (플라이인 중에 표시, 첫 이동 시 사라짐)
+    if (this.currentStageNum === 1) {
+      this.tutorialHint.showStep(1);
     }
 
     // Intro camera fly-in
@@ -1067,7 +955,6 @@ export class GameManager {
   private async loadCustomLevel(data: LevelData, onExit?: () => void): Promise<void> {
     this.unloadCurrent();
     this.stageSelect.hide();
-    this.isTutorial    = false;
     this.goalReached   = false;
     this.tutorialMoved = false;
 
@@ -1582,23 +1469,6 @@ export class GameManager {
     return conns;
   }
 
-  /** 튜토리얼: 경로 블록이 모두 올라온 뒤 goal glow/marker를 활성화 */
-  private _revealTutorialGoal(): void {
-    const goalMesh = this.level?.blocks.get(this.goalBlockId)?.mesh;
-    if (!goalMesh || !this.goalGlow) return;
-
-    // 메시가 올라온 뒤 호출되므로 glow 위치를 현재 메시 위치로 갱신
-    const wp = new THREE.Vector3();
-    goalMesh.getWorldPosition(wp);
-    const glowDir = this._getMarkerDir(this._goalFace, this._goalFlipped);
-    const glowPos = wp.clone().addScaledVector(glowDir, 1.5);
-    const glowLocal = this.level!.getGroup().worldToLocal(glowPos);
-    this.goalGlow.position.copy(glowLocal);
-
-    gsap.to(this.goalGlow, { intensity: 0.4, duration: 1.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
-    this.setupGoalMarker(goalMesh);
-  }
-
   /** 현재 flipPivot 회전 기준 중력 방향 (+Y를 현재 회전으로 변환) */
   private _currentGravUp(): THREE.Vector3 {
     const flipPivot = this.level?.getFlipPivot();
@@ -1973,28 +1843,15 @@ export class GameManager {
     // QA-02: setTimeout ID 저장 → unloadCurrent()에서 취소
     this.goalClearTimeout = setTimeout(() => {
       this.goalClearTimeout = null;
-      if (this.isTutorial) {
-        // 튜토리얼 클리어: 완료 기록 후 타이틀 화면으로 이동
-        ProgressStore.setTutorialDone();
-        ProgressStore.unlockStage(1);
-        this.hud.showClear();
-        // BUG-01: inner timeout 추적 → unloadCurrent()에서 취소
-        this.goalClearInnerTimeout = setTimeout(() => {
-          this.goalClearInnerTimeout = null;
-          this.titleScreen.show();
-        }, 1400);
-      } else {
-        // 일반 스테이지 클리어: 다음 스테이지 언락 + Next Stage / Stage Select 버튼 표시
-        ProgressStore.unlockStage(this.currentStageNum + 1);
-        // 월드맵 모드: 챕터 경계 클리어 시 게이트 열기
-        this.worldMapScene?.notifyStageCleared(this.currentStageNum);
-        const nextNum = this.getNextStageNum();
-        const onNext  = nextNum !== null && ProgressStore.isUnlocked(nextNum)
-          ? () => { this.audio.playClick(); this.loadStage(nextNum); }
-          : undefined;
-        const onSelect = () => { this.audio.playClick(); this.chapterSelect.show(); };
-        this.hud.showClear(onNext, onSelect);
-      }
+      ProgressStore.unlockStage(this.currentStageNum + 1);
+      // 월드맵 모드: 챕터 경계 클리어 시 게이트 열기
+      this.worldMapScene?.notifyStageCleared(this.currentStageNum);
+      const nextNum = this.getNextStageNum();
+      const onNext  = nextNum !== null && ProgressStore.isUnlocked(nextNum)
+        ? () => { this.audio.playClick(); this.loadStage(nextNum); }
+        : undefined;
+      const onSelect = () => { this.audio.playClick(); this.chapterSelect.show(); };
+      this.hud.showClear(onNext, onSelect);
     }, 800);
   }
 

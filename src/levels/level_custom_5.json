@@ -4,10 +4,10 @@
   "backgroundColor": "#E8EEF5",
   "blocks": [
     {
-      "id": "b001",
+      "id": "b013",
       "position": [
-        12.5,
-        4.5,
+        2.5,
+        -0.5,
         10.5
       ],
       "color": "#A8C5DA",
@@ -19,10 +19,70 @@
       "walkable": true
     },
     {
-      "id": "b002",
+      "id": "b014",
       "position": [
-        11.5,
+        2.5,
+        -0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b015",
+      "position": [
+        2.5,
+        -0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b016",
+      "position": [
         3.5,
+        -0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b017",
+      "position": [
+        3.5,
+        -0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b018",
+      "position": [
+        3.5,
+        -0.5,
         10.5
       ],
       "color": "#A8C5DA",
@@ -34,86 +94,11 @@
       "walkable": true
     },
     {
-      "id": "b003",
-      "position": [
-        11.5,
-        2.5,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b004",
-      "position": [
-        7.5,
-        2.5,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b005",
-      "position": [
-        6.5,
-        2.5,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b006",
-      "position": [
-        6.5,
-        3.5,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b007",
-      "position": [
-        6.5,
-        4.5,
-        9.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b008",
+      "id": "b019",
       "position": [
         4.5,
-        1.5,
-        5.5
+        -0.5,
+        10.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -124,11 +109,56 @@
       "walkable": true
     },
     {
-      "id": "b009",
+      "id": "b020",
+      "position": [
+        4.5,
+        -0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b021",
+      "position": [
+        4.5,
+        -0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b022",
+      "position": [
+        6.5,
+        2.5,
+        2.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b023",
       "position": [
         5.5,
-        1.5,
-        5.5
+        2.5,
+        2.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -139,11 +169,11 @@
       "walkable": true
     },
     {
-      "id": "b010",
+      "id": "b024",
       "position": [
         5.5,
-        1.5,
-        4.5
+        2.5,
+        1.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -154,11 +184,56 @@
       "walkable": true
     },
     {
-      "id": "b011",
+      "id": "b025",
+      "position": [
+        6.5,
+        2.5,
+        1.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b026",
+      "position": [
+        6.5,
+        2.5,
+        0.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b027",
+      "position": [
+        5.5,
+        2.5,
+        0.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b028",
       "position": [
         4.5,
-        1.5,
-        4.5
+        2.5,
+        0.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -169,11 +244,26 @@
       "walkable": true
     },
     {
-      "id": "b012",
+      "id": "b029",
       "position": [
-        3.5,
-        0.5,
-        5.5
+        4.5,
+        2.5,
+        1.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b030",
+      "position": [
+        4.5,
+        2.5,
+        2.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -184,155 +274,38 @@
       "walkable": true
     }
   ],
-  "ladders": [
-    {
-      "nodeA": "b001",
-      "nodeB": "b002"
-    },
-    {
-      "nodeA": "b003",
-      "nodeB": "b002"
-    },
-    {
-      "nodeA": "b004",
-      "nodeB": "b007"
-    }
-  ],
+  "ladders": [],
   "stars": [
     {
-      "nodeId": "b007"
+      "nodeId": "b021"
     },
     {
-      "nodeId": "b003"
+      "nodeId": "b019"
+    },
+    {
+      "nodeId": "b015"
+    },
+    {
+      "nodeId": "b030"
+    },
+    {
+      "nodeId": "b022"
+    },
+    {
+      "nodeId": "b028"
     }
   ],
-  "illusionConnections": [
-    {
-      "nodeA": "b001",
-      "nodeB": "b004",
-      "activateAzimuth": 75.5,
-      "azimuthTolerance": 2,
-      "activateElevation": 13.8,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b009",
-      "activateAzimuth": 60,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.4,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b009",
-      "activateAzimuth": 50.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.9,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b001",
-      "nodeB": "b010",
-      "activateAzimuth": 45.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 10.1,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b004",
-      "activateAzimuth": 71.3,
-      "azimuthTolerance": 2,
-      "activateElevation": 9.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b009",
-      "activateAzimuth": 45.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.9,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b002",
-      "nodeB": "b010",
-      "activateAzimuth": 40.3,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b004",
-      "nodeB": "b009",
-      "activateAzimuth": 33.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 7.7,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b012",
-      "activateAzimuth": 45,
-      "azimuthTolerance": 2,
-      "activateElevation": 25.4,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b008",
-      "activateAzimuth": 33.2,
-      "azimuthTolerance": 2,
-      "activateElevation": 22.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b009",
-      "activateAzimuth": 18.7,
-      "azimuthTolerance": 2,
-      "activateElevation": 25.2,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b004",
-      "nodeB": "b012",
-      "activateAzimuth": 52.9,
-      "azimuthTolerance": 2,
-      "activateElevation": 11.4,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b003",
-      "activateAzimuth": -90.2,
-      "azimuthTolerance": 2,
-      "activateElevation": 14.3,
-      "elevationTolerance": 2
-    },
-    {
-      "nodeA": "b007",
-      "nodeB": "b002",
-      "activateAzimuth": -104.1,
-      "azimuthTolerance": 2,
-      "activateElevation": 6.9,
-      "elevationTolerance": 2
-    }
-  ],
+  "illusionConnections": [],
   "character": {
-    "startNodeId": "b001"
-  },
-  "midpoint": {
-    "blockId": "b010"
+    "startNodeId": "b013"
   },
   "goal": {
-    "blockId": "b012"
+    "blockId": "b026"
   },
   "initialCamera": {
-    "azimuth": -136,
-    "polar": 72,
+    "azimuth": 45,
+    "polar": 50,
     "distance": 26,
-    "targetY": 0.0
+    "targetY": 2
   }
 }

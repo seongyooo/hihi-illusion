@@ -101,14 +101,6 @@ export class StageSelectUI {
 
     this.el.appendChild(grid);
 
-    // 튜토리얼 다시하기 버튼
-    if (world.hasTutorial && ProgressStore.isTutorialDone()) {
-      const tutorialBtn = document.createElement('button');
-      tutorialBtn.className = 'stage-select__tutorial-btn';
-      tutorialBtn.textContent = '튜토리얼 다시하기';
-      tutorialBtn.addEventListener('click', () => this.onTutorial());
-      this.el.appendChild(tutorialBtn);
-    }
   }
 
   private async _showPreview(stageNum: number, anchor: HTMLElement): Promise<void> {

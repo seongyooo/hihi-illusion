@@ -111,9 +111,16 @@ export class InputManager {
     // ── Fallback: traditional mesh raycast ───────────────────────────────
     // Handles near-horizontal camera angles where the top-plane approach
     // produces no hits (ray barely descends).
+    // Only accept faces whose world-space normal aligns with camera.up
+    // (i.e. top-facing surfaces only — side/bottom faces are rejected).
+    const normalMatrix = new THREE.Matrix3();
+    const worldNormal  = new THREE.Vector3();
     const hits = this.raycaster.intersectObjects(this.targets, true);
     for (const hit of hits) {
-      if (!(hit.object instanceof THREE.Mesh)) continue;
+      if (!(hit.object instanceof THREE.Mesh) || !hit.face) continue;
+      normalMatrix.getNormalMatrix(hit.object.matrixWorld);
+      worldNormal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
+      if (worldNormal.dot(this.camera.up) <= 0.1) continue; // skip side/bottom faces
       let obj: THREE.Object3D | null = hit.object;
       while (obj) {
         if (obj.userData.blockId) {

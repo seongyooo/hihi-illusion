@@ -4,11 +4,11 @@
   "backgroundColor": "#E8EEF5",
   "blocks": [
     {
-      "id": "b001",
+      "id": "b010",
       "position": [
         3.5,
         0.5,
-        6.5
+        10.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -19,86 +19,11 @@
       "walkable": true
     },
     {
-      "id": "b002",
-      "position": [
-        7.5,
-        0.5,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b003",
-      "position": [
-        7.5,
-        0.5,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b004",
-      "position": [
-        8.5,
-        0.5,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b005",
-      "position": [
-        8.5,
-        0.5,
-        5.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b006",
-      "position": [
-        6.5,
-        0.5,
-        6.5
-      ],
-      "color": "#A8C5DA",
-      "size": [
-        1,
-        1,
-        1
-      ],
-      "walkable": true
-    },
-    {
-      "id": "b007",
+      "id": "b011",
       "position": [
         3.5,
         0.5,
-        7.5
+        9.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -109,7 +34,7 @@
       "walkable": true
     },
     {
-      "id": "b008",
+      "id": "b012",
       "position": [
         3.5,
         0.5,
@@ -124,11 +49,551 @@
       "walkable": true
     },
     {
-      "id": "b009",
+      "id": "b013",
+      "position": [
+        4.5,
+        0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b014",
+      "position": [
+        4.5,
+        0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b015",
+      "position": [
+        4.5,
+        0.5,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b016",
+      "position": [
+        5.5,
+        0.5,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b017",
+      "position": [
+        5.5,
+        0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b018",
+      "position": [
+        5.5,
+        0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b020",
+      "position": [
+        6.5,
+        0.5,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b021",
+      "position": [
+        6.5,
+        0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b022",
+      "position": [
+        6.5,
+        0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b023",
+      "position": [
+        7.5,
+        0.5,
+        10.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b024",
+      "position": [
+        7.5,
+        0.5,
+        9.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b025",
+      "position": [
+        7.5,
+        0.5,
+        8.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b026",
+      "position": [
+        7.5,
+        0.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b027",
+      "position": [
+        6.5,
+        0.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b028",
+      "position": [
+        5.5,
+        0.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b029",
+      "position": [
+        4.5,
+        0.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b030",
       "position": [
         3.5,
         0.5,
-        9.5
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b031",
+      "position": [
+        3.5,
+        1.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b032",
+      "position": [
+        4.5,
+        1.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b033",
+      "position": [
+        5.5,
+        1.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b034",
+      "position": [
+        6.5,
+        1.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b035",
+      "position": [
+        7.5,
+        1.5,
+        7.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b036",
+      "position": [
+        3.5,
+        0.5,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b037",
+      "position": [
+        4.5,
+        0.5,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b038",
+      "position": [
+        5.5,
+        0.5,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b039",
+      "position": [
+        6.5,
+        0.5,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b040",
+      "position": [
+        7.5,
+        0.5,
+        6.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b041",
+      "position": [
+        7.5,
+        0.5,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b042",
+      "position": [
+        6.5,
+        0.5,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b043",
+      "position": [
+        5.5,
+        0.5,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b044",
+      "position": [
+        4.5,
+        0.5,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b045",
+      "position": [
+        3.5,
+        0.5,
+        5.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b046",
+      "position": [
+        3.5,
+        0.5,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b047",
+      "position": [
+        4.5,
+        0.5,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b048",
+      "position": [
+        5.5,
+        0.5,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b049",
+      "position": [
+        6.5,
+        0.5,
+        4.5
+      ],
+      "color": "#A8C5DA",
+      "size": [
+        1,
+        1,
+        1
+      ],
+      "walkable": true
+    },
+    {
+      "id": "b050",
+      "position": [
+        7.5,
+        0.5,
+        4.5
       ],
       "color": "#A8C5DA",
       "size": [
@@ -140,23 +605,34 @@
     }
   ],
   "ladders": [],
-  "teleporters": [
+  "stars": [
     {
-      "nodeA": "b009",
-      "nodeB": "b005"
+      "nodeId": "b031"
+    },
+    {
+      "nodeId": "b032"
+    },
+    {
+      "nodeId": "b033"
+    },
+    {
+      "nodeId": "b034"
+    },
+    {
+      "nodeId": "b035"
     }
   ],
   "illusionConnections": [],
   "character": {
-    "startNodeId": "b001"
+    "startNodeId": "b016"
   },
   "goal": {
-    "blockId": "b006"
+    "blockId": "b048"
   },
   "initialCamera": {
-    "azimuth": -114,
-    "polar": 51,
+    "azimuth": 31,
+    "polar": 48,
     "distance": 26,
-    "targetY": 0.0
+    "targetY": 3
   }
 }

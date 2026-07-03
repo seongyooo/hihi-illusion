@@ -21,7 +21,7 @@ export const WORLDS: WorldDef[] = [
     subtitle: '낯선 공간에 눈을 뜨다',
     startStage: 1,
     endStage: 5,
-    hasTutorial: true,
+    hasTutorial: false,
     color: {
       bg: 'rgba(80,60,180,0.18)',
       border: 'rgba(140,120,255,0.45)',

@@ -75,23 +75,16 @@ function buildPreviewScene(data: LevelData): {
   return { scene, camera };
 }
 
-/** stageNum: 0 = 튜토리얼, 1-N = custom stage */
+/** stageNum: 1-N = custom stage */
 export async function renderStagePreview(stageNum: number): Promise<string> {
   const key = String(stageNum);
   if (_cache.has(key)) return _cache.get(key)!;
 
-  let data: LevelData;
-
-  if (stageNum === 0) {
-    const mod = await import('../levels/level01.json') as unknown as { default: LevelData };
-    data = mod.default;
-  } else {
-    const path   = `./level_custom_${stageNum}.json`;
-    const loader = customModules[path];
-    if (!loader) throw new Error(`No level module for stage ${stageNum}`);
-    const mod = await loader();
-    data = mod.default;
-  }
+  const path   = `./level_custom_${stageNum}.json`;
+  const loader = customModules[path];
+  if (!loader) throw new Error(`No level module for stage ${stageNum}`);
+  const mod = await loader();
+  const data: LevelData = mod.default;
 
   const renderer = getRenderer();
   const { scene, camera } = buildPreviewScene(data);
