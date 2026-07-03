@@ -12,7 +12,7 @@ A Monument Valley-inspired isometric puzzle game built with Three.js and TypeScr
 
 ## Features
 
-- **26 hand-crafted puzzle stages** + tutorial
+- **40 hand-crafted puzzle stages** + tutorial
 - Isometric camera with orbit controls (configurable rotate speed & damping)
 - Illusion mechanics — false paths activated at specific camera angles; works after gravity flip
 - Teleporters, midpoint markers, goal markers

@@ -41,8 +41,7 @@ src/
 │   ├── ElevatorManager.ts    # 엘리베이터 블록
 │   ├── PatrolManager.ts      # 패트롤(자동 이동) 블록
 │   ├── StarBackground.ts     # 배경 별 파티클
-│   ├── WorldRotateManager.ts # 맵 전체 회전 블록 (X·Y축, 각도 설정)
-│   └── GravityFlipManager.ts # 구버전 전체맵 뒤집기 (미사용, 삭제 예정)
+│   └── WorldRotateManager.ts # 맵 전체 회전 블록 (X·Y축, 각도 설정)
 │
 ├── character/
 │   ├── Character.ts          # 캐릭터 메시 (body/head, setFlipped)
@@ -74,7 +73,7 @@ src/
 ├── levels/
 │   ├── registry.ts           # 레벨 메타 목록 (level_01 + custom_N)
 │   ├── level01.json          # 튜토리얼 레벨
-│   └── level_custom_N.json   # 커스텀 스테이지 1~26
+│   └── level_custom_N.json   # 커스텀 스테이지 1~40
 │
 └── main.ts                   # 진입점
 ```
@@ -205,7 +204,6 @@ start()
 - **EditorBlock vs Block**: `LevelEditor`의 `EditorBlock`은 `recolor()` 메서드 없음 → `recolorBlockGroup(mesh, color, variant)` 사용.
 - **StarManager.tryCollect(nodeId, isFlipped)**: 두 번째 인수 필수 — 생략하면 TS 에러.
 - **blinking 가시**: `Level.update()`의 EMERGE/RETRACT 상수는 고정값, `blinkOnDuration`/`blinkOffDuration`만 조절 가능.
-- **GravityFlipManager.ts**: 구버전 전체맵 뒤집기 코드. 현재 미사용이지만 파일 남아있음.
 - **mapRotate + worldToLocal**: 회전 후 마커/링 재배치 시 `group.worldToLocal()`로 로컬 좌표 변환 필수. 직접 월드 좌표를 setPosition하면 회전 후 오작동.
 - **TeleportManager.parent**: `scene` 대신 `level.getGroup()`을 parent로 사용 — 맵 회전 시 링이 함께 회전.
 - **IllusionManager.setFlipped(bool)**: gravity flip 시 반드시 호출 — 미호출 시 뒤집힌 상태에서 착시가 작동하지 않음.
@@ -214,7 +212,4 @@ start()
 
 ## 현재 미완 / 향후 계획
 
-- `GravityFlipManager.ts` 삭제 (구버전 코드)
-- `TeleportManager.reposition()` 제거 (데드 코드 — `repositionRings()`만 사용)
 - 중력 반전 상태에서의 카메라 시점 개선 (현재 `camera.up` 즉시 반전 방식)
-- 모바일: `npm run dev` 후 같은 네트워크에서 표시되는 IP로 접속

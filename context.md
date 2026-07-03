@@ -96,9 +96,3 @@ const targetY = node.position.y + (1 - u.y) * node.halfHeight;
 - seam mesh는 정적 위치 기준으로 빌드됨 → 동적 블록(elev·patrol·move·spawn) 주변에는 인접 블록 이음새가 남을 수 있음 (허용 범위)
 - 카메라 각도에 따라 조명 차이로 블록 경계가 미세하게 보일 수 있음 (PlaneGeometry 방식의 한계)
 
-## 15차 QA 결과 미수정 버그
-
-| ID | 설명 | 심각도 |
-|----|------|--------|
-| ~~BUG-15-01~~ | ~~`goalMesh.scale` 트윈이 `unloadCurrent()`에서 kill 안 됨~~ → **수정 완료** (2026-06-23) | MEDIUM |
-| WARN-15-01 | 골 블록 팽창 애니메이션 시 seam mesh와 z-fighting 가능성 (1프레임 이하, 시각적 영향 미미) | LOW |

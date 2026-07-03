@@ -64,20 +64,6 @@ export class TeleportManager {
     }
   }
 
-  /** 맵 회전 후 모든 링을 새 월드 좌표로 재배치 */
-  reposition(pairs: Array<[PathNode, PathNode]>): void {
-    // 기존 링 제거
-    this.dispose();
-    // 노드 목록에서 다시 생성
-    for (const [a, b] of pairs) {
-      const color = PAIR_COLORS[0]; // 색상은 nodeColors에서 복구 불가하므로 재설정
-      this.nodeColors.set(a.id, color);
-      this.nodeColors.set(b.id, color);
-      this.createPadRings(a, color);
-      this.createPadRings(b, color);
-    }
-  }
-
   /** 맵 회전 후 모든 링 위치를 노드 새 월드 좌표 기준으로 업데이트 (parent 로컬 좌표로 변환) */
   repositionRings(nodes: PathNode[]): void {
     const wp = new THREE.Vector3();
