@@ -130,7 +130,7 @@ export const WORLDS: WorldDef[] = [
     name: '???',
     subtitle: '...',
     startStage: 36,
-    endStage: 39,
+    endStage: 42,
     hasTutorial: false,
     color: {
       bg: 'rgba(80,80,80,0.18)',
@@ -142,6 +142,9 @@ export const WORLDS: WorldDef[] = [
       '이 공간은 이전과 다르다.\n모든 규칙이 의심스럽다.',
       '끝과 시작이 맞닿아 있다.\n모든 것은 처음부터 연결되어 있었다.',
       '...',
+      '한계라고 생각했던 그 너머.\n아직 길이 남아 있었다.',
+      '이곳은 이름도 없다.\n하지만 발은 이미 알고 있다.',
+      '끝은 없다.\n다음 발걸음이 새로운 시작이 된다.',
     ],
   },
 ];
