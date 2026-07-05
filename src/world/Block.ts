@@ -26,6 +26,11 @@ const VARIANT_BODY: Record<BlockVariant, { roughness: number; metalness: number 
 // RoundedBox subdivision segments
 const ROUNDED_SEGMENTS = 4;
 
+// 블록 시각적 스케일 — Level.load()에서 position/size에 곱해 블록을 작게 만들면서
+// 인접 블록끼리는 여전히 맞닿도록 한다 (PathGraph 등 모든 시스템이 스케일된 값을 사용).
+export const BLOCK_XZ_VISUAL = 0.88;
+export const BLOCK_Y_VISUAL  = 0.82;
+
 // ── Material builders ──────────────────────────────────────────────────────
 
 function makeBlockMat(hex: number, variant: BlockVariant): THREE.Material {

@@ -1,7 +1,172 @@
 # QA 리포트 — hihi
 
-> 최종 업데이트: 2026-06-28  
+> 최종 업데이트: 2026-07-05  
 > 이전 1~16차 QA 기록은 git 히스토리에 보존됨
+
+---
+
+## 18차 QA (2026-07-05) — 블록 시각 스케일 시스템 (BLOCK_XZ_VISUAL=0.88, BLOCK_Y_VISUAL=0.82)
+
+### 점검 범위
+- `src/world/Block.ts` — 스케일 상수 export, mesh-level scale 제거
+- `src/world/Level.ts` — `scaleBlock()` 전처리, `getScaledBlocks()` 노출
+- `src/core/GameManager.ts` — PathGraph / 착시 / 레이저 / 카메라 / 사다리 스케일 일관성
+- `src/world/PathGraph.ts` — 상수 유효성 (XZ_THRESHOLD, MIN_XZ_DIST, SAME_FLOOR_Y)
+- `src/world/WorldRotateManager.ts`, `SwitchManager.ts`, `ElevatorManager.ts`, `PatrolManager.ts`, `TeleportManager.ts`, `StarManager.ts`, `IllusionManager.ts`, `SeamMeshBuilder.ts`, `RotatingSection.ts`
+
+### 결과 요약
+
+| 등급 | 건수 |
+|------|------|
+| MAJOR | 3 |
+| INFO | 3 |
+| PASS | 12 |
+
+---
+
+### ~~BUG-18-01~~ — 카메라 fly-in 중심 좌표에 원본(비스케일) 블록 위치 사용 ✅ 수정됨 (2026-07-05)
+**심각도:** MAJOR  
+**파일:** `src/core/GameManager.ts:994-995`
+
+**현상:**  
+`_startCameraFlyIn()`에서 `data.zones`가 없는 레벨의 orbit target 중심을 원본 JSON 블록 위치 평균으로 계산한다.
+```typescript
+cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
+cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+```
+실제 블록은 `position * 0.88` 위치에 있으므로 카메라 타깃이 블록보다 약 **12% 먼 지점**을 향하게 된다.
+
+**재현 조건:** `data.zones`가 없고 `data.initialCamera`도 없는 모든 레벨.
+
+**수정 방향:**  
+```typescript
+const scaledBlocks = this.level!.getScaledBlocks();
+cx = scaledBlocks.reduce((s, b) => s + b.position[0], 0) / Math.max(scaledBlocks.length, 1);
+cz = scaledBlocks.reduce((s, b) => s + b.position[2], 0) / Math.max(scaledBlocks.length, 1);
+```
+
+---
+
+### ~~BUG-18-02~~ — 조건부 사다리 메시가 원본(비스케일) 위치에 생성됨 ✅ 수정됨 (2026-07-05)
+**심각도:** MAJOR  
+**파일:** `src/core/GameManager.ts:550-553`, `1512-1519`
+
+**현상:**  
+스위치 활성화 시 나타나는 조건부 사다리 메시를 `getFinalBlockData(data, nodeId)`로 생성하는데, 내부에서 `data.blocks`(원본)을 참조한다.
+```typescript
+private getFinalBlockData(data: LevelData, nodeId: string): BlockData | null {
+  const block = data.blocks.find(b => b.id === nodeId);  // ← 비스케일 위치
+  ...
+  return { ...block, position: sw.moveTarget };           // moveTarget도 비스케일
+}
+```
+결과적으로 `buildLadderMesh(bdA, bdB)`가 원본 좌표 기준으로 사다리를 생성해 실제 블록 위치와 불일치한다.
+
+**재현 조건:** `conditionalLadders`가 있는 레벨에서 스위치 활성화 시.
+
+**수정 방향:**  
+```typescript
+private getFinalBlockData(nodeId: string): BlockData | null {
+  const scaledMap = new Map(this.level!.getScaledBlocks().map(b => [b.id, b]));
+  const block = scaledMap.get(nodeId);
+  if (!block) return null;
+  const sw = this._levelData?.switches?.find(s => s.targetNodeId === nodeId && s.type === 'move' && s.moveTarget);
+  if (sw?.moveTarget) {
+    return { ...block, position: [
+      sw.moveTarget[0] * BLOCK_XZ_VISUAL,
+      sw.moveTarget[1] * BLOCK_Y_VISUAL,
+      sw.moveTarget[2] * BLOCK_XZ_VISUAL,
+    ]};
+  }
+  return block;
+}
+```
+
+---
+
+### ~~BUG-18-03~~ — 레이저 emitter 높이 계산에 원본 size 사용 ✅ 수정됨 (2026-07-05)
+**심각도:** MAJOR  
+**파일:** `src/core/GameManager.ts:588-591`
+
+**현상:**  
+walkable 아닌 블록에서 레이저 emitter Y 위치를 계산할 때 원본 `bd.size[1]`(= 1.0)의 절반을 더한다.
+```typescript
+const bd = data.blocks.find(b => b.id === blockId);  // ← 비스케일
+blk.mesh.getWorldPosition(wp);
+wp.y += (bd?.size[1] ?? 1) / 2;  // 0.5 더함, 실제 상단은 +0.41
+```
+결과적으로 emitter가 블록 상단면보다 **0.09 유닛 높게** 계산된다.
+
+**재현 조건:** 레이저가 있는 레벨, walkable 아닌 블록에서 레이저가 발사될 때.
+
+**수정 방향:**  
+```typescript
+// 방법 A: 스케일된 블록 참조
+const scaledMap = new Map(this.level!.getScaledBlocks().map(b => [b.id, b]));
+const bd = scaledMap.get(blockId);
+wp.y += (bd?.size[1] ?? BLOCK_Y_VISUAL) / 2;
+
+// 방법 B: PathGraph node.halfHeight 직접 사용 (더 단순)
+const node = this.graph?.getNode(blockId);
+if (node) return node.position.clone();
+```
+
+---
+
+### INFO-18-01 — PathGraph 상수 — 스케일 이후에도 유효
+**파일:** `src/world/PathGraph.ts:14-16`
+
+스케일 후 수치 검증:
+- `XZ_THRESHOLD = 1.1`: 인접 거리 0.88 < 1.1 ✅, 2칸 1.76 > 1.1 ✅
+- `MIN_XZ_DIST = 0.5`: 인접 0.88 > 0.5 ✅ (수직 적층 판정 정상)
+- `SAME_FLOOR_Y = 0.15`: 동일 층 Y 차이 ≈ 0 ✅
+
+코드 동작은 이상 없으나, 스케일 기반 주석이 없어 향후 혼란 가능.
+
+---
+
+### INFO-18-02 — `_buildAutoIllusionConns` 인접 필터 — 스케일 후 유효
+**파일:** `src/core/GameManager.ts:1391-1392`
+
+`xzDist <= 1.1 && yDiff < 0.15` 조건:
+스케일된 인접 거리 0.88 < 1.1 → 인접 블록 올바르게 필터됨 ✅  
+2칸 거리 1.76 > 1.1 → 착시 후보로 유지됨 ✅
+
+---
+
+### INFO-18-03 — RotatingSection — 스케일 미적용 (현재 레벨에서 미사용)
+**파일:** `src/world/RotatingSection.ts:29-51`
+
+`rotatingSections` 블록은 `localPosition`, `size`를 JSON 원본으로 사용하며 스케일 미적용. 현재 사용 중인 레벨 파일에 `rotatingSections`가 없으면 무영향. 향후 이 기능을 사용하는 레벨 제작 시 별도 스케일 처리 필요.
+
+---
+
+### PASS 항목
+
+| 항목 | 파일 | 결론 |
+|------|------|------|
+| `Level.ts` scaleBlock | `Level.ts:278-291` | ✅ position·size 모두 정확히 스케일, scaledBlockMap 사용 |
+| `Level.ts` 가시 메시 | `Level.ts:306` | ✅ `buildSpikesMesh(bd)` — scaledBlocks 기반 |
+| `Level.ts` 사다리 메시 | `Level.ts:326` | ✅ `buildLadderMesh(bdA, bdB)` — scaledBlockMap 기반 |
+| `Level.ts` 링 이펙트 | `Level.ts:347` | ✅ `_buildRingEffect(bd)` — scaledBlockMap 기반 |
+| `Level.ts` SeamMesh | `Level.ts:362` | ✅ `this.levelBlocks = scaledBlocks` |
+| `WorldRotateManager` bounds | `GameManager.ts:641` | ✅ `Box3.setFromObject(level.getGroup())` — 메시 월드 좌표 기반 |
+| `PathGraph.build()` halfHeight | `PathGraph.ts:45-49` | ✅ 스케일된 `size[1]/2` 로 halfHeight 정확히 계산됨 |
+| `_buildAutoIllusionConns` | `GameManager.ts:468` | ✅ `{ ...data, blocks: level.getScaledBlocks() }` 전달 |
+| `_buildIllusionConnsWorldSpace` | `GameManager.ts:1319` | ✅ `level.getScaledBlocks()` 기반 변환 |
+| `SwitchManager` | — | ✅ PathGraph 노드 위치 기반, 스케일 독립적 |
+| `ElevatorManager` | — | ✅ PathGraph 노드 기반 |
+| `PatrolManager` / `TeleportManager` / `StarManager` | — | ✅ 모두 PathNode 월드 좌표 기반 |
+
+---
+
+### 우선순위 요약
+
+| 순위 | ID | 영향 |
+|------|----|------|
+| 1 | BUG-18-01 | 대부분 레벨에서 카메라 타깃 오프셋 |
+| 2 | BUG-18-02 | conditionalLadders 있는 레벨의 사다리 위치 오류 |
+| 3 | BUG-18-03 | 레이저 있는 레벨의 emitter 높이 미세 오차 |
 
 ---
 

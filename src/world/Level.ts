@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
-import { Block } from './Block';
+import { Block, BLOCK_XZ_VISUAL, BLOCK_Y_VISUAL } from './Block';
 import { RotatingSection } from './RotatingSection';
 import type { SectionBlockInput } from './RotatingSection';
 import { buildSeamMesh, disposeSeamGroup } from './SeamMeshBuilder';
@@ -274,8 +274,18 @@ export class Level {
     // Apply level background color
     this.scene.background = new THREE.Color(data.backgroundColor);
 
+    // 블록 position·size를 시각 스케일에 맞게 축소한다.
+    // 인접 블록은 여전히 맞닿으며, PathGraph·캐릭터 등 모든 시스템이 일관된 값을 사용한다.
+    const scaleBlock = (bd: BlockData): BlockData => ({
+      ...bd,
+      position: [bd.position[0] * BLOCK_XZ_VISUAL, bd.position[1] * BLOCK_Y_VISUAL, bd.position[2] * BLOCK_XZ_VISUAL],
+      size:     [bd.size[0]     * BLOCK_XZ_VISUAL, bd.size[1]     * BLOCK_Y_VISUAL, bd.size[2]     * BLOCK_XZ_VISUAL],
+    });
+    const scaledBlocks = data.blocks.map(scaleBlock);
+    const scaledBlockMap = new Map(scaledBlocks.map(b => [b.id, b]));
+
     // Static blocks
-    for (const bd of data.blocks) {
+    for (const bd of scaledBlocks) {
       // per-block JSON variant takes priority; then variantOverride (from settings, non-tutorial only)
       const resolvedVariant = (bd.variant ?? variantOverride ?? 'default') as import('./Block').BlockVariant;
       const block = new Block({
@@ -314,8 +324,8 @@ export class Level {
 
     // 사다리 메시
     for (const ladder of data.ladders ?? []) {
-      const bdA = data.blocks.find(b => b.id === ladder.nodeA);
-      const bdB = data.blocks.find(b => b.id === ladder.nodeB);
+      const bdA = scaledBlockMap.get(ladder.nodeA);
+      const bdB = scaledBlockMap.get(ladder.nodeB);
       if (bdA && bdB) {
         const ladderGroup = buildLadderMesh(bdA, bdB);
         this.group.add(ladderGroup);
@@ -337,7 +347,7 @@ export class Level {
 
     // 맵 회전 블록 — 주황 링 이펙트
     for (const mr of data.mapRotateBlocks ?? []) {
-      const bd = data.blocks.find(b => b.id === mr.nodeId);
+      const bd = scaledBlockMap.get(mr.nodeId);
       if (!bd) continue;
       this.mapRotateNodeIds.add(mr.nodeId);
       const effectGroup = this._buildRingEffect(bd, 0xFF8800);
@@ -351,13 +361,15 @@ export class Level {
     this.scene.add(this.flipPivot);
 
     // seam mesh 빌드 (blockDividers=false 시)
-    this.levelBlocks = data.blocks;
+    this.levelBlocks = scaledBlocks;
     this.dynamicBlockIds = this._computeDynamicBlockIds(data);
     this.rebuildSeamMesh(null);
   }
 
   getGroup(): THREE.Group               { return this.group; }
   getFlipPivot(): THREE.Group           { return this.flipPivot; }
+  /** PathGraph 등에 전달할 스케일된 BlockData 배열 */
+  getScaledBlocks(): BlockData[]        { return this.levelBlocks; }
   getWalkableMeshes(): THREE.Object3D[] { return this.walkableMeshes; }
   getLaddersForBlock(blockId: string): THREE.Group[] { return this.ladderMeshes.get(blockId) ?? []; }
   getMapRotateNodeIds(): Set<string>    { return this.mapRotateNodeIds; }

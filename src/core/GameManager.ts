@@ -7,6 +7,7 @@ import { CameraController }   from './CameraController';
 import { InputManager }       from './InputManager';
 import { Level, buildLadderMesh } from '../world/Level';
 import type { LevelData, BlockData, ZoneDef } from '../world/Level';
+import { BLOCK_XZ_VISUAL, BLOCK_Y_VISUAL } from '../world/Block';
 import { PathGraph }          from '../world/PathGraph';
 import { Character }          from '../character/Character';
 import type { CharacterType } from '../character/Character';
@@ -452,7 +453,7 @@ export class GameManager {
 
     // PathGraph
     this.graph = new PathGraph();
-    this.graph.build(data.blocks, (bid) => this.level!.blocks.get(bid)?.mesh);
+    this.graph.build(this.level.getScaledBlocks(), (bid) => this.level!.blocks.get(bid)?.mesh);
     for (const section of this.level.sections) {
       this.graph.addSectionNodes(section.getWalkableEntries());
     }
@@ -464,7 +465,7 @@ export class GameManager {
     this.illusionMgr = new IllusionManager(
       this.renderer.camera,
       this.orbit.target,
-      this._buildAutoIllusionConns(data),
+      this._buildAutoIllusionConns({ ...data, blocks: this.level.getScaledBlocks() }),
       {
         onActivate:   (nodeA, nodeB) => {
           this.audio.playIllusionActivate();
@@ -546,8 +547,8 @@ export class GameManager {
       // 사다리 시각 메시: 스위치 ON 상태의 블록 위치(moveTarget)를 기준으로 생성
       const ladderMeshes: THREE.Object3D[] = [];
       for (const pair of cl.pairs) {
-        const bdA = this.getFinalBlockData(data, pair.nodeA);
-        const bdB = this.getFinalBlockData(data, pair.nodeB);
+        const bdA = this.getFinalBlockData(data, pair.nodeA, this.level!.getScaledBlocks());
+        const bdB = this.getFinalBlockData(data, pair.nodeB, this.level!.getScaledBlocks());
         if (bdA && bdB) {
           const mesh = buildLadderMesh(bdA, bdB);
           this.renderer.scene.add(mesh);
@@ -582,13 +583,13 @@ export class GameManager {
     const getEmitterPos = (blockId: string): THREE.Vector3 | null => {
       const node = this.graph?.getNode(blockId);
       if (node) return node.position.clone();
-      // walkable 아닌 블록: mesh worldPos + halfHeight (윗면 Y)
+      // walkable 아닌 블록: mesh worldPos + 스케일된 halfHeight (윗면 Y)
       const blk = this.level?.blocks.get(blockId);
       if (!blk) return null;
-      const bd = data.blocks.find(b => b.id === blockId);
+      const scaledBd = this.level!.getScaledBlocks().find(b => b.id === blockId);
       const wp = new THREE.Vector3();
       blk.mesh.getWorldPosition(wp);
-      wp.y += (bd?.size[1] ?? 1) / 2; // 중심 → 윗면
+      wp.y += (scaledBd?.size[1] ?? BLOCK_Y_VISUAL) / 2; // 중심 → 윗면
       return wp;
     };
     this.laserMgr = new LaserManager(this.level.getGroup(), getEmitterPos);
@@ -991,8 +992,9 @@ export class GameManager {
       cx = z0.gridX + z0.width  / 2;
       cz = z0.gridZ + z0.depth  / 2;
     } else {
-      cx = data.blocks.reduce((s, b) => s + b.position[0], 0) / Math.max(data.blocks.length, 1);
-      cz = data.blocks.reduce((s, b) => s + b.position[2], 0) / Math.max(data.blocks.length, 1);
+      const sb = this.level!.getScaledBlocks();
+      cx = sb.reduce((s, b) => s + b.position[0], 0) / Math.max(sb.length, 1);
+      cz = sb.reduce((s, b) => s + b.position[2], 0) / Math.max(sb.length, 1);
     }
 
     let finalPos: [number, number, number];
@@ -1308,7 +1310,9 @@ export class GameManager {
     // Y축이 뒤집혔는지 (X축 180° 회전 → R[1][1] < 0)
     const yFlipped = e[5] < 0;
 
-    const transformed = data.blocks.map(b => {
+    // 실제 시각 위치(스케일 적용된) 기준으로 변환
+    const scaledBlocks = this.level.getScaledBlocks();
+    const transformed = scaledBlocks.map(b => {
       const [bx, by, bz] = b.position;
       const hw = b.size[0] / 2, hh = b.size[1] / 2, hd = b.size[2] / 2;
 
@@ -1418,7 +1422,13 @@ export class GameManager {
     const moveTargets = new Map<string, [number, number, number]>();
     for (const sw of data.switches ?? []) {
       if (sw.type === 'move' && sw.moveTarget) {
-        moveTargets.set(sw.targetNodeId, sw.moveTarget);
+        // moveTarget도 블록과 동일한 스케일 보정 적용
+        const mt = sw.moveTarget;
+        moveTargets.set(sw.targetNodeId, [
+          mt[0] * BLOCK_XZ_VISUAL,
+          mt[1] * BLOCK_Y_VISUAL,
+          mt[2] * BLOCK_XZ_VISUAL,
+        ]);
       }
     }
     if (moveTargets.size > 0) {
@@ -1499,13 +1509,18 @@ export class GameManager {
     return below ? gravUp.negate() : gravUp;
   }
 
-  /** 조건부 사다리 메시 렌더링용: 블록의 최종 위치(moveTarget 있으면 반영) 반환 */
-  private getFinalBlockData(data: LevelData, nodeId: string): BlockData | null {
-    const block = data.blocks.find(b => b.id === nodeId);
+  /** 조건부 사다리 메시 렌더링용: 스케일된 블록의 최종 위치(moveTarget 있으면 반영) 반환 */
+  private getFinalBlockData(data: LevelData, nodeId: string, scaledBlocks: BlockData[]): BlockData | null {
+    const block = scaledBlocks.find(b => b.id === nodeId);
     if (!block) return null;
     const sw = data.switches?.find(s => s.targetNodeId === nodeId && s.type === 'move' && s.moveTarget);
     if (sw?.moveTarget) {
-      return { ...block, position: sw.moveTarget };
+      const mt = sw.moveTarget;
+      return { ...block, position: [
+        mt[0] * BLOCK_XZ_VISUAL,
+        mt[1] * BLOCK_Y_VISUAL,
+        mt[2] * BLOCK_XZ_VISUAL,
+      ]};
     }
     return block;
   }
