@@ -1251,14 +1251,12 @@ export class GameManager {
     // goalMarker 재배치 (GSAP 재시작)
     if (goalMesh && this.goalMarker) {
       goalMesh.getWorldPosition(wp);
-      const dir      = this._getMarkerDir(this._goalFace, this._goalFlipped);
-      const startWp  = wp.clone().addScaledVector(dir, 0.55);
-      const floatWp  = wp.clone().addScaledVector(dir, 0.85);
-      const localStart = toLocal(startWp.x, startWp.y, startWp.z);
-      const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
+      const dir        = this._getMarkerDir(this._goalFace, this._goalFlipped);
+      const localStart = toLocal(wp.x + dir.x * 0.55, wp.y + dir.y * 0.55, wp.z + dir.z * 0.55);
+      const localFloat = toLocal(wp.x + dir.x * 0.85, wp.y + dir.y * 0.85, wp.z + dir.z * 0.85);
       gsap.killTweensOf(this.goalMarker.position);
       this.goalMarker.position.copy(localStart);
-      this.goalMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+      this.goalMarker.quaternion.copy(this._markerLocalQuat(dir));
       gsap.to(this.goalMarker.position, {
         x: localFloat.x, y: localFloat.y, z: localFloat.z,
         duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut',
@@ -1270,14 +1268,12 @@ export class GameManager {
       const midMesh = this.level.blocks.get(this.midpointBlockId)?.mesh;
       if (midMesh) {
         midMesh.getWorldPosition(wp);
-        const dir      = this._getMarkerDir(this._midpointFace, this._midpointFlipped);
-        const startWp  = wp.clone().addScaledVector(dir, 0.55);
-        const floatWp  = wp.clone().addScaledVector(dir, 0.85);
-        const localStart = toLocal(startWp.x, startWp.y, startWp.z);
-        const localFloat = toLocal(floatWp.x, floatWp.y, floatWp.z);
+        const dir        = this._getMarkerDir(this._midpointFace, this._midpointFlipped);
+        const localStart = toLocal(wp.x + dir.x * 0.55, wp.y + dir.y * 0.55, wp.z + dir.z * 0.55);
+        const localFloat = toLocal(wp.x + dir.x * 0.85, wp.y + dir.y * 0.85, wp.z + dir.z * 0.85);
         gsap.killTweensOf(this.midpointMarker.position);
         this.midpointMarker.position.copy(localStart);
-        this.midpointMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        this.midpointMarker.quaternion.copy(this._markerLocalQuat(dir));
         gsap.to(this.midpointMarker.position, {
           x: localFloat.x, y: localFloat.y, z: localFloat.z,
           duration: 1.3, yoyo: true, repeat: -1, ease: 'sine.inOut',
@@ -1479,19 +1475,16 @@ export class GameManager {
     return conns;
   }
 
-  /** 현재 flipPivot 회전 기준 중력 방향 (+Y를 현재 회전으로 변환) */
-  private _currentGravUp(): THREE.Vector3 {
-    const flipPivot = this.level?.getFlipPivot();
-    if (!flipPivot) return new THREE.Vector3(0, 1, 0);
-    flipPivot.updateMatrixWorld(true);
-    const q = new THREE.Quaternion().setFromEuler(flipPivot.rotation);
-    return new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-  }
 
   /**
    * 마커(goal/midpoint ring) 배치 방향 벡터를 반환한다.
    * face 지정 시 로컬 face normal을 현재 맵 회전으로 변환.
-   * face 미지정 시 중력 방향 또는 반전 방향.
+   * face 미지정 시 "접근 가능 여부"에 따라 고정된 world Y 방향 사용.
+   *
+   * 왜 gravUp 대신 고정 Y를 쓰는가:
+   *   CharacterController는 맵 회전 후에도 항상 캐릭터를 world +Y 윗면에 배치한다.
+   *   따라서 링도 접근 가능한 면(goal 조건 충족)이면 world +Y, 아니면 world -Y에 위치해야 한다.
+   *   gravUp을 쓰면 회전 후 (0,-1,0)이 되어 링이 플레이어와 반대 방향에 놓이는 버그가 생긴다.
    */
   private _getMarkerDir(face: [number,number,number] | null, flipped: boolean): THREE.Vector3 {
     if (face) {
@@ -1503,10 +1496,28 @@ export class GameManager {
       }
       return new THREE.Vector3(...face).normalize().applyQuaternion(q);
     }
-    const gravUp = this._currentGravUp();
+    // accessible = 현재 맵 상태에서 골 조건이 충족되는 상태
+    // (flipped 골이면 맵이 뒤집혔을 때 접근 가능, 그 반대도 마찬가지)
     const effectiveFlipped = this.worldRotateMgr?.isMapFlipped() ?? false;
-    const below = flipped !== effectiveFlipped;
-    return below ? gravUp.negate() : gravUp;
+    const accessible = flipped === effectiveFlipped;
+    return accessible
+      ? new THREE.Vector3(0, 1, 0)   // 플레이어가 서는 face (world +Y)
+      : new THREE.Vector3(0, -1, 0); // 반대 face (world -Y, 아직 접근 불가)
+  }
+
+  /**
+   * world-space `dir` 벡터를 기준으로 goalMarker/midpointMarker에 적용할
+   * levelGroup 로컬 공간의 Quaternion을 계산한다.
+   * flipPivot이 회전하면 levelGroup도 그 안에서 회전하므로,
+   * 부모(levelGroup)의 world Quaternion 역행렬을 `dir`에 적용해 로컬 방향으로 변환 후
+   * setFromUnitVectors()로 링이 그 방향을 바라보도록 한다.
+   */
+  private _markerLocalQuat(dir: THREE.Vector3): THREE.Quaternion {
+    const group = this.level!.getGroup();
+    const parentWorldQuat = new THREE.Quaternion();
+    group.getWorldQuaternion(parentWorldQuat);
+    const localDir = dir.clone().applyQuaternion(parentWorldQuat.clone().invert());
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), localDir.normalize());
   }
 
   /** 조건부 사다리 메시 렌더링용: 스케일된 블록의 최종 위치(moveTarget 있으면 반영) 반환 */
@@ -1526,20 +1537,23 @@ export class GameManager {
   }
 
   private setupGoalMarker(goalMesh: THREE.Object3D): void {
+    const group   = this.level!.getGroup();
+    const toLocal = (v: THREE.Vector3) => group.worldToLocal(v.clone());
+
     const wp = new THREE.Vector3();
     goalMesh.getWorldPosition(wp);
-
     const dir = this._getMarkerDir(this._goalFace, this._goalFlipped);
 
     const geo = new THREE.TorusGeometry(0.28, 0.055, 8, 24);
     const mat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
     this.goalMarker = new THREE.Mesh(geo, mat);
-    this.goalMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    // flipPivot 회전 후에도 링이 올바른 방향을 바라보도록 로컬 Quaternion 사용
+    this.goalMarker.quaternion.copy(this._markerLocalQuat(dir));
 
-    const startPos = wp.clone().addScaledVector(dir, 0.55);
-    const floatPos = wp.clone().addScaledVector(dir, 0.85);
+    const startPos = toLocal(wp.clone().addScaledVector(dir, 0.55));
+    const floatPos = toLocal(wp.clone().addScaledVector(dir, 0.85));
     this.goalMarker.position.copy(startPos);
-    this.level!.getGroup().add(this.goalMarker);
+    group.add(this.goalMarker);
 
     gsap.to(this.goalMarker.position, {
       x: floatPos.x, y: floatPos.y, z: floatPos.z,
@@ -1548,20 +1562,22 @@ export class GameManager {
   }
 
   private setupMidpointMarker(midMesh: THREE.Object3D, flipped = false): void {
+    const group   = this.level!.getGroup();
+    const toLocal = (v: THREE.Vector3) => group.worldToLocal(v.clone());
+
     const wp = new THREE.Vector3();
     midMesh.getWorldPosition(wp);
-
     const dir = this._getMarkerDir(this._midpointFace, flipped);
 
     const geo = new THREE.TorusGeometry(0.28, 0.055, 8, 24);
     const mat = new THREE.MeshLambertMaterial({ color: 0x44DDBB });
     this.midpointMarker = new THREE.Mesh(geo, mat);
-    this.midpointMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    this.midpointMarker.quaternion.copy(this._markerLocalQuat(dir));
 
-    const startPos = wp.clone().addScaledVector(dir, 0.55);
-    const floatPos = wp.clone().addScaledVector(dir, 0.85);
+    const startPos = toLocal(wp.clone().addScaledVector(dir, 0.55));
+    const floatPos = toLocal(wp.clone().addScaledVector(dir, 0.85));
     this.midpointMarker.position.copy(startPos);
-    this.level!.getGroup().add(this.midpointMarker);
+    group.add(this.midpointMarker);
 
     gsap.to(this.midpointMarker.position, {
       x: floatPos.x, y: floatPos.y, z: floatPos.z,
@@ -1742,9 +1758,11 @@ export class GameManager {
 
         if (this.goalMarker) {
           const ring = this.goalMarker;
-          // BUG-16-02: dir 벡터 기반으로 floatPos 계산 — 맵 회전 후에도 올바른 방향으로 떠다님
+          // setupGoalMarker가 이미 toLocal()로 올바른 로컬 위치를 설정했으므로
+          // floatPos도 동일한 좌표계(로컬)에서 계산한다.
           const dir      = this._getMarkerDir(this._goalFace, this._goalFlipped);
-          const floatPos = ring.position.clone().addScaledVector(dir, 0.3);
+          const group    = this.level!.getGroup();
+          const floatPos = group.worldToLocal(goalWp.clone().addScaledVector(dir, 0.85));
 
           // 이미 시작된 float 트윈을 멈추고 scale-in 후 재시작
           gsap.killTweensOf(ring.position);

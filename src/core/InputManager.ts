@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const DRAG_THRESHOLD = 5;   // px — below this = click, above = drag
-const DRAG_SCALE     = 0.015; // radians per pixel
+const DRAG_THRESHOLD  = 5;    // px — below this = click, above = drag
+const DRAG_SCALE      = 0.015; // radians per pixel
+// 레이캐스트 폴백: 카메라 up 벡터와의 내적이 이 값 이하인 면(측면·바닥면)은 무시
+const TOP_FACE_DOT_MIN = 0.1;
 
 export interface InputCallbacks {
   onBlockClick:   (blockId: string) => void;
@@ -120,7 +122,7 @@ export class InputManager {
       if (!(hit.object instanceof THREE.Mesh) || !hit.face) continue;
       normalMatrix.getNormalMatrix(hit.object.matrixWorld);
       worldNormal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
-      if (worldNormal.dot(this.camera.up) <= 0.1) continue; // skip side/bottom faces
+      if (worldNormal.dot(this.camera.up) <= TOP_FACE_DOT_MIN) continue; // skip side/bottom faces
       let obj: THREE.Object3D | null = hit.object;
       while (obj) {
         if (obj.userData.blockId) {

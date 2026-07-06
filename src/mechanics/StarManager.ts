@@ -11,6 +11,8 @@ export class StarManager {
   private collectingMeshes: Set<THREE.Mesh> = new Set();
   private collectedIds: Set<string> = new Set();
   private flippedStarIds: Set<string> = new Set();
+  // face가 명시된 별은 flip 상태 무관하게 수집 가능
+  private faceStarIds: Set<string> = new Set();
   private total = 0;
 
   constructor(_scene: THREE.Scene, particles: ParticleSystem) {
@@ -26,6 +28,7 @@ export class StarManager {
       const node = getNode(star.nodeId);
       if (!node) continue;
       if (star.flipped) this.flippedStarIds.add(star.nodeId);
+      if (star.face)    this.faceStarIds.add(star.nodeId);
       this._createStarMesh(star.nodeId, node, !!star.flipped, star.face);
     }
   }
@@ -140,10 +143,16 @@ export class StarManager {
 
   /**
    * 해당 노드에 별이 있으면 수집 처리.
-   * isEffectiveFlipped: 맵 회전으로 인한 flip 상태. 별의 flipped 여부와 일치해야만 수집 가능.
+   * isEffectiveFlipped: 맵 회전으로 인한 flip 상태.
+   * 별의 flipped 여부와 플레이어 flip 상태가 일치해야만 수집 가능.
+   * face가 명시된 별(특정 측면에 배치)은 flip 상태와 무관하게 수집 가능.
    */
   tryCollect(nodeId: string, isEffectiveFlipped: boolean): boolean {
-    if (this.flippedStarIds.has(nodeId) && !isEffectiveFlipped) return false;
+    // face 별은 flip 제한 없음; 일반 별은 플레이어·별 flip 상태가 반드시 일치해야 함
+    if (!this.faceStarIds.has(nodeId)) {
+      const starFlipped = this.flippedStarIds.has(nodeId);
+      if (starFlipped !== isEffectiveFlipped) return false;
+    }
     if (this.collectedIds.has(nodeId)) return false;
     const mesh = this.starMeshes.get(nodeId);
     if (!mesh) return false;
@@ -220,6 +229,7 @@ export class StarManager {
 
     this.collectedIds.clear();
     this.flippedStarIds.clear();
+    this.faceStarIds.clear();
     this.total = 0;
   }
 }

@@ -138,6 +138,8 @@ export function buildBlockMeshGroup(
 /**
  * Recolor an existing block Group (body + cap) in-place.
  * Disposes old materials before creating new ones.
+ * Only processes children with userData.isBlock = true so that
+ * star meshes, goal markers, etc. attached to the same group are unaffected.
  */
 export function recolorBlockGroup(
   group: THREE.Group,
@@ -145,7 +147,9 @@ export function recolorBlockGroup(
   variant: BlockVariant = 'default',
 ): void {
   for (const child of group.children) {
+    if (!child.userData.isBlock) continue;
     const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) continue;
     (mesh.material as THREE.Material).dispose();
     mesh.material = makeBlockMat(hex, variant);
   }

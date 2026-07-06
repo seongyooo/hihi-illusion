@@ -66,14 +66,18 @@ export class CharacterController {
 
   /** 즉시 노드로 이동 (순간이동 발동 시 외부에서 호출) */
   teleportTo(node: PathNode): void {
+    this._snapCharTo(node);
+    this.currentNode = node;
+  }
+
+  /** 캐릭터를 노드의 월드 +Y 윗면에 즉시 배치한다. */
+  private _snapCharTo(node: PathNode, char = this.character): void {
     node.mesh.getWorldPosition(this._wp);
-    const h = node.halfHeight;
-    this.character.setPosition(
+    char.setPosition(
       this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
-      this._wp.y + h,   // 항상 world +Y 윗면
+      this._wp.y + node.halfHeight, // 항상 world +Y 윗면
       this._wp.z,        // 항상 블록 중심 Z
     );
-    this.currentNode = node;
   }
 
   /**
@@ -99,14 +103,7 @@ export class CharacterController {
     gsap.killTweensOf(this.character.mesh.rotation);
     this.character.stopWalk();
     this.isMoving = false;
-    // 현재 노드 위치로 스냅
-    this.currentNode.mesh.getWorldPosition(this._wp);
-    const h = this.currentNode.halfHeight;
-    this.character.setPosition(
-      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
-      this._wp.y + h,   // 항상 world +Y 윗면
-      this._wp.z,        // 항상 블록 중심 Z
-    );
+    this._snapCharTo(this.currentNode);
   }
 
   /**
@@ -136,14 +133,7 @@ export class CharacterController {
     this.isMoving     = false;
     this.pendingTarget = null;
     this._movePath    = [];
-    // 현재 노드 위치로 즉시 스냅
-    this.currentNode.mesh.getWorldPosition(this._wp);
-    const h = this.currentNode.halfHeight;
-    char.setPosition(
-      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
-      this._wp.y + h,   // 항상 world +Y 윗면
-      this._wp.z,        // 항상 블록 중심 Z
-    );
+    this._snapCharTo(this.currentNode, char);
   }
 
   private _startMove(target: PathNode): void {
@@ -263,13 +253,7 @@ export class CharacterController {
   // 매 프레임: 이동 중이 아닐 때 캐릭터를 노드 월드 좌표에 고정
   update(): void {
     if (this.isMoving) return;
-    this.currentNode.mesh.getWorldPosition(this._wp);
-    const h = this.currentNode.halfHeight;
-    this.character.setPosition(
-      this._wp.x,        // 항상 블록 중심 X (카메라가 +Y에서 내려다보므로 XZ 오프셋 불필요)
-      this._wp.y + h,   // 항상 world +Y 윗면
-      this._wp.z,        // 항상 블록 중심 Z
-    );
+    this._snapCharTo(this.currentNode);
   }
 
   getCurrentNode(): PathNode {
